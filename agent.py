@@ -3,6 +3,7 @@ from typing import TypedDict, Annotated, Sequence
 from dotenv import load_dotenv
 from langchain_core.messages import BaseMessage, SystemMessage
 from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
@@ -17,20 +18,27 @@ load_dotenv()
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
 
-# Initialize the Groq model
-# We can read the model name from env or default to a standard Groq Llama 3 model.
-groq_api_key = os.getenv("GROQ_API_KEY")
-model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# Initialize the LLM model (Featherless if configured, fallback to Groq)
+featherless_api_key = os.getenv("FEATHERLSS_API_KEY")
+featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "MiniMax-M3")
 
-if not groq_api_key:
-    raise ValueError("GROQ_API_KEY is not set in the environment variables.")
-
-# Create the LLM instance
-llm = ChatGroq(
-    model=model_name,
-    temperature=0.0,
-    groq_api_key=groq_api_key
-)
+if featherless_api_key:
+    llm = ChatOpenAI(
+        model=featherless_model,
+        temperature=0.0,
+        openai_api_key=featherless_api_key,
+        openai_api_base="https://api.featherless.ai/v1"
+    )
+else:
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    if not groq_api_key:
+        raise ValueError("Neither FEATHERLSS_API_KEY nor GROQ_API_KEY is set in the environment variables.")
+    llm = ChatGroq(
+        model=model_name,
+        temperature=0.0,
+        groq_api_key=groq_api_key
+    )
 
 # Define the tools list
 tools = [scrape_kamis_prices, search_kamis_via_tavily]

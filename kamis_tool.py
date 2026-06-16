@@ -374,16 +374,7 @@ def scrape_kamis_prices(
     df = df[cols_to_keep]
 
     df_limited = df.head(limit)
-
-    markdown_table = df_limited.to_markdown(index=False)
-    json_data = df_limited.to_json(orient="records", indent=2)
-
-    result_str = (
-        f"Found {total_rows} entries in total. Showing the top {len(df_limited)} entries.\n\n"
-        f"### Markdown Table:\n{markdown_table}\n\n"
-        f"### Raw JSON Data:\n{json_data}"
-    )
-    return result_str
+    return df_limited.to_json(orient="records", indent=2)
 
 @tool
 def search_kamis_via_tavily(query: str) -> str:
