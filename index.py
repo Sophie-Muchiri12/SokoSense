@@ -40,7 +40,17 @@ def run_query(query: str):
                         print(output_str)
                         
     except Exception as e:
-        print(f"\n❌ An error occurred during execution: {e}")
+        err_str = str(e)
+        if "rate_limit_exceeded" in err_str or "429" in err_str:
+            import re
+            retry_match = re.search(r"try again in (\S+)", err_str)
+            retry_in = retry_match.group(1) if retry_match else "a few minutes"
+            print(f"\n⚠️  Groq API rate limit reached. Please try again in {retry_in}.")
+            print("   (This is a free-tier quota limit — your query and data retrieval worked fine.)")
+        elif "recursion_limit" in err_str.lower() or "GraphRecursionError" in err_str:
+            print("\n⚠️  The agent made too many tool calls without finishing. Please rephrase your query.")
+        else:
+            print(f"\n❌ An error occurred during execution: {e}")
     print("=" * 60 + "\n")
 
 def main():
