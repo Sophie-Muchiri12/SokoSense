@@ -289,20 +289,24 @@ def scrape_kamis_prices(
     """
     url = "https://kamis.kilimo.go.ke/site/market"
     limit = min(limit, 10)  # Hard cap — never return more than 10 rows
-    
+
     clean_crop_name = crop_name.strip() if crop_name else None
     clean_market_name = market_name.strip() if market_name else None
     clean_county_name = county_name.strip() if county_name else None
-    
+
+    # If a location filter is set, fetch more rows from the server so the local
+    # filter has enough data to find matches. Without a filter, 10 is enough.
+    has_location = bool(clean_market_name or clean_county_name)
+    server_per_page = 100 if has_location else 10
+
     product_ids = resolve_crop_ids(clean_crop_name)
     dfs = []
-    
+
     if product_ids:
-        # Fetch prices for all matched crop IDs and combine them
         for pid in product_ids:
             params = {
                 "product": pid,
-                "per_page": 10  # Request only 10 entries directly from the server
+                "per_page": server_per_page
             }
             try:
                 kamis_http_limiter.acquire()  # ← rate-limit each outgoing HTTP call
@@ -314,8 +318,7 @@ def scrape_kamis_prices(
             except Exception:
                 pass
     else:
-        # Fallback: Scrape the general list of prices
-        params = {"per_page": 10}
+        params = {"per_page": server_per_page}
         try:
             kamis_http_limiter.acquire()  # ← rate-limit the fallback HTTP call
             response = requests.get(url, params=params, verify=False, timeout=20)
@@ -324,19 +327,20 @@ def scrape_kamis_prices(
                 if sub_dfs:
                     dfs.append(sub_dfs[0])
         except Exception as e:
-            return f"An error occurred while fetching KAMIS data: {str(e)}"            
+            return f"An error occurred while fetching KAMIS data: {str(e)}"
+
     if not dfs:
         return "No price data could be retrieved from the KAMIS website."
-        
-    # Combine and clean the dataframe
+
+    # Combine and clean
     df = pd.concat(dfs, ignore_index=True)
     df.columns = [c.strip() for c in df.columns]
     df = df.drop_duplicates()
-    
+
     # Filter in pandas (Case-Insensitive)
     if clean_crop_name:
         df = df[df['Commodity'].str.contains(clean_crop_name, case=False, na=False)]
-        
+
     if clean_market_name and clean_county_name:
         # Match either market OR county
         df = df[
@@ -348,10 +352,10 @@ def scrape_kamis_prices(
             df = df[df['Market'].str.contains(clean_market_name, case=False, na=False)]
         if clean_county_name:
             df = df[df['County'].str.contains(clean_county_name, case=False, na=False)]
-        
+
     total_rows = len(df)
     if total_rows == 0:
-        msg = f"No price data found matching your query."
+        msg = "No price data found matching your query."
         if crop_name:
             msg += f" Crop: '{crop_name}' (Resolved IDs: {product_ids})."
         if market_name:
@@ -359,21 +363,21 @@ def scrape_kamis_prices(
         if county_name:
             msg += f" County: '{county_name}'."
         return msg
-        
-    # Sort by Date descending so the newest records are shown first
+
+    # Sort newest first
     if 'Date' in df.columns:
         df = df.sort_values(by='Date', ascending=False)
-        
-    # Limit to essential columns to save token usage
+
+    # Keep only essential columns
     essential_cols = ['Commodity', 'Market', 'County', 'Wholesale', 'Retail', 'Date']
     cols_to_keep = [c for c in essential_cols if c in df.columns]
     df = df[cols_to_keep]
-    
+
     df_limited = df.head(limit)
-    
+
     markdown_table = df_limited.to_markdown(index=False)
     json_data = df_limited.to_json(orient="records", indent=2)
-    
+
     result_str = (
         f"Found {total_rows} entries in total. Showing the top {len(df_limited)} entries.\n\n"
         f"### Markdown Table:\n{markdown_table}\n\n"
