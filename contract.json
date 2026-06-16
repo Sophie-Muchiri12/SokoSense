@@ -1,0 +1,127 @@
+{
+  "version": "1.0.0",
+  "description": "SokoSense API contract — Ian (UI), Lucy (AT webhook), and Job (engines) build against this.",
+  "constraints": {
+    "short_reply_max_chars": 320,
+    "ussd_screen_max_chars": 182
+  },
+  "markets": [
+    "Nairobi",
+    "Nakuru",
+    "Eldoret",
+    "Kisumu",
+    "Mombasa",
+    "Kitale",
+    "Nyeri"
+  ],
+  "crops": [
+    "maize",
+    "beans",
+    "sorghum",
+    "millet",
+    "potatoes",
+    "tomatoes"
+  ],
+  "endpoints": {
+    "POST /api/market": {
+      "description": "Market decision engine — where to sell",
+      "request": {
+        "crop": "string (required) — e.g. maize",
+        "location": "string (required) — farmer's market or county, e.g. nakuru"
+      },
+      "response": {
+        "crop": "string",
+        "location": "string",
+        "recommendation": "string — SELL_HERE | SELL_IN_MARKET | WAIT",
+        "short_reply": "string (max 320) — SMS-ready one-line decision",
+        "market_name": "string | null — farmer's local market",
+        "best_market": "string | null — recommended market if different",
+        "local_price_kes": "number | null — price at local market per 90kg bag",
+        "best_price_kes": "number | null — price at best market",
+        "price_diff_kes": "number | null — gain per bag if farmer travels"
+      }
+    },
+    "POST /api/timing": {
+      "description": "Sell timing engine — when to sell",
+      "request": {
+        "crop": "string (required)",
+        "market": "string (required)"
+      },
+      "response": {
+        "crop": "string",
+        "market": "string",
+        "recommendation": "string — SELL_TODAY | WAIT",
+        "short_reply": "string (max 320)",
+        "wait_days": "integer | null",
+        "reason": "string"
+      }
+    },
+    "POST /api/loan": {
+      "description": "Loan APR engine — safe or not safe",
+      "request": {
+        "monthly_rate_percent": "number (required) — e.g. 10 for 10% per month"
+      },
+      "response": {
+        "monthly_rate_percent": "number",
+        "apr_percent": "number",
+        "cbk_rate_percent": "number — benchmark, ~13",
+        "risk_verdict": "string — SAFE | CAUTION | HIGH_RISK | AVOID",
+        "short_reply": "string (max 320)",
+        "comparison_phrase": "string (max 320)",
+        "payment_id": "string | null — Masumi mock ID from Lucy"
+      }
+    },
+    "GET /api/logs": {
+      "description": "Query log for admin dashboard and SACCO feed",
+      "query": {
+        "page": "integer (default 1)",
+        "page_size": "integer (default 50, max 100)"
+      },
+      "response": {
+        "total": "integer",
+        "page": "integer",
+        "page_size": "integer",
+        "items": [
+          {
+            "timestamp": "string ISO8601",
+            "raw_input": "string",
+            "engine": "string — market | timing | loan | sms",
+            "short_reply": "string",
+            "latency_ms": "integer",
+            "error": "string | null"
+          }
+        ]
+      }
+    },
+    "GET /api/market-prices": {
+      "description": "Price table for Ian's Leaflet map",
+      "query": {
+        "crop": "string (optional, default maize)"
+      },
+      "response": {
+        "crop": "string",
+        "date": "string ISO8601 date",
+        "markets": [
+          {
+            "name": "string",
+            "lat": "number",
+            "lng": "number",
+            "price_kes": "number",
+            "recommended": "boolean"
+          }
+        ]
+      }
+    },
+    "POST /webhook/sms": {
+      "description": "Africa's Talking SMS webhook — Lucy implements handler; contract for Ian simulator",
+      "note": "Lucy owns implementation; simulator may POST same shape or call /api/market after parse",
+      "request": {
+        "from": "string — sender phone",
+        "text": "string — raw SMS body"
+      },
+      "response": {
+        "short_reply": "string (max 320)"
+      }
+    }
+  }
+}
