@@ -6,6 +6,7 @@ import pandas as pd
 from typing import Optional
 from langchain_core.tools import tool
 from tavily import TavilyClient
+from rate_limiter import kamis_http_limiter
 
 # Suppress SSL certificate warning from urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -301,9 +302,10 @@ def scrape_kamis_prices(
         for pid in product_ids:
             params = {
                 "product": pid,
-                "per_page": 3000  # Select 3000 entries to get the full list of prices
+                "per_page": 10  # Request only 10 entries directly from the server
             }
             try:
+                kamis_http_limiter.acquire()  # ← rate-limit each outgoing HTTP call
                 response = requests.get(url, params=params, verify=False, timeout=15)
                 if response.status_code == 200:
                     sub_dfs = pd.read_html(io.StringIO(response.text))
@@ -313,16 +315,16 @@ def scrape_kamis_prices(
                 pass
     else:
         # Fallback: Scrape the general list of prices
-        params = {"per_page": 3000}
+        params = {"per_page": 10}
         try:
+            kamis_http_limiter.acquire()  # ← rate-limit the fallback HTTP call
             response = requests.get(url, params=params, verify=False, timeout=20)
             if response.status_code == 200:
                 sub_dfs = pd.read_html(io.StringIO(response.text))
                 if sub_dfs:
                     dfs.append(sub_dfs[0])
         except Exception as e:
-            return f"An error occurred while fetching KAMIS data: {str(e)}"
-            
+            return f"An error occurred while fetching KAMIS data: {str(e)}"            
     if not dfs:
         return "No price data could be retrieved from the KAMIS website."
         
