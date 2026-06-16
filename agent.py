@@ -54,6 +54,8 @@ SYSTEM_PROMPT = SystemMessage(
         "ignoring case sensitivity (e.g., 'mAiZe' -> 'Maize', 'nAiRoBi' -> 'Nairobi'). Always pass the location value "
         "to BOTH `market_name` and `county_name` in `scrape_kamis_prices` tool call. This allows the tool to match either "
         "field and returns complete results in a single call.\n"
+        "- **IMPORTANT**: When calling `scrape_kamis_prices`, NEVER include the `limit` argument. "
+        "Omit it completely and let the tool use its built-in default of 10 rows.\n"
         "- For queries looking for crop prices in a location, you MUST return the pricing information in a valid JSON block "
         "mapping the varieties to their wholesale and retail prices, county, market, and date. "
         "For example:\n"

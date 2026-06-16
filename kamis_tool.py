@@ -274,20 +274,20 @@ def scrape_kamis_prices(
     crop_name: Optional[str] = None,
     market_name: Optional[str] = None,
     county_name: Optional[str] = None,
-    limit: int = 15
+    limit: int = 10
 ) -> str:
     """
-    Directly queries the KAMIS market price website, retrieves up to 3000 entries per matching crop,
-    and returns a filtered list of prices as a Markdown table and a Raw JSON data block.
+    Directly queries the KAMIS market price website and returns the 10 most recent price entries.
+    IMPORTANT: Always use the default limit of 10. Do NOT pass a higher limit value.
     
     Args:
         crop_name: The name of the crop to filter by (e.g. 'Tomatoes', 'Maize', 'Beans'). Case-insensitive.
         market_name: Optional name of the market location to filter by (e.g. 'Maua', 'Kibuye'). Case-insensitive.
         county_name: Optional name of the county to filter by (e.g. 'Meru', 'Kakamega', 'Nairobi'). Case-insensitive.
-        limit: Max number of records to return (defaults to 15).
+        limit: Number of records to return. Maximum is 10. Do NOT change this value.
     """
     url = "https://kamis.kilimo.go.ke/site/market"
-    limit = min(limit, 15)
+    limit = min(limit, 10)  # Hard cap — never return more than 10 rows
     
     clean_crop_name = crop_name.strip() if crop_name else None
     clean_market_name = market_name.strip() if market_name else None

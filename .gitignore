@@ -1,3 +1,33 @@
-.venv
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment secrets — NEVER commit these
 .env
-__pycache__
+.env.local
+.env.*.local
+.env.example
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Dist / build
+dist/
+build/
+*.egg-info/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
