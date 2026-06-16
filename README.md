@@ -35,9 +35,10 @@ SokoSense is an AI-powered agricultural agent built with LangChain, LangGraph, a
    Create a `.env` file in the root directory based on `.env.example`:
    ```bash
    cp .env.example .env
-   ```
    Fill in your credentials:
    ```env
+   FEATHERLSS_API_KEY=your_featherless_api_key_here
+   LLM_MODEL_FEATHERLESS=MiniMaxAI/MiniMax-M3
    GROQ_API_KEY=your_groq_api_key_here
    TAVILY_API_KEY=your_tavily_api_key_here
    ```
