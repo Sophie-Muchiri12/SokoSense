@@ -10,7 +10,7 @@ from langgraph.prebuilt import ToolNode
 
 # Import the custom tools
 from kamis_tool import scrape_kamis_prices, search_kamis_via_tavily
-from loan_engine import advise_on_loan
+from engines.loaning import advise_on_loan
 
 # Load environment variables from .env
 load_dotenv()
