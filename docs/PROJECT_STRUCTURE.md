@@ -166,3 +166,81 @@ Ian’s SMS Simulator hits the same path via `POST /webhook/sms` or `POST /api/m
 ---
 
 *Kenya AI Challenge 2026 · SokoSense · update this file when the team agrees changes.*
+
+<!-- 
+
+
+## Quick start (FastAPI — under 5 minutes)
+
+1. **Clone and enter the repo:**
+   ```bash
+   cd SokoSense
+   ```
+
+2. **Virtual environment and dependencies:**
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+3. **Environment (optional for mock API):**
+   ```bash
+   cp .env.example .env
+   ```
+   Mock endpoints work without API keys. Add keys when wiring LLM parser, Neo4j, and Africa's Talking.
+
+4. **Run the API:**
+   ```bash
+   uvicorn main:app --reload
+   ```
+   Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for interactive Swagger UI.
+
+5. **Smoke test:**
+   ```bash
+   pytest tests/test_api.py -q
+   ```
+
+## API endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | Health check |
+| POST | `/api/market` | Where to sell — `{ "crop": "maize", "location": "nakuru" }` |
+| POST | `/api/timing` | When to sell — `{ "crop": "maize", "market": "nakuru" }` |
+| POST | `/api/loan` | Loan APR verdict — `{ "monthly_rate_percent": 10 }` |
+| GET | `/api/logs` | Query log (empty until logging middleware) |
+| GET | `/api/market-prices?crop=maize` | Map price table for Ian's dashboard |
+
+Request/response shapes: see **`contract.json`** in the repo root.
+
+### Example — Wanjiku's market decision
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/market \
+  -H "Content-Type: application/json" \
+  -d '{"crop":"maize","location":"nakuru"}' | python3 -m json.tool
+```
+
+Expected `short_reply`: *SELL IN ELDORET. KSh 600 more per bag. Worth the trip.*
+
+## Project structure
+
+```
+engines/          # Decision engines  — market, timing, loan
+models/           # Shared Pydantic schemas
+routes/           # FastAPI route handlers
+middleware/       # Query logging (Sophie D1 17:00)
+main.py           # App entry — uvicorn main:app
+contract.json     # API contract for Ian, Lucy, Job
+```
+
+## Legacy CLI — KAMIS Market Price Agent
+
+Job's LangGraph KAMIS scraper still runs separately (research / data prototyping):
+
+```bash
+python index.py "maize nairobi"
+```
+
+--- -->
