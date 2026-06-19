@@ -11,6 +11,8 @@ from langgraph.prebuilt import ToolNode
 # Import the custom tools
 from kamis_tool import scrape_kamis_prices, search_kamis_via_tavily
 from engines.loaning import advise_on_loan
+from engines.advisory import answer_farmer_question
+from engines.weather import get_farmer_weather
 
 # Load environment variables from .env
 load_dotenv()
@@ -42,7 +44,13 @@ else:
     )
 
 # Define the tools list
-tools = [scrape_kamis_prices, search_kamis_via_tavily, advise_on_loan]
+tools = [
+    scrape_kamis_prices,
+    search_kamis_via_tavily,
+    advise_on_loan,
+    get_farmer_weather,
+    answer_farmer_question,
+]
 
 # Bind the tools to the LLM
 llm_with_tools = llm.bind_tools(tools)
@@ -52,14 +60,21 @@ SYSTEM_PROMPT = SystemMessage(
     content=(
         "You are an advanced agricultural AI assistant specializing in the Kenyan market. "
         "Your goal is to help users find accurate crop prices and market locations using the KAMIS website (https://kamis.kilimo.go.ke/site/market).\n\n"
-        "You have access to three tools:\n"
+        "You have access to five tools:\n"
         "1. `scrape_kamis_prices`: Directly queries the KAMIS website. It matches crop names, pulls up to 10 rows, "
         "and filters the data by crop, market, and county. It handles case sensitivity automatically.\n"
         "2. `search_kamis_via_tavily`: Performs web search on the KAMIS domain.\n"
         "3. `advise_on_loan`: Analyzes a farmer's loan request. When a user asks about a loan (e.g. 'Is a loan of KES 50000 "
         "at 5% monthly interest for 6 months safe?'), extract the principal, interest_rate, rate_period (annual/monthly/weekly/daily), "
         "term_value, term_unit (years/months/weeks/days), and optionally compounding_frequency and is_simple_interest, "
-        "then call this tool. Return the full audit report it provides.\n\n"
+        "then call this tool. Return the full audit report it provides.\n"
+        "4. `get_farmer_weather`: Fetch current weather + 3-day forecast for a Kenyan location and return farming-relevant "
+        "advice based on conditions. Call this when the user mentions a location or asks about weather, spraying conditions, "
+        "planting timing, or disease risk related to climate.\n"
+        "5. `answer_farmer_question`: Runs the full RAG advisory pipeline — extracts crop/disease/location from the query, "
+        "retrieves knowledge from the agricultural graph database (Neo4j), fetches weather data, and calls the LLM to "
+        "generate a complete answer. Use this as the primary tool for any farming/crop/disease/pest question. "
+        "Returns structured answer with sources.\n\n"
         "Handling Multi-Variety and Specific Queries:\n"
         "- If a user enters a general term like 'maize' or 'beans', you must check for all matching varieties "
         "(e.g., 'Dry Maize', 'Green Maize', 'Maize Flour' for maize; 'Beans Rosecoco', 'Beans Yellow-Green', etc. for beans).\n"

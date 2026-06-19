@@ -23,6 +23,19 @@
     "tomatoes"
   ],
   "endpoints": {
+    "POST /api/advisory": {
+      "description": "RAG advisory engine — answer farmer questions using Neo4j knowledge graph + weather + LLM",
+      "request": {
+        "query": "string (required) — farmer question, e.g. 'What causes maize rust in Nakuru?'"
+      },
+      "response": {
+        "query": "string",
+        "answer": "string — LLM-generated advisory (320 chars SMS-ready)",
+        "location": "string | null — detected location",
+        "weather": "object | null — current weather + 3-day forecast",
+        "sources": "array of strings — knowledge and data sources used"
+      }
+    },
     "POST /api/market": {
       "description": "Market decision engine — where to sell",
       "request": {
@@ -85,7 +98,7 @@
           {
             "timestamp": "string ISO8601",
             "raw_input": "string",
-            "engine": "string — market | timing | loan | sms",
+            "engine": "string — market | timing | loan | sms | advisory",
             "short_reply": "string",
             "latency_ms": "integer",
             "error": "string | null"
@@ -114,7 +127,7 @@
     },
     "POST /webhook/sms": {
       "description": "Africa's Talking SMS webhook — Lucy implements handler; contract for Ian simulator",
-      "note": "Lucy owns implementation; simulator may POST same shape or call /api/market after parse",
+      "note": "Lucy owns implementation; simulator may POST same shape or call /api/advisory after parse",
       "request": {
         "from": "string — sender phone",
         "text": "string — raw SMS body"

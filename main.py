@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import decisions, logs, market_data
+from routes import advisory, decisions, logs, market_data
 
 app = FastAPI(
     title="SokoSense",
@@ -22,6 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(advisory.router)
 app.include_router(decisions.router)
 app.include_router(logs.router)
 app.include_router(market_data.router)
