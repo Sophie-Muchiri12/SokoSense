@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routes import decisions, logs, market_data
+from routes import decisions, logs, market_data, webhook
 
 app = FastAPI(
     title="SokoSense",
@@ -25,7 +25,7 @@ app.add_middleware(
 app.include_router(decisions.router)
 app.include_router(logs.router)
 app.include_router(market_data.router)
-
+app.include_router(webhook.router)
 
 @app.get("/health")
 def health() -> dict[str, str]:
