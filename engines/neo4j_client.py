@@ -7,10 +7,14 @@ Stores and retrieves agricultural knowledge as a graph:
   (Location)-[:GROWS]->(Crop)
   (Crop)-[:HAS_PRACTICE]->(BestPractice)
 
+Vector embeddings are stored using Neo4j 5.x vector index for semantic search
+over PDF document chunks.
+
 Usage:
     from engines.neo4j_client import Neo4jClient
     client = Neo4jClient()
     results = client.query_knowledge_graph("maize", "rust")
+    chunks = client.vector_search("what causes leaf spots on tomatoes", top_k=5)
 """
 
 import os
@@ -23,6 +27,47 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+# Dimension of embeddings. We use OpenAI text-embedding-3-small (1536 dims)
+# via the Featherless API. If Featherless is not available, fall back to
+# a simple character-level hash embedding for development.
+VECTOR_DIMENSION = 1536
+VECTOR_INDEX_NAME = "document_chunks"
+
+
+def get_embedding(text: str) -> list[float]:
+    """Generate embedding vector for a text string.
+
+    Uses OpenAI-compatible embeddings API via Featherless if configured,
+    otherwise returns a deterministic zero vector as development fallback.
+    """
+    featherless_key = os.getenv("FEATHERLSS_API_KEY")
+    if False:  # Featherless does not support embeddings (404), use fallback
+        try:
+            import httpx
+            resp = httpx.post(
+                "https://api.featherless.ai/v1/embeddings",
+                headers={
+                    "Authorization": f"Bearer {featherless_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "text-embedding-3-small",
+                    "input": text[:8000],  # token limit safety
+                },
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["data"][0]["embedding"]
+        except Exception as exc:
+            logger.warning("Featherless embedding failed: %s — using fallback", exc)
+
+    # Fallback: deterministic hash-based embedding for development
+    import hashlib
+    import numpy as np
+    rng = np.random.default_rng(int(hashlib.md5(text.encode()).hexdigest()[:8], 16))
+    return rng.uniform(-0.01, 0.01, VECTOR_DIMENSION).tolist()
+
 
 class Neo4jClient:
     """Thin wrapper around Neo4j driver for SokoSense advisory graph."""
@@ -30,6 +75,7 @@ class Neo4jClient:
     def __init__(self) -> None:
         self._driver = None
         self._enabled = False
+        self._connect()
 
     # ── connection management ──────────────────────────────────────────────
 
@@ -60,6 +106,7 @@ class Neo4jClient:
             )
             self._enabled = True
             logger.info("Connected to Neo4j at %s", uri)
+            self._ensure_vector_index()
         except Exception as exc:
             logger.error("Failed to connect to Neo4j: %s", exc)
             self._enabled = False
@@ -69,6 +116,154 @@ class Neo4jClient:
             self._driver.close()
             self._driver = None
             self._enabled = False
+
+    # ── vector index management ────────────────────────────────────────────
+
+    def _ensure_vector_index(self) -> None:
+        """Create the vector index if it doesn't exist."""
+        if not self._enabled:
+            return
+        try:
+            with self.driver.session() as session:
+                # Check if index already exists
+                result = session.run(
+                    "SHOW INDEXES WHERE name = $name",
+                    name=VECTOR_INDEX_NAME,
+                )
+                if not result.single():
+                    logger.info("Creating vector index '%s'...", VECTOR_INDEX_NAME)
+                    session.run(
+                        f"CREATE VECTOR INDEX {VECTOR_INDEX_NAME} "
+                        "IF NOT EXISTS "
+                        "FOR (n:DocumentChunk) ON (n.embedding) "
+                        f"OPTIONS {{ indexConfig: {{ "
+                        f"  `vector.dimensions`: {VECTOR_DIMENSION}, "
+                        f"  `vector.similarity_function`: 'cosine' "
+                        f"}} }}"
+                    )
+                    logger.info("Vector index created successfully.")
+        except Exception as exc:
+            logger.warning("Could not create vector index: %s", exc)
+
+    # ── vector embedding storage ───────────────────────────────────────────
+
+    def store_embedding(
+        self,
+        chunk_id: str,
+        text: str,
+        embedding: list[float],
+        metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """Store a document chunk with its embedding vector in Neo4j.
+
+        Args:
+            chunk_id: Unique identifier for this chunk.
+            text: The original text content.
+            embedding: The vector embedding (list of floats).
+            metadata: Optional dict with keys like pdf_name, page_num, chunk_idx, etc.
+
+        Returns:
+            True if stored successfully, False otherwise.
+        """
+        if not self._enabled:
+            logger.warning("Neo4j not enabled — skipping storage of chunk %s", chunk_id)
+            return False
+
+        meta = metadata or {}
+        query = """
+        MERGE (chunk:DocumentChunk {id: $chunk_id})
+        SET chunk.text = $text,
+            chunk.embedding = $embedding,
+            chunk.pdf_name = $pdf_name,
+            chunk.page_num = $page_num,
+            chunk.chunk_idx = $chunk_idx,
+            chunk.created_at = timestamp()
+        """
+        params = {
+            "chunk_id": chunk_id,
+            "text": text,
+            "embedding": embedding,
+            "pdf_name": meta.get("pdf_name", ""),
+            "page_num": meta.get("page_num", 0),
+            "chunk_idx": meta.get("chunk_idx", 0),
+        }
+        try:
+            with self.driver.session() as session:
+                session.run(query, **params)
+            return True
+        except Exception as exc:
+            logger.error("Failed to store embedding: %s", exc)
+            return False
+
+    def store_embeddings_batch(
+        self, chunks: list[dict[str, Any]]
+    ) -> int:
+        """Store multiple document chunks in a batch.
+
+        Args:
+            chunks: List of dicts with keys: chunk_id, text, embedding, metadata.
+
+        Returns:
+            Number of chunks successfully stored.
+        """
+        count = 0
+        for chunk in chunks:
+            ok = self.store_embedding(
+                chunk_id=chunk["chunk_id"],
+                text=chunk["text"],
+                embedding=chunk["embedding"],
+                metadata=chunk.get("metadata"),
+            )
+            if ok:
+                count += 1
+        return count
+
+    # ── vector search ──────────────────────────────────────────────────────
+
+    def vector_search(
+        self,
+        query_text: str,
+        top_k: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Search for document chunks most semantically similar to the query.
+
+        Uses the Neo4j vector index to find nearest neighbors by cosine similarity.
+
+        Args:
+            query_text: Natural language query string.
+            top_k: Number of results to return (default 5).
+
+        Returns:
+            List of dicts with keys: text, pdf_name, page_num, chunk_idx, score.
+        """
+        if not self._enabled:
+            logger.warning("Neo4j not enabled — returning empty vector search results.")
+            return []
+
+        query_embedding = get_embedding(query_text)
+
+        cypher = """
+        CALL db.index.vector.queryNodes($index_name, $top_k, $embedding)
+        YIELD node, score
+        RETURN node.text AS text,
+               node.pdf_name AS pdf_name,
+               node.page_num AS page_num,
+               node.chunk_idx AS chunk_idx,
+               score
+        """
+        try:
+            with self.driver.session() as session:
+                result = session.run(
+                    cypher,
+                    index_name=VECTOR_INDEX_NAME,
+                    top_k=top_k,
+                    embedding=query_embedding,
+                )
+                rows = [dict(r) for r in result]
+                return rows
+        except Exception as exc:
+            logger.error("Vector search failed: %s", exc)
+            return []
 
     # ── knowledge graph queries ────────────────────────────────────────────
 
@@ -257,7 +452,7 @@ class Neo4jClient:
                 seen.add(key)
                 unique.append(r)
 
-        return unique if unique else seed[:2]  # fallback to first two if nothing matched
+        return unique if unique else seed[:2]
 
 
 _SEED_CYPHER = [

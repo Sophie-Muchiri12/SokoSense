@@ -2,8 +2,8 @@ import os
 import sys
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
-from agent import agent_graph
-from rate_limiter import agent_query_limiter
+from engines.agent import agent_graph
+from engines.rate_limiter import agent_query_limiter
 
 def run_query(query: str):
     # Enforce max 5 agent queries per minute

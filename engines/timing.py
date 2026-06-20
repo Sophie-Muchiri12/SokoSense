@@ -2,7 +2,7 @@
 
 import json
 from models.timing import TimingRequest, TimingResponse
-from kamis_tool import scrape_kamis_prices
+from engines.kamis_tool import scrape_kamis_prices
 
 def parse_price(val: str) -> float | None:
     if not val or val == "-":

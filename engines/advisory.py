@@ -119,6 +119,24 @@ def _format_graph_context(rows: list[dict[str, Any]]) -> str:
     return "\n\n".join(parts)
 
 
+def _format_vector_context(chunks: list[dict[str, Any]]) -> str:
+    """Format Neo4j vector search results into a readable context block."""
+    if not chunks:
+        return ""
+
+    parts = []
+    for c in chunks:
+        source = c.get("pdf_name", "Unknown PDF")
+        page = c.get("page_num", "?")
+        score = c.get("score", 0)
+        text = c.get("text", "")
+        parts.append(
+            f"[From: {source} (Page {page}), relevance: {score:.2f}]\n{text}"
+        )
+
+    return "\n\n".join(parts)
+
+
 def answer_farmer_question(
     query: str,
     include_weather: bool = True,
@@ -138,10 +156,16 @@ def answer_farmer_question(
     disease = kw["disease"]
     location = kw["location"]
 
-    # 2. Query Neo4j knowledge graph
+    # 2. Query Neo4j knowledge graph AND vector store
     neo4j = Neo4jClient()
+
+    # 2a. Graph knowledge (structured crop-disease-remedy)
     graph_rows = neo4j.query_knowledge_graph(crop=crop, disease=disease)
     graph_context = _format_graph_context(graph_rows)
+
+    # 2b. Vector search (semantic search over PDF document chunks)
+    vector_chunks = neo4j.vector_search(query_text=query, top_k=5)
+    vector_context = _format_vector_context(vector_chunks)
 
     # 3. Fetch weather if location detected
     weather_context = ""
@@ -181,6 +205,10 @@ def answer_farmer_question(
         for r in graph_rows[:3]:
             if r.get("crop") and r.get("disease"):
                 sources.append(f"Agricultural knowledge base: {r['crop']} - {r['disease']}")
+    if vector_chunks:
+        for c in vector_chunks[:3]:
+            pdf = c.get("pdf_name", "PDF document")
+            sources.append(f"PDF reference: {pdf} (page {c.get('page_num', '?')})")
     if weather_data:
         sources.append(f"Weather data (Open-Meteo) for {location.title()}")
 
@@ -202,9 +230,13 @@ def answer_farmer_question(
     )
 
     context_parts = [
-        "=== RELEVANT AGRICULTURAL KNOWLEDGE ===",
+        "=== RELEVANT AGRICULTURAL KNOWLEDGE (Graph) ===",
         graph_context,
     ]
+    if vector_context:
+        context_parts.append("")
+        context_parts.append("=== RELEVANT DOCUMENT EXTRACTS (Vector Search) ===")
+        context_parts.append(vector_context)
     if weather_context:
         context_parts.append("")
         context_parts.append(weather_context)
@@ -215,7 +247,8 @@ def answer_farmer_question(
         content=(
             f"Farmer's question: {query}\n\n"
             f"{context_block}\n\n"
-            f"Provide a helpful answer for this Kenyan farmer."
+            f"Provide a helpful answer for this Kenyan farmer. "
+            f"Respond in JSON format: {{\"response\": \"your answer\", \"type\": \"advisory\"}}"
         )
     )
 

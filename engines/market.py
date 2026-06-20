@@ -2,7 +2,7 @@
 
 import json
 from models.market import MarketDecisionRequest, MarketDecisionResponse
-from kamis_tool import scrape_kamis_prices
+from engines.kamis_tool import scrape_kamis_prices
 
 # Mock prices per 90kg bag (KSh) — fallback if live KAMIS data is unavailable
 _MOCK_PRICES: dict[str, dict[str, float]] = {

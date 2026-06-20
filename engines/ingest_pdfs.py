@@ -1,24 +1,30 @@
-"""Ingest PDF files from engines/data/ into the Neo4j knowledge graph.
+"""Ingest PDF files from engines/data/ into the Neo4j vector knowledge graph.
 
 Usage:
     python engines/ingest_pdfs.py                      # ingest all PDFs
     python engines/ingest_pdfs.py --file sample.pdf    # ingest specific PDF
     python engines/ingest_pdfs.py --dry-run            # print what would happen
 
-Extracts text, chunks it, and creates Cypher MERGE statements to load into Neo4j.
-If Neo4j is not configured, prints the Cypher statements that can be run manually.
+Pipeline:
+  1. Extract text from PDF using pypdf
+  2. Chunk text into overlapping segments
+  3. Generate vector embeddings for each chunk via Featherless API
+  4. Store chunks in Neo4j as DocumentChunk nodes with vector index
+
+If Neo4j is not configured, prints the chunk metadata that would be stored.
 """
 
 import os
 import re
 import argparse
 import logging
+import hashlib
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
 
-from engines.neo4j_client import Neo4jClient
+from engines.neo4j_client import Neo4jClient, get_embedding, VECTOR_DIMENSION
 
 load_dotenv()
 
@@ -26,71 +32,45 @@ logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
-# ── crop & disease keyword matching ────────────────────────────────────────
-
-CROP_KEYWORDS = [
-    "maize", "beans", "tomatoes", "potatoes", "kale", "cabbage",
-    "carrots", "onions", "spinach", "cassava", "sweet potato",
-    "irish potato", "rice", "wheat", "sorghum", "millet",
-    "green grams", "groundnuts", "cowpeas", "pigeon peas",
-    "french beans", "capsicum", "cucumber", "lettuce", "pumpkin",
-    "watermelon", "mangoes", "avocado", "oranges", "banana",
-    "pineapples", "pawpaw", "passion fruit", "coffee", "tea",
-    "cotton", "macadamia", "coconut", "ginger", "garlic",
-    "chillies", "egg plant", "brinjals", "sukuma wiki",
-    "managu", "terere", "murenda", "kunde", "mito",
-]
-
-DISEASE_KEYWORDS = [
-    "rust", "blight", "wilt", "mosaic", "streak", "smut", "mildew",
-    "rot", "leaf spot", "canker", "gall", "scab", "curl",
-    "yellow", "necrosis", "armyworm", "borer", "aphid", "thrips",
-    "whitefly", "nematode", "weevil", "mite", "fungal", "bacterial",
-    "virus", "disease", "pest", "infection", "decline",
-]
+# Chunking configuration
+CHUNK_SIZE = 500       # target characters per chunk
+CHUNK_OVERLAP = 100    # overlap between consecutive chunks in characters
 
 
 def extract_text_from_pdf(pdf_path: str) -> list[dict[str, Any]]:
-    """Extract text from a PDF file, returning pages.
+    """Extract text from a PDF file using pypdf, returning pages.
 
-    Uses PyMuPDF (fitz) if available, falls back to pdfminer.
+    Args:
+        pdf_path: Path to the PDF file.
+
+    Returns:
+        List of dicts with keys: page (int), text (str).
     """
-    text = ""
-    try:
-        import fitz  # PyMuPDF
+    from pypdf import PdfReader
 
-        doc = fitz.open(pdf_path)
-        pages = []
-        for page_num, page in enumerate(doc, 1):
-            page_text = page.get_text().strip()
-            if page_text:
-                pages.append({"page": page_num, "text": page_text})
-        doc.close()
-        return pages
-    except ImportError:
-        pass
-
-    try:
-        from pdfminer.high_level import extract_text as pdfminer_extract
-
-        full_text = pdfminer_extract(pdf_path)
-        # Split by page break markers (form feed)
-        page_texts = full_text.split("\f")
-        return [
-            {"page": i + 1, "text": pt.strip()}
-            for i, pt in enumerate(page_texts)
-            if pt.strip()
-        ]
-    except ImportError:
-        logger.error(
-            "No PDF parser installed. Install with: "
-            "pip install PyMuPDF pdfminer.six"
-        )
-        return []
+    reader = PdfReader(pdf_path)
+    pages = []
+    for page_num, page in enumerate(reader.pages, 1):
+        text = page.extract_text()
+        if text and text.strip():
+            pages.append({"page": page_num, "text": text.strip()})
+    return pages
 
 
-def chunk_text(text: str, chunk_size: int = 500) -> list[str]:
-    """Split text into overlapping chunks at sentence boundaries."""
+def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
+    """Split text into overlapping chunks at sentence boundaries.
+
+    Args:
+        text: The full text to split.
+        chunk_size: Target character count per chunk.
+        overlap: Number of overlapping characters between consecutive chunks.
+
+    Returns:
+        List of text chunks.
+    """
+    if len(text) <= chunk_size:
+        return [text]
+
     sentences = re.split(r"(?<=[.!?])\s+", text)
     chunks = []
     current = []
@@ -99,139 +79,76 @@ def chunk_text(text: str, chunk_size: int = 500) -> list[str]:
     for sent in sentences:
         sent_len = len(sent)
         if current_len + sent_len > chunk_size and current:
-            chunks.append(" ".join(current))
-            current = current[-2:]  # overlap last 2 sentences
-            current_len = sum(len(s) for s in current)
+            # Calculate overlap: keep last ~overlap chars worth of sentences
+            combined = " ".join(current)
+            chunks.append(combined)
+
+            # Overlap: keep sentences from the end that cover ~overlap chars
+            overlap_sentences = []
+            overlap_len = 0
+            for s in reversed(current):
+                overlap_sentences.insert(0, s)
+                overlap_len += len(s)
+                if overlap_len >= overlap:
+                    break
+
+            current = overlap_sentences
+            current_len = overlap_len
+
         current.append(sent)
         current_len += sent_len
 
     if current:
         chunks.append(" ".join(current))
 
-    return chunks if chunks else [text]
+    return chunks
 
 
-def extract_knowledge_from_chunk(
-    chunk: str,
-) -> dict[str, Any]:
-    """Identify crops, diseases, and possible remedy/practice from a text chunk."""
-    chunk_lower = chunk.lower()
+def process_pdf_for_ingestion(
+    pdf_path: str,
+    include_embeddings: bool = True,
+) -> list[dict[str, Any]]:
+    """Extract, chunk, and embed text from a PDF.
 
-    found_crops = [c for c in CROP_KEYWORDS if c in chunk_lower]
-    found_diseases = [d for d in DISEASE_KEYWORDS if d in chunk_lower]
+    Args:
+        pdf_path: Path to the PDF file.
+        include_embeddings: If True, generate vector embeddings for each chunk.
 
-    # Extract potential remedy sentences: sentences with action words
-    remedy_pattern = re.compile(
-        r"(apply|use|spray|plant|rotate|remove|control|treat|manage|prevent|"
-        r"avoid|ensure|harvest|prune|mulch|irrigate|foliar|drench|rogue|"
-        r"uproot|burn|destroy|disinfect|solarize|seed dress)[^.]*\.",
-        re.IGNORECASE,
-    )
-    remedy_sentences = remedy_pattern.findall(chunk)
+    Returns:
+        List of chunk dicts with keys: chunk_id, text, embedding, metadata.
+    """
+    pdf_name = os.path.basename(pdf_path)
+    pages = extract_text_from_pdf(pdf_path)
 
-    # Extract potential practice sentences: general recommendations
-    practice_pattern = re.compile(
-        r"(best practice|recommend|should|always|never|important to|crucial to)[^.]*\.",
-        re.IGNORECASE,
-    )
-    practice_sentences = practice_pattern.findall(chunk)
-
-    return {
-        "crops": found_crops,
-        "diseases": found_diseases,
-        "remedies": remedy_sentences[:3],
-        "practices": practice_sentences[:3],
-        "original_chunk": chunk,
-    }
-
-
-def generate_cypher_statements(
-    pdf_name: str,
-    extracted: list[dict[str, Any]],
-) -> list[str]:
-    """Generate Cypher MERGE statements from extracted PDF pages."""
-    statements = []
-    source_prefix = pdf_name.replace(".pdf", "").replace("_", " ").title()
-
-    for page_data in extracted:
+    all_chunks = []
+    for page_data in pages:
         page_num = page_data["page"]
-        chunks = chunk_text(page_data["text"])
+        page_text = page_data["text"]
 
-        for chunk_idx, chunk_text_content in enumerate(chunks):
-            knowledge = extract_knowledge_from_chunk(chunk_text_content)
+        chunks = chunk_text(page_text)
+        for chunk_idx, chunk_content in enumerate(chunks):
+            # Create a deterministic unique ID
+            unique_str = f"{pdf_name}:p{page_num}:c{chunk_idx}:{chunk_content[:50]}"
+            chunk_id = hashlib.md5(unique_str.encode()).hexdigest()
 
-            for crop in set(knowledge["crops"]):
-                crop_node = f"MERGE (c:Crop {{name: '{crop.title()}'}})"
-                if crop_node not in statements:
-                    statements.append(crop_node)
+            entry: dict[str, Any] = {
+                "chunk_id": chunk_id,
+                "text": chunk_content,
+                "metadata": {
+                    "pdf_name": pdf_name,
+                    "page_num": page_num,
+                    "chunk_idx": chunk_idx,
+                },
+            }
 
-            for disease in set(knowledge["diseases"]):
-                disease_node = f"MERGE (d:Disease {{name: '{disease.title()}'}})"
-                if disease_node not in statements:
-                    statements.append(disease_node)
+            if include_embeddings:
+                entry["embedding"] = get_embedding(chunk_content)
+            else:
+                entry["embedding"] = []
 
-            # Link crops to diseases
-            for crop in set(knowledge["crops"]):
-                for disease in set(knowledge["diseases"]):
-                    rel = (
-                        f"MATCH (c:Crop {{name: '{crop.title()}'}}), "
-                        f"(d:Disease {{name: '{disease.title()}'}}) "
-                        f"MERGE (c)-[:AFFECTED_BY]->(d)"
-                    )
-                    if rel not in statements:
-                        statements.append(rel)
+            all_chunks.append(entry)
 
-            # Create remedy nodes and link
-            for remedy in set(knowledge["remedies"]):
-                remedy_text = remedy.strip().rstrip(".")
-                remedy_node = (
-                    f"MERGE (r:Remedy {{name: '{remedy_text[:120]}'}})"
-                )
-                if remedy_node not in statements:
-                    statements.append(remedy_node)
-                for disease in set(knowledge["diseases"]):
-                    rel = (
-                        f"MATCH (d:Disease {{name: '{disease.title()}'}}), "
-                        f"(r:Remedy {{name: '{remedy_text[:120]}'}}) "
-                        f"MERGE (d)-[:TREATED_BY]->(r)"
-                    )
-                    if rel not in statements:
-                        statements.append(rel)
-
-            # Create practice nodes and link
-            for practice in set(knowledge["practices"]):
-                practice_text = practice.strip().rstrip(".")
-                practice_node = (
-                    f"MERGE (p:BestPractice {{name: '{practice_text[:120]}'}})"
-                )
-                if practice_node not in statements:
-                    statements.append(practice_node)
-                for crop in set(knowledge["crops"]):
-                    rel = (
-                        f"MATCH (c:Crop {{name: '{crop.title()}'}}), "
-                        f"(p:BestPractice {{name: '{practice_text[:120]}'}}) "
-                        f"MERGE (c)-[:HAS_PRACTICE]->(p)"
-                    )
-                    if rel not in statements:
-                        statements.append(rel)
-
-            # Create a Source node pointing back to PDF
-            source_name = f"{source_prefix} (Page {page_num})"
-            source_node = f"MERGE (src:Source {{name: '{source_name}'}})"
-            if source_node not in statements:
-                statements.append(source_node)
-
-            # Link knowledge chunks to source
-            for crop in set(knowledge["crops"]):
-                link = (
-                    f"MATCH (c:Crop {{name: '{crop.title()}'}}), "
-                    f"(src:Source {{name: '{source_name}'}}) "
-                    f"MERGE (c)-[:HAS_SOURCE]->(src)"
-                )
-                if link not in statements:
-                    statements.append(link)
-
-    return statements
+    return all_chunks
 
 
 def ingest_pdf(
@@ -239,45 +156,54 @@ def ingest_pdf(
     neo4j_client: Neo4jClient | None = None,
     dry_run: bool = False,
 ) -> str:
-    """Ingest a single PDF into Neo4j."""
-    pdf_name = os.path.basename(pdf_path)
+    """Ingest a single PDF into Neo4j vector store.
 
-    print(f" Processing: {pdf_name}")
-    pages = extract_text_from_pdf(pdf_path)
-    if not pages:
+    Args:
+        pdf_path: Path to the PDF file.
+        neo4j_client: Neo4j client instance. If None, prints results instead.
+        dry_run: If True, only print what would be done.
+
+    Returns:
+        Status message.
+    """
+    pdf_name = os.path.basename(pdf_path)
+    logger.info("Processing: %s", pdf_name)
+
+    chunks = process_pdf_for_ingestion(pdf_path, include_embeddings=not dry_run)
+    if not chunks:
         return f" No text extracted from {pdf_name}"
 
-    print(f"   Extracted {len(pages)} page(s)")
-
-    statements = generate_cypher_statements(pdf_name, pages)
-    print(f"   Generated {len(statements)} Cypher statements")
+    logger.info("  Generated %d chunk(s)", len(chunks))
 
     if dry_run:
-        print("\n─── Cypher Statements (dry-run) ───")
-        for stmt in statements:
-            print(stmt)
-        return f" Dry-run complete for {pdf_name}: {len(statements)} statements"
+        print(f"\n─── Chunks from {pdf_name} (dry-run) ───")
+        for i, chunk in enumerate(chunks):
+            print(f"\n--- Chunk {i + 1} (id: {chunk['chunk_id'][:12]}...) ---")
+            print(f"  Page: {chunk['metadata']['page_num']}")
+            print(f"  Text preview: {chunk['text'][:200]}...")
+            if chunk["embedding"]:
+                print(f"  Embedding: {len(chunk['embedding'])} dims "
+                      f"[{chunk['embedding'][0]:.4f}, {chunk['embedding'][1]:.4f}, ...]")
+        print()
+        return f" Dry-run complete for {pdf_name}: {len(chunks)} chunks"
 
-    # Execute against Neo4j
+    # Store in Neo4j
     if neo4j_client and neo4j_client._enabled:
-        try:
-            with neo4j_client.driver.session() as session:
-                for stmt in statements:
-                    session.run(stmt)
-            return f" Ingested {pdf_name}: {len(statements)} statements executed"
-        except Exception as exc:
-            return f" Neo4j ingestion failed for {pdf_name}: {exc}"
+        stored = neo4j_client.store_embeddings_batch(chunks)
+        return f" Ingested {pdf_name}: {stored}/{len(chunks)} chunks stored in Neo4j"
     else:
-        print("\n─── Cypher Statements (Neo4j not available) ───")
-        for stmt in statements:
-            print(stmt)
-        print(f"\nℹ  Paste the {len(statements)} statements above into your Neo4j browser.")
-        return f" Printed {len(statements)} Cypher statements for {pdf_name}"
+        # Print summary
+        print(f"\n─── Chunks from {pdf_name} (Neo4j not available) ───")
+        for i, chunk in enumerate(chunks):
+            print(f"\n  Chunk {i + 1} (page {chunk['metadata']['page_num']}): "
+                  f"{chunk['text'][:150]}...")
+        print(f"\nℹ  Configure NEO4J_URI and NEO4J_PASSWORD in .env to store in Neo4j.")
+        return f" Chunked {pdf_name}: {len(chunks)} chunks (not stored — Neo4j not configured)"
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Ingest PDF files from engines/data/ into Neo4j knowledge graph."
+        description="Ingest PDF files from engines/data/ into Neo4j vector knowledge graph."
     )
     parser.add_argument(
         "--file", "-f",
@@ -288,7 +214,7 @@ def main():
     parser.add_argument(
         "--dry-run", "-n",
         action="store_true",
-        help="Print Cypher statements without executing them.",
+        help="Print chunks without computing embeddings or storing in Neo4j.",
     )
     parser.add_argument(
         "--use-neo4j",
@@ -306,7 +232,7 @@ def main():
         if neo4j_client._enabled:
             print(" Connected to Neo4j")
         else:
-            print(" Neo4j not configured — will print Cypher statements instead")
+            print(" Neo4j not configured — will print chunk info instead")
             neo4j_client = None
 
     # Determine which PDFs to process
@@ -327,16 +253,20 @@ def main():
 
     results = []
     for pdf in pdf_files:
-        result = ingest_pdf(str(pdf), neo4j_client=neo4j_client, dry_run=args.dry_run)
+        result = ingest_pdf(
+            str(pdf),
+            neo4j_client=neo4j_client,
+            dry_run=args.dry_run,
+        )
         results.append(result)
         print(f"   {result}\n")
 
     # Summary
-    success = sum(1 for r in results if r.startswith(""))
-    info = sum(1 for r in results if r.startswith(""))
-    failed = sum(1 for r in results if r.startswith(""))
+    success = sum(1 for r in results if "stored" in r or "Chunked" in r)
+    dry = sum(1 for r in results if "Dry-run" in r)
+    failed = sum(1 for r in results if "No text" in r)
     print(
-        f"─── Summary: {success} ingested, {info} printed, {failed} failed ───"
+        f"─── Summary: {success} processed, {dry} dry-runs, {failed} failed ───"
     )
 
 

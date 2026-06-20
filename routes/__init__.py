@@ -1,3 +1,3 @@
-from routes import advisory, decisions, logs, market_data
+from routes import advisory, decisions, logs, market_data, agent
 
-__all__ = ["advisory", "decisions", "logs", "market_data"]
+__all__ = ["advisory", "decisions", "logs", "market_data", "agent"]
