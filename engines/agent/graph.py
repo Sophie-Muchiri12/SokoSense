@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # ── LLM initialisation ─────────────────────────────────────────────────────
 
 featherless_api_key = os.getenv("FEATHERLSS_API_KEY")
-featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "MiniMaxAI/MiniMax-M3")
+featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "deepseek-ai/DeepSeek-V4-Flash")
 
 if not featherless_api_key:
     raise ValueError("FEATHERLSS_API_KEY is not set in .env")
@@ -58,6 +58,7 @@ SYSTEM_PROMPT = SystemMessage(
         "- For final responses, use this format:\n"
         "  {\"response\": \"your answer here\", \"type\": \"advisory|market|weather|loan\"}\n"
         "- Keep answers concise and actionable (under 320 chars when possible for SMS).\n"
+        "- DO NOT use any emojis in your response under any circumstances.\n"
     )
 )
 
@@ -107,4 +108,4 @@ workflow.add_conditional_edges(
 workflow.add_edge("tools", "agent")
 
 agent_graph = workflow.compile()
-agent_graph = agent_graph.with_config({"recursion_limit": 6})
+agent_graph = agent_graph.with_config({"recursion_limit": 25})

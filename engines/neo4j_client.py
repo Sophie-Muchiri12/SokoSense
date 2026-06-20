@@ -335,6 +335,19 @@ class Neo4jClient:
             logger.error("Seeding failed: %s", exc)
             return f"Seeding failed: {exc}"
 
+    def clear_document_chunks(self) -> bool:
+        """Deletes all DocumentChunk nodes from the Neo4j database to prevent duplicate chunks."""
+        if not self._enabled:
+            return False
+        try:
+            with self.driver.session() as session:
+                session.run("MATCH (n:DocumentChunk) DETACH DELETE n")
+            logger.info("Cleared all DocumentChunk nodes from Neo4j.")
+            return True
+        except Exception as exc:
+            logger.error("Failed to clear DocumentChunk nodes: %s", exc)
+            return False
+
     # ── fallback sample data (no Neo4j) ────────────────────────────────────
 
     def _sample_data(

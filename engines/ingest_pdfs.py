@@ -16,11 +16,17 @@ If Neo4j is not configured, prints the chunk metadata that would be stored.
 
 import os
 import re
+import sys
 import argparse
 import logging
 import hashlib
 from pathlib import Path
 from typing import Any
+
+# Add project root to sys.path to support executing this script directly
+project_root = str(Path(__file__).resolve().parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from dotenv import load_dotenv
 
@@ -223,16 +229,16 @@ def main():
     )
     args = parser.parse_args()
 
-    # Set up Neo4j client if requested
+    # Set up Neo4j client (enabled by default unless dry-run is requested)
     neo4j_client = None
-    if args.use_neo4j:
+    if not args.dry_run:
         neo4j_client = Neo4jClient()
-        # Trigger connection
-        _ = neo4j_client.driver
         if neo4j_client._enabled:
             print(" Connected to Neo4j")
+            print(" Clearing existing DocumentChunk nodes to avoid conflicts...")
+            neo4j_client.clear_document_chunks()
         else:
-            print(" Neo4j not configured — will print chunk info instead")
+            print(" Neo4j not configured or connection failed — will print chunk info instead")
             neo4j_client = None
 
     # Determine which PDFs to process
