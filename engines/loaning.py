@@ -183,9 +183,9 @@ def _format_loan_report(result: dict[str, Any]) -> str:
         f"• Total Interest Cost: KES {result['total_interest']:,.2f}\n"
         f"• Interest-to-Principal: {result['interest_to_principal_ratio'] * 100:.1f}%\n"
         f"------------------------------------\n"
-        f"📢 VERDICT: {result['verdict']}\n"
-        f"⚠️ RISK LEVEL: {result['risk_level']}\n\n"
-        f"💡 ADVICE:\n{result['advice']}"
+        f"VERDICT: {result['verdict']}\n"
+        f"RISK LEVEL: {result['risk_level']}\n\n"
+        f"ADVICE:\n{result['advice']}"
     )
 
 

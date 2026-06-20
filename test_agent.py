@@ -56,7 +56,7 @@ def run_query(query: str):
                         content_str = content_str[:200] + "..."
                     print(f"  [Tool Output] <- {last_msg.name}: {content_str}")
     except Exception as e:
-        print(f"❌ Error executing query: {e}")
+        print(f"Error executing query: {e}")
     print("\n" + "="*70 + "\n")
 
 def run_interactive():

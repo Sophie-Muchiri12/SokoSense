@@ -29,13 +29,13 @@ def run_query(query: str):
                 if last_msg.type == "ai":
                     if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
                         for tool_call in last_msg.tool_calls:
-                            print(f"\n🤖 Agent is calling tool '{tool_call['name']}' with arguments:")
+                            print(f"\nAgent is calling tool '{tool_call['name']}' with arguments:")
                             print(f"   {tool_call['args']}")
                     else:
-                        print("\n🤖 Agent response:")
+                        print("\nAgent response:")
                         print(last_msg.content)
                 elif last_msg.type == "tool":
-                    print(f"\n🔧 Tool '{last_msg.name}' returned output:")
+                    print(f"\nTool '{last_msg.name}' returned output:")
                     # Truncate output if it is very long to avoid cluttered terminal
                     output_str = str(last_msg.content)
                     if len(output_str) > 500:
@@ -49,12 +49,12 @@ def run_query(query: str):
             import re
             retry_match = re.search(r"try again in (\S+)", err_str)
             retry_in = retry_match.group(1) if retry_match else "a few minutes"
-            print(f"\n⚠️  Groq API rate limit reached. Please try again in {retry_in}.")
+            print(f"\nGroq API rate limit reached. Please try again in {retry_in}.")
             print("   (This is a free-tier quota limit — your query and data retrieval worked fine.)")
         elif "recursion_limit" in err_str.lower() or "GraphRecursionError" in err_str:
-            print("\n⚠️  The agent made too many tool calls without finishing. Please rephrase your query.")
+            print("\nThe agent made too many tool calls without finishing. Please rephrase your query.")
         else:
-            print(f"\n❌ An error occurred during execution: {e}")
+            print(f"\nAn error occurred during execution: {e}")
     print("=" * 60 + "\n")
 
 def main():

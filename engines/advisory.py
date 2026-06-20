@@ -252,34 +252,25 @@ def answer_farmer_question(
         )
     )
 
-    # Initialize the LLM (Featherless preferred, fallback to Groq)
+    # Initialize the LLM (Featherless API)
     featherless_api_key = os.getenv("FEATHERLSS_API_KEY")
-    featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "MiniMax-M3")
+    featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "MiniMaxAI/MiniMax-M3")
 
-    if featherless_api_key:
-        llm = ChatOpenAI(
-            model=featherless_model,
-            temperature=0.3,
-            openai_api_key=featherless_api_key,
-            openai_api_base="https://api.featherless.ai/v1",
-        )
-    else:
-        from langchain_groq import ChatGroq
-        groq_api_key = os.getenv("GROQ_API_KEY")
-        groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-        if not groq_api_key:
-            return {
-                "query": query,
-                "answer": "No LLM API key configured. Please set FEATHERLSS_API_KEY or GROQ_API_KEY.",
-                "location": location,
-                "weather": weather_data,
-                "sources": sources,
-            }
-        llm = ChatGroq(
-            model=groq_model,
-            temperature=0.3,
-            groq_api_key=groq_api_key,
-        )
+    if not featherless_api_key:
+        return {
+            "query": query,
+            "answer": "FEATHERLSS_API_KEY is not set in .env.",
+            "location": location,
+            "weather": weather_data,
+            "sources": sources,
+        }
+
+    llm = ChatOpenAI(
+        model=featherless_model,
+        temperature=0.3,
+        openai_api_key=featherless_api_key,
+        openai_api_base="https://api.featherless.ai/v1",
+    )
 
     try:
         response = llm.invoke([system_prompt, user_message])

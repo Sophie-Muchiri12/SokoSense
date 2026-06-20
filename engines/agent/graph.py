@@ -9,7 +9,6 @@ import logging
 
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage
-from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
@@ -24,27 +23,18 @@ logger = logging.getLogger(__name__)
 # ── LLM initialisation ─────────────────────────────────────────────────────
 
 featherless_api_key = os.getenv("FEATHERLSS_API_KEY")
-featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "MiniMax-M3")
+featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "MiniMaxAI/MiniMax-M3")
 
-if featherless_api_key:
-    llm = ChatOpenAI(
-        model=featherless_model,
-        temperature=0.0,
-        openai_api_key=featherless_api_key,
-        openai_api_base="https://api.featherless.ai/v1",
-    )
-    logger.info("Using Featherless LLM: %s", featherless_model)
-else:
-    groq_api_key = os.getenv("GROQ_API_KEY")
-    model_name = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-    if not groq_api_key:
-        raise ValueError("Neither FEATHERLSS_API_KEY nor GROQ_API_KEY is set in .env")
-    llm = ChatGroq(
-        model=model_name,
-        temperature=0.0,
-        groq_api_key=groq_api_key,
-    )
-    logger.info("Using Groq LLM: %s", model_name)
+if not featherless_api_key:
+    raise ValueError("FEATHERLSS_API_KEY is not set in .env")
+
+llm = ChatOpenAI(
+    model=featherless_model,
+    temperature=0.0,
+    openai_api_key=featherless_api_key,
+    openai_api_base="https://api.featherless.ai/v1",
+)
+logger.info("Using Featherless LLM: %s", featherless_model)
 
 llm_with_tools = llm.bind_tools(TOOLS)
 
