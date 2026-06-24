@@ -6,7 +6,7 @@ import pandas as pd
 from typing import Optional
 from langchain_core.tools import tool
 from tavily import TavilyClient
-from rate_limiter import kamis_http_limiter
+from engines.rate_limiter import kamis_http_limiter
 
 # Suppress SSL certificate warning from urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
