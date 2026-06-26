@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
+import { api, ApiError } from "@/lib/api/client";
+import { parseAgent } from "@/lib/api/agent-format";
+
 export const Route = createFileRoute("/simulator")({
   head: () => ({
     meta: [
@@ -21,24 +24,30 @@ export const Route = createFileRoute("/simulator")({
 });
 
 type Lang = "en" | "sw";
-type StageState = "pending" | "running" | "completed";
+type StageState = "pending" | "running" | "completed" | "error";
 type Stage = { id: string; label: string; detail: string };
 
 const STAGES: Stage[] = [
-  { id: "sms-in", label: "SMS received", detail: "Telco gateway · Safaricom 21455" },
-  { id: "market", label: "Market engine called", detail: "Spatial price + arbitrage graph" },
-  { id: "loan", label: "Loan engine called", detail: "Credit scoring · risk tier model" },
-  { id: "compose", label: "Response generated", detail: "gemini-flash-agri · 160-char shaping" },
-  { id: "sms-out", label: "SMS delivered", detail: "DLR confirmed · session closed" },
+  { id: "sms-in", label: "Message received", detail: "Inbound query · shortcode 21455" },
+  { id: "agent", label: "Agent engine", detail: "LangGraph orchestrator · /api/agent" },
+  { id: "tools", label: "Tools invoked", detail: "KAMIS prices · loan · weather · RAG" },
+  { id: "compose", label: "Response composed", detail: "Featherless LLM · SMS shaping" },
+  { id: "sms-out", label: "Reply delivered", detail: "JSON returned to gateway" },
 ];
 
+const TYPE_LABEL: Record<string, string> = {
+  market: "Market intelligence",
+  loan: "Credit assessment",
+  weather: "Weather advisory",
+  advisory: "Agronomic advisory",
+  general: "General assistant",
+};
+
 type Recommendation = {
-  crop: string;
-  market: string;
-  price: string;
-  recommendation: string;
-  confidence: number;
-  explanation: string;
+  type: string;
+  reply: string;
+  tool: string | null;
+  data: Record<string, unknown> | null;
 };
 
 const COPY = {
@@ -100,141 +109,90 @@ const COPY = {
   },
 } as const;
 
-function parseMessage(raw: string, lang: Lang): Recommendation {
-  const text = raw.trim().toUpperCase();
-  const tokens = text.split(/\s+/).filter(Boolean);
-
-  const cropMap: Record<string, string> = {
-    MAIZE: "Maize", MAHINDI: "Maize",
-    BEANS: "Beans", MAHARAGE: "Beans", MAHARAGWE: "Beans",
-    POTATO: "Potato", VIAZI: "Potato",
-    RICE: "Rice", MCHELE: "Rice",
-    COFFEE: "Coffee", KAHAWA: "Coffee",
-    TEA: "Tea", CHAI: "Tea",
-  };
-  const marketSet = new Set([
-    "NAKURU", "NAIROBI", "ELDORET", "KITALE", "MERU", "KISUMU", "MOMBASA",
-    "GARISSA", "MACHAKOS", "MARSABIT", "NYERI", "THIKA",
-  ]);
-
-  let crop = "Maize";
-  let market = "Nakuru";
-  for (const t of tokens) {
-    if (cropMap[t]) crop = cropMap[t];
-    if (marketSet.has(t)) market = t.charAt(0) + t.slice(1).toLowerCase();
-  }
-
-  const isLoan = /^(LOAN|MKOPO)/.test(text);
-  const isWeather = /(WEATHER|HALI)/.test(text);
-
-  if (isLoan) {
-    const amt = tokens.find((t) => /^\d{3,7}$/.test(t)) ?? "35000";
-    return {
-      crop,
-      market,
-      price: `KSh ${Number(amt).toLocaleString()} requested`,
-      recommendation: lang === "sw" ? "Idhini ya awali · APR 18.4%" : "Pre-approved · APR 18.4%",
-      confidence: 0.72,
-      explanation:
-        lang === "sw"
-          ? `Tier B kwa mzigo wa ${crop}. Historia ya malipo nzuri, msimu wa mavuno wa miezi 6 unalingana.`
-          : `Tier B against ${crop} cycle. Repayment history clean, 6-month harvest window aligns with bullet term.`,
-    };
-  }
-
-  if (isWeather) {
-    return {
-      crop,
-      market,
-      price: lang === "sw" ? "38mm mvua / siku 7" : "38mm rain / 7 days",
-      recommendation:
-        lang === "sw" ? "Nyunyizia dawa ya kuvu kabla ya Jumanne" : "Apply preventative fungicide before Tuesday",
-      confidence: 0.88,
-      explanation:
-        lang === "sw"
-          ? "Shinikizo la blight linaongezeka. Siku tatu za mvua zinazokuja huongeza hatari kwa viazi na nyanya."
-          : "Late-blight pressure rising. Three wet days forecast lift risk for potato and tomato — preventative window now.",
-    };
-  }
-
-  // Price intent (default)
-  const priceTable: Record<string, number> = {
-    Maize: 4520, Beans: 11800, Potato: 3200, Rice: 9800, Coffee: 38500, Tea: 5400,
-  };
-  const base = priceTable[crop] ?? 4520;
-  const delta = base * 0.066;
-  const alt = market === "Eldoret" ? "Nakuru" : "Eldoret";
-  return {
-    crop,
-    market,
-    price: `KSh ${base.toLocaleString()} / 90kg`,
-    recommendation:
-      lang === "sw"
-        ? `Shikilia wiki 2 · uza ${alt}`
-        : `Hold 14 days · sell ${alt}`,
-    confidence: 0.92,
-    explanation:
-      lang === "sw"
-        ? `${alt} inalipa KSh ${(base + delta).toFixed(0)} (+6.2%). Baada ya usafiri, faida ni KSh 20/gunia. Utabiri unaonyesha bei kupanda zaidi.`
-        : `${alt} pays KSh ${(base + delta).toFixed(0)} (+6.2%). Net of transport you gain KSh 20/bag. Forward curve points to +KSh 180 over 14 days.`,
-  };
-}
+const allPending = () =>
+  Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>;
 
 function SimulatorPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [message, setMessage] = useState("");
   const [rec, setRec] = useState<Recommendation | null>(null);
-  const [stageStates, setStageStates] = useState<Record<string, StageState>>(
-    Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>
-  );
+  const [error, setError] = useState<string | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [stageStates, setStageStates] = useState<Record<string, StageState>>(allPending());
   const [running, setRunning] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const t = COPY[lang];
 
-  const reset = () => {
+  const clearTimers = () => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
-    setRec(null);
-    setRunning(false);
-    setStageStates(Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>);
   };
 
-  const run = () => {
-    if (!message.trim() || running) return;
-    reset();
-    setRunning(true);
-    const next: Record<string, StageState> = Object.fromEntries(
-      STAGES.map((s) => [s.id, "pending"])
-    ) as Record<string, StageState>;
+  const reset = () => {
+    clearTimers();
+    setRec(null);
+    setError(null);
+    setLatencyMs(null);
+    setRunning(false);
+    setStageStates(allPending());
+  };
 
-    const tick = (i: number, state: StageState, delay: number) => {
+  const run = async () => {
+    if (!message.trim() || running) return;
+    clearTimers();
+    setRec(null);
+    setError(null);
+    setLatencyMs(null);
+    setRunning(true);
+
+    // Drive the pipeline animation while the real request is in flight.
+    const next = allPending();
+    next["sms-in"] = "completed";
+    next["agent"] = "running";
+    setStageStates({ ...next });
+
+    const advance = (id: string, state: StageState, delay: number) => {
       const handle = setTimeout(() => {
-        next[STAGES[i].id] = state;
+        next[id] = state;
         setStageStates({ ...next });
       }, delay);
       timers.current.push(handle);
     };
+    advance("tools", "running", 500);
 
-    // sequential running -> completed for each stage
-    const step = 280;
-    STAGES.forEach((_, i) => {
-      tick(i, "running", i * step);
-      tick(i, "completed", i * step + step - 40);
-    });
-
-    const total = STAGES.length * step + 60;
-    const finish = setTimeout(() => {
-      setRec(parseMessage(message, lang));
+    const started = performance.now();
+    try {
+      const res = await api.agent(message.trim());
+      const parsed = parseAgent(res);
+      clearTimers();
+      setLatencyMs(Math.round(performance.now() - started));
+      setStageStates({
+        "sms-in": "completed",
+        agent: "completed",
+        tools: "completed",
+        compose: "completed",
+        "sms-out": "completed",
+      });
+      setRec({ type: res.type, reply: parsed.text, tool: parsed.tool, data: parsed.data });
+    } catch (e) {
+      clearTimers();
+      const msg = e instanceof ApiError ? e.message : "Unexpected error contacting the agent.";
+      setError(msg);
+      setStageStates((prev) => {
+        const errored = { ...prev };
+        for (const s of STAGES) if (errored[s.id] === "running") errored[s.id] = "error";
+        return errored;
+      });
+    } finally {
       setRunning(false);
-    }, total);
-    timers.current.push(finish);
+    }
   };
 
   const charCount = message.length;
   const overLimit = charCount > 160;
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void run();
   };
 
   return (
@@ -283,7 +241,7 @@ function SimulatorPage() {
 
           <div className="mt-6 flex items-center gap-3">
             <button
-              onClick={run}
+              onClick={() => void run()}
               disabled={!message.trim() || running}
               className="rounded-full bg-teal px-5 py-2.5 text-[12.5px] font-medium text-paper hover:bg-teal-soft disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -307,35 +265,59 @@ function SimulatorPage() {
               <p className="eyebrow">{t.aiTitle}</p>
               <h2 className="font-serif text-[22px] text-ink mt-2">{t.aiSub}</h2>
             </div>
-            <span className={`chip ${rec ? "border-teal/40 text-teal" : ""}`}>
-              {rec ? "● ready" : "○ idle"}
+            <span
+              className={`chip ${
+                error ? "border-rose/40 text-rose" : rec ? "border-teal/40 text-teal" : ""
+              }`}
+            >
+              {running ? "● running" : error ? "● error" : rec ? "● ready" : "○ idle"}
             </span>
           </div>
 
-          {!rec ? (
+          {error ? (
+            <div className="mt-8 flex-1 rounded-xl border border-rose/30 bg-rose/4 p-6">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-rose/80">Request failed</p>
+              <p className="mt-2 text-[13.5px] leading-relaxed text-ink">{error}</p>
+              <p className="mt-3 text-[12px] text-steel">
+                Make sure the backend is running on{" "}
+                <code className="font-mono text-ink">localhost:8000</code> (uvicorn main:app).
+              </p>
+            </div>
+          ) : !rec ? (
             <div className="mt-8 flex-1 rounded-xl border border-dashed border-fog bg-canvas/60 p-10 flex items-center justify-center text-center">
               <p className="text-[13px] text-mist max-w-xs">{t.empty}</p>
             </div>
           ) : (
             <div className="mt-6 flex flex-col gap-5">
-              <div className="grid grid-cols-3 gap-px bg-hairline rounded-xl overflow-hidden border border-hairline">
-                <Field label={t.crop} value={rec.crop} />
-                <Field label={t.market} value={rec.market} />
-                <Field label={t.price} value={rec.price} mono />
+              <div className="grid grid-cols-2 gap-px bg-hairline rounded-xl overflow-hidden border border-hairline">
+                <Field label="Response type" value={TYPE_LABEL[rec.type] ?? rec.type} />
+                <Field label="Tool invoked" value={rec.tool ?? "direct answer"} mono />
               </div>
 
-              <div className="rounded-xl border border-teal/25 bg-teal/[0.04] p-5">
+              <div className="rounded-xl border border-teal/25 bg-teal/4 p-5">
                 <p className="text-[10.5px] uppercase tracking-[0.14em] text-teal/80">{t.rec}</p>
-                <p className="mt-1.5 font-serif text-[20px] leading-snug text-ink">{rec.recommendation}</p>
+                <p className="mt-1.5 text-[14.5px] leading-relaxed text-ink whitespace-pre-wrap">
+                  {rec.reply}
+                </p>
               </div>
 
-              <div className="grid grid-cols-[auto_1fr] gap-5 items-center">
-                <ConfidenceDial value={rec.confidence} label={t.conf} />
+              {rec.data && (
                 <div>
-                  <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist">{t.why}</p>
-                  <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink">{rec.explanation}</p>
+                  <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist">
+                    Structured payload
+                  </p>
+                  <pre className="mt-1.5 max-h-56 overflow-auto rounded-xl border border-hairline bg-canvas p-4 font-mono text-[11.5px] leading-relaxed text-ink">
+                    {JSON.stringify(rec.data, null, 2)}
+                  </pre>
                 </div>
-              </div>
+              )}
+
+              {latencyMs != null && (
+                <p className="text-[11.5px] text-mist">
+                  Live response from <code className="font-mono text-steel">/api/agent</code> ·{" "}
+                  <span className="tabular text-ink">{latencyMs}ms</span>
+                </p>
+              )}
             </div>
           )}
         </section>
@@ -391,37 +373,6 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
   );
 }
 
-function ConfidenceDial({ value, label }: { value: number; label: string }) {
-  const pct = Math.round(value * 100);
-  const r = 28;
-  const c = 2 * Math.PI * r;
-  const dash = c * value;
-  return (
-    <div className="flex flex-col items-center">
-      <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist mb-2">{label}</p>
-      <div className="relative h-[72px] w-[72px]">
-        <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90">
-          <circle cx="32" cy="32" r={r} fill="none" stroke="#E6EAE3" strokeWidth="5" />
-          <circle
-            cx="32"
-            cy="32"
-            r={r}
-            fill="none"
-            stroke="#0D9280"
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeDasharray={`${dash} ${c}`}
-            className="transition-[stroke-dasharray] duration-500"
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="font-serif text-[18px] text-ink tabular">{pct}%</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function PipelineLegend() {
   const items: { state: StageState; label: string }[] = [
     { state: "pending", label: "Pending" },
@@ -444,16 +395,23 @@ function StateDot({ state }: { state: StageState }) {
   if (state === "completed") return <span className="h-2 w-2 rounded-full bg-teal" />;
   if (state === "running")
     return <span className="h-2 w-2 rounded-full bg-teal animate-pulse ring-2 ring-teal/25" />;
+  if (state === "error") return <span className="h-2 w-2 rounded-full bg-rose" />;
   return <span className="h-2 w-2 rounded-full border border-mist" />;
 }
 
 function PipelineStep({ index, stage, state }: { index: number; stage: Stage; state: StageState }) {
   const stateCopy =
-    state === "completed" ? "Completed" : state === "running" ? "Running" : "Pending";
+    state === "completed"
+      ? "Completed"
+      : state === "running"
+      ? "Running"
+      : state === "error"
+      ? "Failed"
+      : "Pending";
   return (
     <li
       className={`bg-paper p-5 flex flex-col gap-3 transition-colors ${
-        state === "running" ? "bg-teal/[0.04]" : ""
+        state === "running" ? "bg-teal/4" : ""
       }`}
     >
       <div className="flex items-center justify-between">
@@ -472,6 +430,8 @@ function PipelineStep({ index, stage, state }: { index: number; stage: Stage; st
             ? "text-teal"
             : state === "running"
             ? "text-ink"
+            : state === "error"
+            ? "text-rose"
             : "text-mist"
         }`}
       >

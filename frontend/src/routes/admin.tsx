@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { PageHeader } from "./market";
+import { api } from "@/lib/api/client";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -63,6 +65,14 @@ function AdminPage() {
   const [status, setStatus] = useState("all");
   const [q, setQ] = useState("");
 
+  const health = useQuery({
+    queryKey: ["health"],
+    queryFn: () => api.health(),
+    refetchInterval: 15_000,
+    retry: false,
+  });
+  const apiOk = health.data?.status === "ok";
+
   const filtered = useMemo(() => {
     return LOGS.filter((l) => {
       if (engine !== "all" && l.engine !== engine) return false;
@@ -84,9 +94,25 @@ function AdminPage() {
           sub="Realtime telemetry for the SokoSense intelligence platform — engines, latency, request volumes and recent activity across all USSD aggregators."
         />
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-surface px-3 py-1.5 text-[11.5px] text-green-deep">
-            <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" />
-            All systems operational
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] ${
+              health.isLoading
+                ? "bg-canvas text-steel"
+                : apiOk
+                ? "bg-green-surface text-green-deep"
+                : "bg-rose/10 text-rose"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                health.isLoading ? "bg-mist" : apiOk ? "bg-green animate-pulse" : "bg-rose"
+              }`}
+            />
+            {health.isLoading
+              ? "Checking API…"
+              : apiOk
+              ? `API online · ${health.data?.service ?? "sokosense"}`
+              : "API unreachable"}
           </span>
           <div className="inline-flex rounded-full border border-hairline bg-paper p-0.5">
             {DATE_RANGES.map((r) => (
