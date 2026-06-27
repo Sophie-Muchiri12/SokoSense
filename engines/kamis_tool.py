@@ -349,7 +349,13 @@ def scrape_kamis_prices(
         ]
     else:
         if clean_market_name:
-            df = df[df['Market'].str.contains(clean_market_name, case=False, na=False)]
+            # LLMs and SMS parsers often pass a town/county as market_name
+            # ("Nairobi") even when KAMIS stores the exact market separately
+            # ("Kawangware"). Treat market_name as a broad location hint.
+            df = df[
+                df['Market'].str.contains(clean_market_name, case=False, na=False) |
+                df['County'].str.contains(clean_market_name, case=False, na=False)
+            ]
         if clean_county_name:
             df = df[df['County'].str.contains(clean_county_name, case=False, na=False)]
 
