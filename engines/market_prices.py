@@ -1,8 +1,19 @@
+"""Market map price feed — live KAMIS data with mock fallback."""
+
+import io
 from datetime import date
 
+import pandas as pd
+import requests
+
+from engines.kamis_tool import resolve_crop_ids
+from engines.market import parse_price
+from engines.rate_limiter import kamis_http_limiter
 from models.market_map import MarketMapResponse, MarketPricePoint
 
-# GPS coords for Ian's Leaflet map
+KAMIS_URL = "https://kamis.kilimo.go.ke/site/market"
+
+# GPS coords for Leaflet map markers
 _MARKET_LOCATIONS: dict[str, tuple[float, float]] = {
     "Nairobi": (-1.2864, 36.8172),
     "Nakuru": (-0.3031, 36.0800),
@@ -11,6 +22,19 @@ _MARKET_LOCATIONS: dict[str, tuple[float, float]] = {
     "Mombasa": (-4.0435, 39.6682),
     "Kitale": (1.0167, 35.0000),
     "Nyeri": (-0.4197, 36.9475),
+}
+
+_MARKET_ALIASES: dict[str, str] = {
+    "nairobi": "Nairobi",
+    "nakuru": "Nakuru",
+    "eldoret": "Eldoret",
+    "uasin gishu": "Eldoret",
+    "kisumu": "Kisumu",
+    "mombasa": "Mombasa",
+    "kitale": "Kitale",
+    "trans-nzoia": "Kitale",
+    "trans nzoia": "Kitale",
+    "nyeri": "Nyeri",
 }
 
 _MOCK_PRICES: dict[str, dict[str, float]] = {
@@ -71,26 +95,95 @@ _MOCK_PRICES: dict[str, dict[str, float]] = {
 }
 
 
+def _canonical_market(market: str, county: str) -> str | None:
+    """Map a KAMIS market/county label to one of our seven map markets."""
+    haystack = f"{market} {county}".lower()
+    for alias, canonical in _MARKET_ALIASES.items():
+        if alias in haystack:
+            return canonical
+    for name in _MARKET_LOCATIONS:
+        if name.lower() in haystack:
+            return name
+    return None
+
+
+def _fetch_kamis_prices(crop: str) -> tuple[dict[str, float], str | None]:
+    """Scrape KAMIS with a single HTTP request and map rows to our seven markets."""
+    prices: dict[str, float] = {}
+    latest_date: str | None = None
+
+    product_ids = resolve_crop_ids(crop)
+    params: dict[str, int] = {"per_page": 100}
+    if product_ids:
+        params["product"] = product_ids[0]
+
+    try:
+        kamis_http_limiter.acquire()
+        response = requests.get(KAMIS_URL, params=params, verify=False, timeout=20)
+        if response.status_code != 200:
+            return prices, latest_date
+        tables = pd.read_html(io.StringIO(response.text))
+        if not tables:
+            return prices, latest_date
+        df = tables[0]
+        df.columns = [c.strip() for c in df.columns]
+    except Exception:
+        return prices, latest_date
+
+    crop_lower = crop.lower()
+    if "Commodity" in df.columns:
+        df = df[df["Commodity"].str.contains(crop_lower, case=False, na=False)]
+
+    for _, row in df.iterrows():
+        canonical = _canonical_market(
+            str(row.get("Market", "")),
+            str(row.get("County", "")),
+        )
+        if not canonical:
+            continue
+
+        price = parse_price(str(row.get("Wholesale", ""))) or parse_price(
+            str(row.get("Retail", ""))
+        )
+        if price is None:
+            continue
+
+        existing = prices.get(canonical)
+        if existing is None or price > existing:
+            prices[canonical] = price
+
+        row_date = row.get("Date")
+        if isinstance(row_date, str) and row_date:
+            latest_date = row_date
+
+    return prices, latest_date
+
+
 def get_market_prices(crop: str = "maize") -> MarketMapResponse:
-    """Return price table for map. Stub data until Job/Lucy wire live KACE/Neo4j."""
+    """Return price table for the map — live KAMIS with mock fallback per market."""
     crop_key = crop.strip().lower()
-    prices = _MOCK_PRICES.get(crop_key, _MOCK_PRICES["maize"])
-    best_market = max(prices, key=prices.get)
+    kamis_prices, kamis_date = _fetch_kamis_prices(crop_key)
+    mock_prices = _MOCK_PRICES.get(crop_key, _MOCK_PRICES["maize"])
+
+    merged: dict[str, float] = {}
+    for name in _MARKET_LOCATIONS:
+        merged[name] = kamis_prices.get(name, mock_prices[name])
+
+    best_market = max(merged, key=merged.get)
 
     markets = [
         MarketPricePoint(
             name=name,
             lat=coords[0],
             lng=coords[1],
-            price_kes=price,
+            price_kes=merged[name],
             recommended=(name == best_market),
         )
         for name, coords in _MARKET_LOCATIONS.items()
-        for price in [prices[name]]
     ]
 
     return MarketMapResponse(
         crop=crop_key,
-        date=date.today().isoformat(),
+        date=kamis_date or date.today().isoformat(),
         markets=markets,
     )

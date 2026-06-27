@@ -5,6 +5,8 @@ const nav = [
   { to: "/", label: "Overview" },
   { to: "/simulator", label: "SMS Simulator" },
   { to: "/market", label: "Market Map" },
+  { to: "/timing", label: "Sell Timing" },
+  { to: "/advisory", label: "Advisory" },
   { to: "/loans", label: "Loan Analyzer" },
   { to: "/sacco", label: "SACCO Dashboard" },
   { to: "/ussd", label: "USSD" },

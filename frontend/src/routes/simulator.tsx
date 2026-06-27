@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
+import { postAgent, type AgentResponse } from "@/lib/sokosense-api";
 
 import { api, ApiError } from "@/lib/api/client";
 import { parseAgent } from "@/lib/api/agent-format";
@@ -28,11 +29,19 @@ type StageState = "pending" | "running" | "completed" | "error";
 type Stage = { id: string; label: string; detail: string };
 
 const STAGES: Stage[] = [
+<<<<<<< HEAD
+  { id: "sms-in", label: "SMS received", detail: "Telco gateway · Safaricom 21455" },
+  { id: "agent", label: "Agent invoked", detail: "LangGraph · tool-calling loop" },
+  { id: "market", label: "Market engine called", detail: "KAMIS price feed · arbitrage graph" },
+  { id: "compose", label: "Response generated", detail: "Featherless LLM · 160-char shaping" },
+  { id: "sms-out", label: "SMS delivered", detail: "DLR confirmed · session closed" },
+=======
   { id: "sms-in", label: "Message received", detail: "Inbound query · shortcode 21455" },
   { id: "agent", label: "Agent engine", detail: "LangGraph orchestrator · /api/agent" },
   { id: "tools", label: "Tools invoked", detail: "KAMIS prices · loan · weather · RAG" },
   { id: "compose", label: "Response composed", detail: "Featherless LLM · SMS shaping" },
   { id: "sms-out", label: "Reply delivered", detail: "JSON returned to gateway" },
+>>>>>>> development
 ];
 
 const TYPE_LABEL: Record<string, string> = {
@@ -44,10 +53,16 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 type Recommendation = {
+<<<<<<< HEAD
+  type: AgentResponse["type"];
+  raw_response: string;
+  toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
+=======
   type: string;
   reply: string;
   tool: string | null;
   data: Record<string, unknown> | null;
+>>>>>>> development
 };
 
 const COPY = {
@@ -59,7 +74,7 @@ const COPY = {
       "Type a farmer message in the format the shortcode expects. We parse intent, run the market and credit engines, then return a 160-character reply.",
     inputCardTitle: "Inbound SMS",
     inputCardSub: "Farmer message · shortcode 21455",
-    placeholder: "MAIZE NAKURU",
+    placeholder: "PRICE MAIZE NAKURU",
     send: "Run engine",
     sending: "Running…",
     langLabel: "Language",
@@ -67,17 +82,15 @@ const COPY = {
     limit: "160 char limit",
     aiTitle: "AI recommendation",
     aiSub: "Decision payload returned to the farmer",
-    crop: "Crop",
-    market: "Market",
-    price: "Reference price",
-    rec: "Recommendation",
-    conf: "Confidence",
-    why: "Decision explanation",
+    responseType: "Response type",
+    agentReply: "Agent reply",
+    toolsUsed: "Tools invoked",
     pipelineTitle: "Live pipeline",
     pipelineSub: "Engine stages for the active request",
     empty: "Run the engine to see a recommendation.",
     reset: "Reset",
     hint: "Try: PRICE MAIZE NAKURU · LOAN 35000 BEANS 6 MONTHS · WEATHER MERU",
+    error: "Agent error — check backend logs.",
   },
   sw: {
     eyebrow: "Simulator ya Akili ya SMS",
@@ -87,7 +100,7 @@ const COPY = {
       "Andika ujumbe wa mkulima kwa muundo unaotarajiwa. Tunafafanua nia, tunaita injini ya soko na mkopo, kisha tunarudisha jibu la herufi 160.",
     inputCardTitle: "SMS ya kuingia",
     inputCardSub: "Ujumbe wa mkulima · namba fupi 21455",
-    placeholder: "MAHINDI NAKURU",
+    placeholder: "BEI MAHINDI NAKURU",
     send: "Endesha injini",
     sending: "Inafanya kazi…",
     langLabel: "Lugha",
@@ -95,37 +108,81 @@ const COPY = {
     limit: "kikomo herufi 160",
     aiTitle: "Pendekezo la AI",
     aiSub: "Jibu linalorudi kwa mkulima",
-    crop: "Zao",
-    market: "Soko",
-    price: "Bei ya rejeleo",
-    rec: "Pendekezo",
-    conf: "Uhakika",
-    why: "Maelezo ya uamuzi",
+    responseType: "Aina ya jibu",
+    agentReply: "Jibu la wakala",
+    toolsUsed: "Zana zilizotumika",
     pipelineTitle: "Hatua za moja kwa moja",
     pipelineSub: "Hatua za injini kwa ombi la sasa",
     empty: "Endesha injini kuona pendekezo.",
     reset: "Anza upya",
     hint: "Jaribu: BEI MAHINDI NAKURU · MKOPO 35000 MAHARAGE MIEZI 6 · HALI YA HEWA MERU",
+    error: "Hitilafu ya wakala — angalia kumbukumbu za seva.",
   },
 } as const;
 
+<<<<<<< HEAD
+/** Map agent type → badge colours */
+const TYPE_COLORS: Record<AgentResponse["type"], { bg: string; text: string }> = {
+  market:   { bg: "bg-teal/10",        text: "text-teal" },
+  loan:     { bg: "bg-green-surface",  text: "text-green-deep" },
+  weather:  { bg: "bg-sky-50",         text: "text-sky-700" },
+  advisory: { bg: "bg-amber/10",       text: "text-amber" },
+  general:  { bg: "bg-canvas",         text: "text-steel" },
+};
+=======
 const allPending = () =>
   Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>;
+>>>>>>> development
 
 function SimulatorPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [message, setMessage] = useState("");
   const [rec, setRec] = useState<Recommendation | null>(null);
+<<<<<<< HEAD
+  const [stageStates, setStageStates] = useState<Record<string, StageState>>(
+    Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>,
+  );
+=======
   const [error, setError] = useState<string | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [stageStates, setStageStates] = useState<Record<string, StageState>>(allPending());
+>>>>>>> development
   const [running, setRunning] = useState(false);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const t = COPY[lang];
 
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
+<<<<<<< HEAD
+    setRec(null);
+    setRunning(false);
+    setLatencyMs(null);
+    setStageStates(
+      Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>,
+    );
+  };
+
+  const run = async () => {
+    if (!message.trim() || running) return;
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    setRec(null);
+    setLatencyMs(null);
+    setStageStates(
+      Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>,
+    );
+    setRunning(true);
+
+    // Animate stages 0..2 sequentially while we await the API
+    const next: Record<string, StageState> = Object.fromEntries(
+      STAGES.map((s) => [s.id, "pending"]),
+    ) as Record<string, StageState>;
+
+    const tick = (id: string, state: StageState, delay: number) => {
+      const h = setTimeout(() => {
+=======
   };
 
   const reset = () => {
@@ -153,13 +210,59 @@ function SimulatorPage() {
 
     const advance = (id: string, state: StageState, delay: number) => {
       const handle = setTimeout(() => {
+>>>>>>> development
         next[id] = state;
         setStageStates({ ...next });
       }, delay);
-      timers.current.push(handle);
+      timers.current.push(h);
     };
     advance("tools", "running", 500);
 
+<<<<<<< HEAD
+    // Show first 3 stages animating while the real request is in flight
+    tick("sms-in", "running",   0);
+    tick("sms-in", "completed", 300);
+    tick("agent",  "running",   320);
+    tick("market", "running",   700);
+
+    try {
+      const start = performance.now();
+      const result = await postAgent(message);
+      const elapsed = Math.round(performance.now() - start);
+      setLatencyMs(elapsed);
+
+      // Complete remaining pipeline stages
+      const now = performance.now() - start; // approx 0 since we just awaited
+      tick("market",  "completed", 0);
+      tick("agent",   "completed", 80);
+      tick("compose", "running",   100);
+      tick("compose", "completed", 350);
+      tick("sms-out", "running",   370);
+      tick("sms-out", "completed", 600);
+
+      const finish = setTimeout(() => {
+        const toolCalls = result.raw?.messages?.flatMap(
+          (m) => m.tool_calls ?? [],
+        ) ?? [];
+        setRec({
+          type: result.type,
+          raw_response: result.response,
+          toolCalls,
+        });
+        setRunning(false);
+      }, 650);
+      timers.current.push(finish);
+    } catch (err) {
+      // Mark all remaining stages as error
+      STAGES.forEach((s) => {
+        next[s.id] = next[s.id] === "completed" ? "completed" : "error";
+      });
+      setStageStates({ ...next });
+      setRec({
+        type: "general",
+        raw_response: t.error + (err instanceof Error ? ` (${err.message})` : ""),
+      });
+=======
     const started = performance.now();
     try {
       const res = await api.agent(message.trim());
@@ -184,6 +287,7 @@ function SimulatorPage() {
         return errored;
       });
     } finally {
+>>>>>>> development
       setRunning(false);
     }
   };
@@ -194,6 +298,8 @@ function SimulatorPage() {
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void run();
   };
+
+  const typeColors = rec ? TYPE_COLORS[rec.type] : TYPE_COLORS.general;
 
   return (
     <div className="mx-auto max-w-[1240px] px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
@@ -224,6 +330,7 @@ function SimulatorPage() {
             Farmer message
           </label>
           <textarea
+            id="simulator-input"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={onKey}
@@ -241,13 +348,19 @@ function SimulatorPage() {
 
           <div className="mt-6 flex items-center gap-3">
             <button
+<<<<<<< HEAD
+              id="simulator-run-btn"
+              onClick={run}
+=======
               onClick={() => void run()}
+>>>>>>> development
               disabled={!message.trim() || running}
               className="rounded-full bg-teal px-5 py-2.5 text-[12.5px] font-medium text-paper hover:bg-teal-soft disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {running ? t.sending : t.send}
             </button>
             <button
+              id="simulator-reset-btn"
               onClick={reset}
               disabled={running && !rec}
               className="rounded-full border border-ink/15 bg-paper px-4 py-2.5 text-[12.5px] font-medium text-ink hover:border-ink/40 disabled:opacity-50 transition-colors"
@@ -256,9 +369,20 @@ function SimulatorPage() {
             </button>
             <span className="ml-auto text-[11px] text-mist">⌘ + Enter</span>
           </div>
+
+          {/* Latency badge */}
+          {latencyMs !== null && (
+            <div className="mt-5 flex items-center gap-2 rounded-xl border border-hairline bg-canvas px-4 py-3">
+              <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
+              <p className="text-[12px] text-steel">
+                Agent responded in{" "}
+                <span className="tabular font-medium text-ink">{latencyMs}ms</span>
+              </p>
+            </div>
+          )}
         </section>
 
-        {/* RIGHT — AI Recommendation */}
+        {/* RIGHT — Agent response */}
         <section className="card-surface p-7 flex flex-col">
           <div className="flex items-start justify-between">
             <div>
@@ -288,6 +412,53 @@ function SimulatorPage() {
               <p className="text-[13px] text-mist max-w-xs">{t.empty}</p>
             </div>
           ) : (
+<<<<<<< HEAD
+            <div className="mt-6 flex flex-col gap-5 flex-1">
+              {/* Type badge */}
+              <div className="flex items-center gap-2">
+                <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist">
+                  {t.responseType}
+                </p>
+                <span
+                  className={`inline-flex rounded-full px-3 py-0.5 text-[11px] font-medium capitalize ${typeColors.bg} ${typeColors.text}`}
+                >
+                  {rec.type}
+                </span>
+              </div>
+
+              {/* Agent reply — full prose from the LLM */}
+              <div className="rounded-xl border border-teal/25 bg-teal/[0.04] p-5 flex-1">
+                <p className="text-[10.5px] uppercase tracking-[0.14em] text-teal/80 mb-2">
+                  {t.agentReply}
+                </p>
+                <p className="text-[14px] leading-relaxed text-ink whitespace-pre-wrap">
+                  {rec.raw_response}
+                </p>
+              </div>
+
+              {rec.toolCalls && rec.toolCalls.length > 0 && (
+                <div>
+                  <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist mb-2">
+                    {t.toolsUsed}
+                  </p>
+                  <ul className="space-y-2">
+                    {rec.toolCalls.map((tc, i) => (
+                      <li
+                        key={`${tc.name}-${i}`}
+                        className="rounded-lg border border-hairline bg-canvas px-3 py-2 text-[12px] font-mono text-steel"
+                      >
+                        <span className="text-teal">{tc.name}</span>
+                        {Object.keys(tc.args).length > 0 && (
+                          <span className="text-mist ml-2">
+                            {JSON.stringify(tc.args)}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+=======
             <div className="mt-6 flex flex-col gap-5">
               <div className="grid grid-cols-2 gap-px bg-hairline rounded-xl overflow-hidden border border-hairline">
                 <Field label="Response type" value={TYPE_LABEL[rec.type] ?? rec.type} />
@@ -318,6 +489,7 @@ function SimulatorPage() {
                   <span className="tabular text-ink">{latencyMs}ms</span>
                 </p>
               )}
+>>>>>>> development
             </div>
           )}
         </section>
@@ -364,6 +536,8 @@ function LangToggle({ lang, onChange, label }: { lang: Lang; onChange: (l: Lang)
   );
 }
 
+<<<<<<< HEAD
+=======
 function Field({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="bg-paper p-4">
@@ -373,11 +547,13 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
   );
 }
 
+>>>>>>> development
 function PipelineLegend() {
   const items: { state: StageState; label: string }[] = [
-    { state: "pending", label: "Pending" },
-    { state: "running", label: "Running" },
+    { state: "pending",   label: "Pending" },
+    { state: "running",   label: "Running" },
     { state: "completed", label: "Completed" },
+    { state: "error",     label: "Error" },
   ];
   return (
     <div className="flex items-center gap-4">
@@ -392,15 +568,31 @@ function PipelineLegend() {
 }
 
 function StateDot({ state }: { state: StageState }) {
-  if (state === "completed") return <span className="h-2 w-2 rounded-full bg-teal" />;
+  if (state === "completed")
+    return <span className="h-2 w-2 rounded-full bg-teal" />;
   if (state === "running")
     return <span className="h-2 w-2 rounded-full bg-teal animate-pulse ring-2 ring-teal/25" />;
+<<<<<<< HEAD
+  if (state === "error")
+    return <span className="h-2 w-2 rounded-full bg-rose-500" />;
+=======
   if (state === "error") return <span className="h-2 w-2 rounded-full bg-rose" />;
+>>>>>>> development
   return <span className="h-2 w-2 rounded-full border border-mist" />;
 }
 
 function PipelineStep({ index, stage, state }: { index: number; stage: Stage; state: StageState }) {
   const stateCopy =
+<<<<<<< HEAD
+    state === "completed" ? "Completed"
+    : state === "running"   ? "Running"
+    : state === "error"     ? "Error"
+    : "Pending";
+  return (
+    <li
+      className={`bg-paper p-5 flex flex-col gap-3 transition-colors ${
+        state === "running" ? "bg-teal/[0.04]" : state === "error" ? "bg-rose-50" : ""
+=======
     state === "completed"
       ? "Completed"
       : state === "running"
@@ -412,6 +604,7 @@ function PipelineStep({ index, stage, state }: { index: number; stage: Stage; st
     <li
       className={`bg-paper p-5 flex flex-col gap-3 transition-colors ${
         state === "running" ? "bg-teal/4" : ""
+>>>>>>> development
       }`}
     >
       <div className="flex items-center justify-between">
@@ -426,6 +619,12 @@ function PipelineStep({ index, stage, state }: { index: number; stage: Stage; st
       </div>
       <p
         className={`text-[10.5px] uppercase tracking-[0.14em] tabular ${
+<<<<<<< HEAD
+          state === "completed" ? "text-teal"
+          : state === "running"   ? "text-ink"
+          : state === "error"     ? "text-rose-500"
+          : "text-mist"
+=======
           state === "completed"
             ? "text-teal"
             : state === "running"
@@ -433,6 +632,7 @@ function PipelineStep({ index, stage, state }: { index: number; stage: Stage; st
             : state === "error"
             ? "text-rose"
             : "text-mist"
+>>>>>>> development
         }`}
       >
         {stateCopy}
@@ -440,4 +640,3 @@ function PipelineStep({ index, stage, state }: { index: number; stage: Stage; st
     </li>
   );
 }
-

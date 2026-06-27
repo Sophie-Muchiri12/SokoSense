@@ -10,17 +10,24 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UssdRouteImport } from './routes/ussd'
+import { Route as TimingRouteImport } from './routes/timing'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SimulatorRouteImport } from './routes/simulator'
 import { Route as SaccoRouteImport } from './routes/sacco'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as LoansRouteImport } from './routes/loans'
+import { Route as AdvisoryRouteImport } from './routes/advisory'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
 const UssdRoute = UssdRouteImport.update({
   id: '/ussd',
   path: '/ussd',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TimingRoute = TimingRouteImport.update({
+  id: '/timing',
+  path: '/timing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -48,6 +55,11 @@ const LoansRoute = LoansRouteImport.update({
   path: '/loans',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdvisoryRoute = AdvisoryRouteImport.update({
+  id: '/advisory',
+  path: '/advisory',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -62,32 +74,38 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/advisory': typeof AdvisoryRoute
   '/loans': typeof LoansRoute
   '/market': typeof MarketRoute
   '/sacco': typeof SaccoRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/timing': typeof TimingRoute
   '/ussd': typeof UssdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/advisory': typeof AdvisoryRoute
   '/loans': typeof LoansRoute
   '/market': typeof MarketRoute
   '/sacco': typeof SaccoRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/timing': typeof TimingRoute
   '/ussd': typeof UssdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/advisory': typeof AdvisoryRoute
   '/loans': typeof LoansRoute
   '/market': typeof MarketRoute
   '/sacco': typeof SaccoRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/timing': typeof TimingRoute
   '/ussd': typeof UssdRoute
 }
 export interface FileRouteTypes {
@@ -95,42 +113,50 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/advisory'
     | '/loans'
     | '/market'
     | '/sacco'
     | '/simulator'
     | '/sitemap.xml'
+    | '/timing'
     | '/ussd'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/admin'
+    | '/advisory'
     | '/loans'
     | '/market'
     | '/sacco'
     | '/simulator'
     | '/sitemap.xml'
+    | '/timing'
     | '/ussd'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/advisory'
     | '/loans'
     | '/market'
     | '/sacco'
     | '/simulator'
     | '/sitemap.xml'
+    | '/timing'
     | '/ussd'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AdvisoryRoute: typeof AdvisoryRoute
   LoansRoute: typeof LoansRoute
   MarketRoute: typeof MarketRoute
   SaccoRoute: typeof SaccoRoute
   SimulatorRoute: typeof SimulatorRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TimingRoute: typeof TimingRoute
   UssdRoute: typeof UssdRoute
 }
 
@@ -141,6 +167,13 @@ declare module '@tanstack/react-router' {
       path: '/ussd'
       fullPath: '/ussd'
       preLoaderRoute: typeof UssdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/timing': {
+      id: '/timing'
+      path: '/timing'
+      fullPath: '/timing'
+      preLoaderRoute: typeof TimingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -178,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoansRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/advisory': {
+      id: '/advisory'
+      path: '/advisory'
+      fullPath: '/advisory'
+      preLoaderRoute: typeof AdvisoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -198,11 +238,13 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AdvisoryRoute: AdvisoryRoute,
   LoansRoute: LoansRoute,
   MarketRoute: MarketRoute,
   SaccoRoute: SaccoRoute,
   SimulatorRoute: SimulatorRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TimingRoute: TimingRoute,
   UssdRoute: UssdRoute,
 }
 export const routeTree = rootRouteImport

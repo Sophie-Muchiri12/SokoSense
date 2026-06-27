@@ -29,7 +29,7 @@ services:
       - key: FEATHERLSS_API_KEY
         sync: false
       - key: LLM_MODEL_FEATHERLESS
-        value: deepseek-ai/DeepSeek-V4-Flash
+        value: MiniMaxAI/MiniMax-M3
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
@@ -43,7 +43,7 @@ services:
       - key: NEO4J_PASSWORD
         sync: false
       - key: NEO4J_DATABASE
-        value: 566e7c08
+        value: neo4j
       - key: AURA_INSTANCEID
         sync: false
       - key: AURA_INSTANCENAME
