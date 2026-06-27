@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { postAgent, postLoan, type LoanResponse } from "@/lib/sokosense-api";
 
@@ -100,9 +101,9 @@ function LoanRiskAnalyzer() {
   const debouncedRate = useDebounced(monthlyRate, 350);
   const verdict = useQuery({
     queryKey: ["loan", debouncedRate],
-    queryFn: () => api.loan(debouncedRate),
+    queryFn: () => postLoan(debouncedRate),
     staleTime: 60_000,
-    placeholderData: (prev) => prev,
+    placeholderData: (prev: LoanResponse | undefined) => prev,
   });
 
   const riskColor =

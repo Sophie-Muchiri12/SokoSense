@@ -1,5 +1,7 @@
 # Neo4j Integration in SokoSense
 
+> **Kenya AI Challenge submission:** see [`NEO4J_INTEGRATION_DOCUMENT.md`](./NEO4J_INTEGRATION_DOCUMENT.md) for the judge-facing 1–2 page document aligned with the official Neo4j template. This file is the technical deep-dive.
+
 This document explains how **Neo4j AuraDB** is used in SokoSense for the Kenya AI Challenge / AgriFin track. Everything below is based on the current codebase — no aspirational features.
 
 ---

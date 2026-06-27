@@ -89,6 +89,10 @@ export type TimingResponse = {
   short_reply: string;
   wait_days?: number | null;
   reason: string;
+  price_kes?: number | null;
+  trend?: "rising" | "falling" | "stable" | null;
+  kamis_date?: string | null;
+  data_source?: string;
 };
 
 export type AdvisoryResponse = {

@@ -137,6 +137,32 @@ function TimingPage() {
               </span>
               <p className="mt-5 font-serif text-[22px] text-ink leading-snug">{result.short_reply}</p>
               <p className="mt-4 text-[13px] text-steel leading-relaxed">{result.reason}</p>
+              {(result.price_kes != null || result.kamis_date) && (
+                <div className="mt-4 rounded-xl border border-hairline bg-canvas px-4 py-3 text-[12px] text-steel space-y-1">
+                  {result.price_kes != null && (
+                    <p>
+                      KAMIS wholesale:{" "}
+                      <span className="text-ink font-medium tabular">
+                        KSh {result.price_kes.toLocaleString()}/90kg bag
+                      </span>
+                    </p>
+                  )}
+                  {result.trend && (
+                    <p>
+                      Trend:{" "}
+                      <span className="text-ink font-medium uppercase">{result.trend}</span>
+                    </p>
+                  )}
+                  {result.kamis_date && (
+                    <p>
+                      Report date: <span className="text-ink">{result.kamis_date}</span>
+                    </p>
+                  )}
+                  {result.data_source && (
+                    <p className="text-mist">Source: {result.data_source}</p>
+                  )}
+                </div>
+              )}
               {result.wait_days != null && result.wait_days > 0 && (
                 <p className="mt-3 text-[12px] text-mist tabular">
                   Suggested wait: {result.wait_days} days

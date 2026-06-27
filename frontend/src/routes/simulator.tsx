@@ -119,6 +119,7 @@ function SimulatorPage() {
     Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>,
   );
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const t = COPY[lang];
@@ -127,6 +128,7 @@ function SimulatorPage() {
     timers.current.forEach(clearTimeout);
     timers.current = [];
     setRec(null);
+    setError(null);
     setRunning(false);
     setLatencyMs(null);
     setStageStates(
@@ -134,11 +136,17 @@ function SimulatorPage() {
     );
   };
 
+  const reset = () => {
+    clearTimers();
+    setMessage("");
+  };
+
   const run = async () => {
     if (!message.trim() || running) return;
     timers.current.forEach(clearTimeout);
     timers.current = [];
     setRec(null);
+    setError(null);
     setLatencyMs(null);
     setStageStates(
       Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>,
@@ -157,8 +165,6 @@ function SimulatorPage() {
       }, delay);
       timers.current.push(h);
     };
-    advance("tools", "running", 500);
-
     // Show first 3 stages animating while the real request is in flight
     tick("sms-in", "running",   0);
     tick("sms-in", "completed", 300);
@@ -198,10 +204,9 @@ function SimulatorPage() {
         next[s.id] = next[s.id] === "completed" ? "completed" : "error";
       });
       setStageStates({ ...next });
-      setRec({
-        type: "general",
-        raw_response: t.error + (err instanceof Error ? ` (${err.message})` : ""),
-      });
+      const message = t.error + (err instanceof Error ? ` (${err.message})` : "");
+      setError(message);
+      setRec(null);
       setRunning(false);
     }
   };

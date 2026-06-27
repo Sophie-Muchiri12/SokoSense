@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import type { LMarket } from "@/components/leaflet-market-map";
 import { getMarketPrices, type MarketPricePoint } from "@/lib/sokosense-api";
 
@@ -167,7 +166,7 @@ function MarketMapPage() {
                 : "bg-paper text-ink border-hairline hover:border-ink/40"
             }`}
           >
-            {cap(c)}
+            {c}
           </button>
         ))}
         <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-steel">
