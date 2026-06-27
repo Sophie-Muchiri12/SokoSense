@@ -19,6 +19,23 @@ _MOCK_PRICES: dict[str, dict[str, float]] = {
 _PRICE_DIFF_THRESHOLD = 0.08  # 8% minimum to recommend travel
 
 
+def parse_price(val) -> float | None:
+    """Convert a KAMIS price string to KSh per 90kg bag (None if unparseable)."""
+    if not val or str(val).strip() in ("-", "", "nan"):
+        return None
+    try:
+        cleaned = "".join(c for c in str(val) if c.isdigit() or c == ".")
+        if cleaned:
+            price = float(cleaned)
+            # KAMIS reports per KG — convert to 90kg bag
+            if price < 500:
+                price = price * 90
+            return round(price, 0)
+    except Exception:
+        pass
+    return None
+
+
 def decide_market(request: MarketDecisionRequest) -> MarketDecisionResponse:
     """Return where to sell. Live KAMIS data first, mock fallback if unavailable."""
     crop     = request.crop.strip().lower()
