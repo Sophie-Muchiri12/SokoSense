@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { postAgent, postLoan, type LoanResponse } from "@/lib/sokosense-api";
 
 export const Route = createFileRoute("/loans")({
   head: () => ({
@@ -30,6 +31,51 @@ function LoanRiskAnalyzer() {
   const [monthlyRate, setMonthlyRate] = useState(2.5);
   const [amount, setAmount] = useState(35000);
   const [months, setMonths] = useState(6);
+
+  const [engineResult, setEngineResult] = useState<LoanResponse | null>(null);
+  const [agentReply, setAgentReply] = useState<string | null>(null);
+  const [engineLoading, setEngineLoading] = useState(false);
+  const [engineError, setEngineError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setEngineLoading(true);
+      setEngineError(null);
+      postLoan(monthlyRate)
+        .then((res) => {
+          if (!cancelled) setEngineResult(res);
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setEngineError(err instanceof Error ? err.message : "Engine unavailable");
+            setEngineResult(null);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setEngineLoading(false);
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [monthlyRate]);
+
+  const askAgent = async () => {
+    setEngineLoading(true);
+    setEngineError(null);
+    try {
+      const res = await postAgent(
+        `LOAN ${amount} BEANS ${months} MONTHS at ${monthlyRate}% monthly interest`,
+      );
+      setAgentReply(res.response);
+    } catch (err) {
+      setEngineError(err instanceof Error ? err.message : "Agent unavailable");
+    } finally {
+      setEngineLoading(false);
+    }
+  };
 
   const calc = useMemo(() => {
     const r = monthlyRate / 100;
@@ -142,10 +188,51 @@ function LoanRiskAnalyzer() {
               {months} payments of KSh {Math.round(calc.monthlyPayment).toLocaleString()}
             </p>
           </div>
+
+          <div className="mt-5 flex gap-3">
+            <button
+              onClick={askAgent}
+              disabled={engineLoading}
+              className="rounded-full bg-ink px-4 py-2 text-[12px] font-medium text-paper hover:bg-ink-soft disabled:opacity-50"
+            >
+              {engineLoading ? "Querying agent…" : "Ask agent for full audit"}
+            </button>
+          </div>
         </div>
 
         {/* Analysis */}
         <div className="space-y-5">
+          {/* Engine verdict from POST /api/loan */}
+          {(engineResult || engineLoading || engineError) && (
+            <div className="card-surface p-7 border-teal/20">
+              <p className="eyebrow text-teal">SokoSense engine</p>
+              {engineLoading && !engineResult && (
+                <p className="mt-3 text-[13px] text-steel">Checking loan engine…</p>
+              )}
+              {engineError && (
+                <p className="mt-3 text-[13px] text-rose-600">{engineError}</p>
+              )}
+              {engineResult && (
+                <>
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="font-serif text-[28px] text-ink tabular">
+                      {engineResult.apr_percent.toFixed(1)}% APR
+                    </span>
+                    <span className="chip capitalize">{engineResult.risk_verdict.toLowerCase().replace("_", " ")}</span>
+                  </div>
+                  <p className="mt-3 text-[13.5px] text-ink leading-relaxed">{engineResult.short_reply}</p>
+                  <p className="mt-2 text-[12px] text-steel">{engineResult.comparison_phrase}</p>
+                </>
+              )}
+            </div>
+          )}
+
+          {agentReply && (
+            <div className="card-surface p-7 bg-canvas">
+              <p className="eyebrow">Agent audit</p>
+              <p className="mt-3 text-[13.5px] text-ink leading-relaxed whitespace-pre-wrap">{agentReply}</p>
+            </div>
+          )}
           {/* Risk classification */}
           <div className={`card-surface p-7 ${riskColor.border}`}>
             <div className="flex items-center justify-between">

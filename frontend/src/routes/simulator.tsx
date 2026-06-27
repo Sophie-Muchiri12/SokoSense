@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
+import { postAgent, type AgentResponse } from "@/lib/sokosense-api";
 
 export const Route = createFileRoute("/simulator")({
   head: () => ({
@@ -21,24 +22,21 @@ export const Route = createFileRoute("/simulator")({
 });
 
 type Lang = "en" | "sw";
-type StageState = "pending" | "running" | "completed";
+type StageState = "pending" | "running" | "completed" | "error";
 type Stage = { id: string; label: string; detail: string };
 
 const STAGES: Stage[] = [
   { id: "sms-in", label: "SMS received", detail: "Telco gateway · Safaricom 21455" },
-  { id: "market", label: "Market engine called", detail: "Spatial price + arbitrage graph" },
-  { id: "loan", label: "Loan engine called", detail: "Credit scoring · risk tier model" },
-  { id: "compose", label: "Response generated", detail: "gemini-flash-agri · 160-char shaping" },
+  { id: "agent", label: "Agent invoked", detail: "LangGraph · tool-calling loop" },
+  { id: "market", label: "Market engine called", detail: "KAMIS price feed · arbitrage graph" },
+  { id: "compose", label: "Response generated", detail: "Featherless LLM · 160-char shaping" },
   { id: "sms-out", label: "SMS delivered", detail: "DLR confirmed · session closed" },
 ];
 
 type Recommendation = {
-  crop: string;
-  market: string;
-  price: string;
-  recommendation: string;
-  confidence: number;
-  explanation: string;
+  type: AgentResponse["type"];
+  raw_response: string;
+  toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
 };
 
 const COPY = {
@@ -50,7 +48,7 @@ const COPY = {
       "Type a farmer message in the format the shortcode expects. We parse intent, run the market and credit engines, then return a 160-character reply.",
     inputCardTitle: "Inbound SMS",
     inputCardSub: "Farmer message · shortcode 21455",
-    placeholder: "MAIZE NAKURU",
+    placeholder: "PRICE MAIZE NAKURU",
     send: "Run engine",
     sending: "Running…",
     langLabel: "Language",
@@ -58,17 +56,15 @@ const COPY = {
     limit: "160 char limit",
     aiTitle: "AI recommendation",
     aiSub: "Decision payload returned to the farmer",
-    crop: "Crop",
-    market: "Market",
-    price: "Reference price",
-    rec: "Recommendation",
-    conf: "Confidence",
-    why: "Decision explanation",
+    responseType: "Response type",
+    agentReply: "Agent reply",
+    toolsUsed: "Tools invoked",
     pipelineTitle: "Live pipeline",
     pipelineSub: "Engine stages for the active request",
     empty: "Run the engine to see a recommendation.",
     reset: "Reset",
     hint: "Try: PRICE MAIZE NAKURU · LOAN 35000 BEANS 6 MONTHS · WEATHER MERU",
+    error: "Agent error — check backend logs.",
   },
   sw: {
     eyebrow: "Simulator ya Akili ya SMS",
@@ -78,7 +74,7 @@ const COPY = {
       "Andika ujumbe wa mkulima kwa muundo unaotarajiwa. Tunafafanua nia, tunaita injini ya soko na mkopo, kisha tunarudisha jibu la herufi 160.",
     inputCardTitle: "SMS ya kuingia",
     inputCardSub: "Ujumbe wa mkulima · namba fupi 21455",
-    placeholder: "MAHINDI NAKURU",
+    placeholder: "BEI MAHINDI NAKURU",
     send: "Endesha injini",
     sending: "Inafanya kazi…",
     langLabel: "Lugha",
@@ -86,108 +82,36 @@ const COPY = {
     limit: "kikomo herufi 160",
     aiTitle: "Pendekezo la AI",
     aiSub: "Jibu linalorudi kwa mkulima",
-    crop: "Zao",
-    market: "Soko",
-    price: "Bei ya rejeleo",
-    rec: "Pendekezo",
-    conf: "Uhakika",
-    why: "Maelezo ya uamuzi",
+    responseType: "Aina ya jibu",
+    agentReply: "Jibu la wakala",
+    toolsUsed: "Zana zilizotumika",
     pipelineTitle: "Hatua za moja kwa moja",
     pipelineSub: "Hatua za injini kwa ombi la sasa",
     empty: "Endesha injini kuona pendekezo.",
     reset: "Anza upya",
     hint: "Jaribu: BEI MAHINDI NAKURU · MKOPO 35000 MAHARAGE MIEZI 6 · HALI YA HEWA MERU",
+    error: "Hitilafu ya wakala — angalia kumbukumbu za seva.",
   },
 } as const;
 
-function parseMessage(raw: string, lang: Lang): Recommendation {
-  const text = raw.trim().toUpperCase();
-  const tokens = text.split(/\s+/).filter(Boolean);
-
-  const cropMap: Record<string, string> = {
-    MAIZE: "Maize", MAHINDI: "Maize",
-    BEANS: "Beans", MAHARAGE: "Beans", MAHARAGWE: "Beans",
-    POTATO: "Potato", VIAZI: "Potato",
-    RICE: "Rice", MCHELE: "Rice",
-    COFFEE: "Coffee", KAHAWA: "Coffee",
-    TEA: "Tea", CHAI: "Tea",
-  };
-  const marketSet = new Set([
-    "NAKURU", "NAIROBI", "ELDORET", "KITALE", "MERU", "KISUMU", "MOMBASA",
-    "GARISSA", "MACHAKOS", "MARSABIT", "NYERI", "THIKA",
-  ]);
-
-  let crop = "Maize";
-  let market = "Nakuru";
-  for (const t of tokens) {
-    if (cropMap[t]) crop = cropMap[t];
-    if (marketSet.has(t)) market = t.charAt(0) + t.slice(1).toLowerCase();
-  }
-
-  const isLoan = /^(LOAN|MKOPO)/.test(text);
-  const isWeather = /(WEATHER|HALI)/.test(text);
-
-  if (isLoan) {
-    const amt = tokens.find((t) => /^\d{3,7}$/.test(t)) ?? "35000";
-    return {
-      crop,
-      market,
-      price: `KSh ${Number(amt).toLocaleString()} requested`,
-      recommendation: lang === "sw" ? "Idhini ya awali · APR 18.4%" : "Pre-approved · APR 18.4%",
-      confidence: 0.72,
-      explanation:
-        lang === "sw"
-          ? `Tier B kwa mzigo wa ${crop}. Historia ya malipo nzuri, msimu wa mavuno wa miezi 6 unalingana.`
-          : `Tier B against ${crop} cycle. Repayment history clean, 6-month harvest window aligns with bullet term.`,
-    };
-  }
-
-  if (isWeather) {
-    return {
-      crop,
-      market,
-      price: lang === "sw" ? "38mm mvua / siku 7" : "38mm rain / 7 days",
-      recommendation:
-        lang === "sw" ? "Nyunyizia dawa ya kuvu kabla ya Jumanne" : "Apply preventative fungicide before Tuesday",
-      confidence: 0.88,
-      explanation:
-        lang === "sw"
-          ? "Shinikizo la blight linaongezeka. Siku tatu za mvua zinazokuja huongeza hatari kwa viazi na nyanya."
-          : "Late-blight pressure rising. Three wet days forecast lift risk for potato and tomato — preventative window now.",
-    };
-  }
-
-  // Price intent (default)
-  const priceTable: Record<string, number> = {
-    Maize: 4520, Beans: 11800, Potato: 3200, Rice: 9800, Coffee: 38500, Tea: 5400,
-  };
-  const base = priceTable[crop] ?? 4520;
-  const delta = base * 0.066;
-  const alt = market === "Eldoret" ? "Nakuru" : "Eldoret";
-  return {
-    crop,
-    market,
-    price: `KSh ${base.toLocaleString()} / 90kg`,
-    recommendation:
-      lang === "sw"
-        ? `Shikilia wiki 2 · uza ${alt}`
-        : `Hold 14 days · sell ${alt}`,
-    confidence: 0.92,
-    explanation:
-      lang === "sw"
-        ? `${alt} inalipa KSh ${(base + delta).toFixed(0)} (+6.2%). Baada ya usafiri, faida ni KSh 20/gunia. Utabiri unaonyesha bei kupanda zaidi.`
-        : `${alt} pays KSh ${(base + delta).toFixed(0)} (+6.2%). Net of transport you gain KSh 20/bag. Forward curve points to +KSh 180 over 14 days.`,
-  };
-}
+/** Map agent type → badge colours */
+const TYPE_COLORS: Record<AgentResponse["type"], { bg: string; text: string }> = {
+  market:   { bg: "bg-teal/10",        text: "text-teal" },
+  loan:     { bg: "bg-green-surface",  text: "text-green-deep" },
+  weather:  { bg: "bg-sky-50",         text: "text-sky-700" },
+  advisory: { bg: "bg-amber/10",       text: "text-amber" },
+  general:  { bg: "bg-canvas",         text: "text-steel" },
+};
 
 function SimulatorPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [message, setMessage] = useState("");
   const [rec, setRec] = useState<Recommendation | null>(null);
   const [stageStates, setStageStates] = useState<Record<string, StageState>>(
-    Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>
+    Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>,
   );
   const [running, setRunning] = useState(false);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const t = COPY[lang];
 
@@ -196,38 +120,81 @@ function SimulatorPage() {
     timers.current = [];
     setRec(null);
     setRunning(false);
-    setStageStates(Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>);
+    setLatencyMs(null);
+    setStageStates(
+      Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>,
+    );
   };
 
-  const run = () => {
+  const run = async () => {
     if (!message.trim() || running) return;
-    reset();
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+    setRec(null);
+    setLatencyMs(null);
+    setStageStates(
+      Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>,
+    );
     setRunning(true);
+
+    // Animate stages 0..2 sequentially while we await the API
     const next: Record<string, StageState> = Object.fromEntries(
-      STAGES.map((s) => [s.id, "pending"])
+      STAGES.map((s) => [s.id, "pending"]),
     ) as Record<string, StageState>;
 
-    const tick = (i: number, state: StageState, delay: number) => {
-      const handle = setTimeout(() => {
-        next[STAGES[i].id] = state;
+    const tick = (id: string, state: StageState, delay: number) => {
+      const h = setTimeout(() => {
+        next[id] = state;
         setStageStates({ ...next });
       }, delay);
-      timers.current.push(handle);
+      timers.current.push(h);
     };
 
-    // sequential running -> completed for each stage
-    const step = 280;
-    STAGES.forEach((_, i) => {
-      tick(i, "running", i * step);
-      tick(i, "completed", i * step + step - 40);
-    });
+    // Show first 3 stages animating while the real request is in flight
+    tick("sms-in", "running",   0);
+    tick("sms-in", "completed", 300);
+    tick("agent",  "running",   320);
+    tick("market", "running",   700);
 
-    const total = STAGES.length * step + 60;
-    const finish = setTimeout(() => {
-      setRec(parseMessage(message, lang));
+    try {
+      const start = performance.now();
+      const result = await postAgent(message);
+      const elapsed = Math.round(performance.now() - start);
+      setLatencyMs(elapsed);
+
+      // Complete remaining pipeline stages
+      const now = performance.now() - start; // approx 0 since we just awaited
+      tick("market",  "completed", 0);
+      tick("agent",   "completed", 80);
+      tick("compose", "running",   100);
+      tick("compose", "completed", 350);
+      tick("sms-out", "running",   370);
+      tick("sms-out", "completed", 600);
+
+      const finish = setTimeout(() => {
+        const toolCalls = result.raw?.messages?.flatMap(
+          (m) => m.tool_calls ?? [],
+        ) ?? [];
+        setRec({
+          type: result.type,
+          raw_response: result.response,
+          toolCalls,
+        });
+        setRunning(false);
+      }, 650);
+      timers.current.push(finish);
+    } catch (err) {
+      // Mark all remaining stages as error
+      STAGES.forEach((s) => {
+        next[s.id] = next[s.id] === "completed" ? "completed" : "error";
+      });
+      setStageStates({ ...next });
+      setRec({
+        type: "general",
+        raw_response: t.error + (err instanceof Error ? ` (${err.message})` : ""),
+      });
       setRunning(false);
-    }, total);
-    timers.current.push(finish);
+    }
   };
 
   const charCount = message.length;
@@ -236,6 +203,8 @@ function SimulatorPage() {
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
   };
+
+  const typeColors = rec ? TYPE_COLORS[rec.type] : TYPE_COLORS.general;
 
   return (
     <div className="mx-auto max-w-[1240px] px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
@@ -266,6 +235,7 @@ function SimulatorPage() {
             Farmer message
           </label>
           <textarea
+            id="simulator-input"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={onKey}
@@ -283,6 +253,7 @@ function SimulatorPage() {
 
           <div className="mt-6 flex items-center gap-3">
             <button
+              id="simulator-run-btn"
               onClick={run}
               disabled={!message.trim() || running}
               className="rounded-full bg-teal px-5 py-2.5 text-[12.5px] font-medium text-paper hover:bg-teal-soft disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -290,6 +261,7 @@ function SimulatorPage() {
               {running ? t.sending : t.send}
             </button>
             <button
+              id="simulator-reset-btn"
               onClick={reset}
               disabled={running && !rec}
               className="rounded-full border border-ink/15 bg-paper px-4 py-2.5 text-[12.5px] font-medium text-ink hover:border-ink/40 disabled:opacity-50 transition-colors"
@@ -298,9 +270,20 @@ function SimulatorPage() {
             </button>
             <span className="ml-auto text-[11px] text-mist">⌘ + Enter</span>
           </div>
+
+          {/* Latency badge */}
+          {latencyMs !== null && (
+            <div className="mt-5 flex items-center gap-2 rounded-xl border border-hairline bg-canvas px-4 py-3">
+              <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
+              <p className="text-[12px] text-steel">
+                Agent responded in{" "}
+                <span className="tabular font-medium text-ink">{latencyMs}ms</span>
+              </p>
+            </div>
+          )}
         </section>
 
-        {/* RIGHT — AI Recommendation */}
+        {/* RIGHT — Agent response */}
         <section className="card-surface p-7 flex flex-col">
           <div className="flex items-start justify-between">
             <div>
@@ -317,25 +300,51 @@ function SimulatorPage() {
               <p className="text-[13px] text-mist max-w-xs">{t.empty}</p>
             </div>
           ) : (
-            <div className="mt-6 flex flex-col gap-5">
-              <div className="grid grid-cols-3 gap-px bg-hairline rounded-xl overflow-hidden border border-hairline">
-                <Field label={t.crop} value={rec.crop} />
-                <Field label={t.market} value={rec.market} />
-                <Field label={t.price} value={rec.price} mono />
+            <div className="mt-6 flex flex-col gap-5 flex-1">
+              {/* Type badge */}
+              <div className="flex items-center gap-2">
+                <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist">
+                  {t.responseType}
+                </p>
+                <span
+                  className={`inline-flex rounded-full px-3 py-0.5 text-[11px] font-medium capitalize ${typeColors.bg} ${typeColors.text}`}
+                >
+                  {rec.type}
+                </span>
               </div>
 
-              <div className="rounded-xl border border-teal/25 bg-teal/[0.04] p-5">
-                <p className="text-[10.5px] uppercase tracking-[0.14em] text-teal/80">{t.rec}</p>
-                <p className="mt-1.5 font-serif text-[20px] leading-snug text-ink">{rec.recommendation}</p>
+              {/* Agent reply — full prose from the LLM */}
+              <div className="rounded-xl border border-teal/25 bg-teal/[0.04] p-5 flex-1">
+                <p className="text-[10.5px] uppercase tracking-[0.14em] text-teal/80 mb-2">
+                  {t.agentReply}
+                </p>
+                <p className="text-[14px] leading-relaxed text-ink whitespace-pre-wrap">
+                  {rec.raw_response}
+                </p>
               </div>
 
-              <div className="grid grid-cols-[auto_1fr] gap-5 items-center">
-                <ConfidenceDial value={rec.confidence} label={t.conf} />
+              {rec.toolCalls && rec.toolCalls.length > 0 && (
                 <div>
-                  <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist">{t.why}</p>
-                  <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink">{rec.explanation}</p>
+                  <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist mb-2">
+                    {t.toolsUsed}
+                  </p>
+                  <ul className="space-y-2">
+                    {rec.toolCalls.map((tc, i) => (
+                      <li
+                        key={`${tc.name}-${i}`}
+                        className="rounded-lg border border-hairline bg-canvas px-3 py-2 text-[12px] font-mono text-steel"
+                      >
+                        <span className="text-teal">{tc.name}</span>
+                        {Object.keys(tc.args).length > 0 && (
+                          <span className="text-mist ml-2">
+                            {JSON.stringify(tc.args)}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </section>
@@ -382,51 +391,12 @@ function LangToggle({ lang, onChange, label }: { lang: Lang; onChange: (l: Lang)
   );
 }
 
-function Field({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="bg-paper p-4">
-      <p className="text-[10.5px] uppercase tracking-[0.12em] text-mist">{label}</p>
-      <p className={`mt-1.5 text-[14px] text-ink ${mono ? "tabular font-mono" : ""}`}>{value}</p>
-    </div>
-  );
-}
-
-function ConfidenceDial({ value, label }: { value: number; label: string }) {
-  const pct = Math.round(value * 100);
-  const r = 28;
-  const c = 2 * Math.PI * r;
-  const dash = c * value;
-  return (
-    <div className="flex flex-col items-center">
-      <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist mb-2">{label}</p>
-      <div className="relative h-[72px] w-[72px]">
-        <svg viewBox="0 0 64 64" className="h-full w-full -rotate-90">
-          <circle cx="32" cy="32" r={r} fill="none" stroke="#E6EAE3" strokeWidth="5" />
-          <circle
-            cx="32"
-            cy="32"
-            r={r}
-            fill="none"
-            stroke="#0D9280"
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeDasharray={`${dash} ${c}`}
-            className="transition-[stroke-dasharray] duration-500"
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="font-serif text-[18px] text-ink tabular">{pct}%</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function PipelineLegend() {
   const items: { state: StageState; label: string }[] = [
-    { state: "pending", label: "Pending" },
-    { state: "running", label: "Running" },
+    { state: "pending",   label: "Pending" },
+    { state: "running",   label: "Running" },
     { state: "completed", label: "Completed" },
+    { state: "error",     label: "Error" },
   ];
   return (
     <div className="flex items-center gap-4">
@@ -441,19 +411,25 @@ function PipelineLegend() {
 }
 
 function StateDot({ state }: { state: StageState }) {
-  if (state === "completed") return <span className="h-2 w-2 rounded-full bg-teal" />;
+  if (state === "completed")
+    return <span className="h-2 w-2 rounded-full bg-teal" />;
   if (state === "running")
     return <span className="h-2 w-2 rounded-full bg-teal animate-pulse ring-2 ring-teal/25" />;
+  if (state === "error")
+    return <span className="h-2 w-2 rounded-full bg-rose-500" />;
   return <span className="h-2 w-2 rounded-full border border-mist" />;
 }
 
 function PipelineStep({ index, stage, state }: { index: number; stage: Stage; state: StageState }) {
   const stateCopy =
-    state === "completed" ? "Completed" : state === "running" ? "Running" : "Pending";
+    state === "completed" ? "Completed"
+    : state === "running"   ? "Running"
+    : state === "error"     ? "Error"
+    : "Pending";
   return (
     <li
       className={`bg-paper p-5 flex flex-col gap-3 transition-colors ${
-        state === "running" ? "bg-teal/[0.04]" : ""
+        state === "running" ? "bg-teal/[0.04]" : state === "error" ? "bg-rose-50" : ""
       }`}
     >
       <div className="flex items-center justify-between">
@@ -468,11 +444,10 @@ function PipelineStep({ index, stage, state }: { index: number; stage: Stage; st
       </div>
       <p
         className={`text-[10.5px] uppercase tracking-[0.14em] tabular ${
-          state === "completed"
-            ? "text-teal"
-            : state === "running"
-            ? "text-ink"
-            : "text-mist"
+          state === "completed" ? "text-teal"
+          : state === "running"   ? "text-ink"
+          : state === "error"     ? "text-rose-500"
+          : "text-mist"
         }`}
       >
         {stateCopy}
@@ -480,4 +455,3 @@ function PipelineStep({ index, stage, state }: { index: number; stage: Stage; st
     </li>
   );
 }
-
