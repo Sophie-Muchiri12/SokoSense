@@ -385,30 +385,18 @@ def scrape_kamis_prices(
         if clean_county_name:
             location_params["county"] = clean_county_name
         if clean_market_name:
-            location_params["market"] = clean_market_name
-        frames = _fetch_products(KAMIS_SEARCH_URL, location_params, per_page=100)
-    else:
-        frames = _fetch_products(KAMIS_MARKET_URL, {}, per_page=10)
+            # LLMs and SMS parsers often pass a town/county as market_name
+            # ("Nairobi") even when KAMIS stores the exact market separately
+            # ("Kawangware"). Treat market_name as a broad location hint.
+            df = df[
+                df['Market'].str.contains(clean_market_name, case=False, na=False) |
+                df['County'].str.contains(clean_market_name, case=False, na=False)
+            ]
+        if clean_county_name:
+            df = df[df['County'].str.contains(clean_county_name, case=False, na=False)]
 
-    df = _apply_filters(_combine(frames))
-
-    # 2. Fallback: location query returned nothing (KAMIS ignored the filter,
-    #    a county slug mismatch, etc.). Pull a broad recent window from the main
-    #    endpoint and filter locally — degrades gracefully instead of failing.
-    if has_location and (df is None or df.empty) and time.monotonic() < deadline:
-        fallback_frames = _fetch_products(KAMIS_MARKET_URL, {}, per_page=100)
-        if fallback_frames:
-            df = _apply_filters(_combine(fallback_frames))
-
-    if df is None:
-        if fetch_state["skipped"]:
-            return (
-                "KAMIS price service is busy right now (rate limit reached). "
-                "Please try again in a minute."
-            )
-        return "No price data could be retrieved from the KAMIS website."
-
-    if len(df) == 0:
+    total_rows = len(df)
+    if total_rows == 0:
         msg = "No price data found matching your query."
         if crop_name:
             msg += f" Crop: '{crop_name}' (Resolved IDs: {product_ids})."

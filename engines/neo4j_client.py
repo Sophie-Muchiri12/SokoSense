@@ -20,6 +20,8 @@ Usage:
 import os
 import logging
 from typing import Any
+import hashlib
+import numpy as np
 
 from dotenv import load_dotenv
 
@@ -63,8 +65,7 @@ def get_embedding(text: str) -> list[float]:
             logger.warning("Featherless embedding failed: %s — using fallback", exc)
 
     # Fallback: deterministic hash-based embedding for development
-    import hashlib
-    import numpy as np
+   
     rng = np.random.default_rng(int(hashlib.md5(text.encode()).hexdigest()[:8], 16))
     return rng.uniform(-0.01, 0.01, VECTOR_DIMENSION).tolist()
 

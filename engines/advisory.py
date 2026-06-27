@@ -342,7 +342,7 @@ def answer_farmer_question(
         response = llm.invoke([system_prompt, user_message])
         answer = response.content.strip()
     except Exception as exc:
-        logger.error("LLM call failed: %s", exc)
+        logger.warning("Featherless LLM call failed in advisory: %s", exc)
         answer = (
             f"I'm sorry, I couldn't generate a complete answer right now. "
             f"Based on my records: {graph_context[:300]}"
