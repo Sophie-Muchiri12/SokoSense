@@ -382,10 +382,18 @@ def _build_short_reply(monthly: float, apr: float, mapped: RiskVerdict) -> str:
     )
 
 
-def _build_short_reply_multi(monthly: float, apr: float, mapped: RiskVerdict) -> str:
+def _build_short_reply_multi(
+    monthly: float,
+    apr: float,
+    mapped: RiskVerdict,
+    principal: float = None,
+    total_repayment: float = None,
+    term_months: float = None,
+) -> str:
     """
-    USSD amount-band variant: shows all 3 lender alternatives in one screen
-    instead of just the single cheapest one. Still capped at 320 chars to
+    USSD amount-band variant: shows the payment breakdown (amount, monthly
+    payment, total repayment) plus all 3 lender alternatives in one screen,
+    instead of just a rate-only danger verdict. Still capped at 320 chars to
     satisfy LoanResponse.short_reply's max_length — real lender blurbs from
     lenders.json can be long enough to exceed it, so we truncate defensively
     at a word boundary rather than letting Pydantic reject the response.
@@ -393,25 +401,37 @@ def _build_short_reply_multi(monthly: float, apr: float, mapped: RiskVerdict) ->
     ratio = round(apr / CBK_CBR_RATE, 1) if CBK_CBR_RATE else 0
     alternatives = _get_alternatives_list()
 
+    payment_line = ""
+    if principal is not None and total_repayment is not None and term_months:
+        monthly_payment = total_repayment / term_months
+        payment_line = (
+            f"KSh {principal:,.0f} over {term_months:.0f}mo: "
+            f"~KSh {monthly_payment:,.0f}/month, total KSh {total_repayment:,.0f}. "
+        )
+
     if mapped == RiskVerdict.AVOID:
         msg = (
+            f"{payment_line}"
             f"DO NOT TAKE THIS LOAN. {apr}% APR. {ratio}x the CBK rate. "
             f"BETTER OPTIONS: {alternatives}"
         )
     elif mapped == RiskVerdict.HIGH_RISK:
         msg = (
+            f"{payment_line}"
             f"HIGH RISK. {apr}% APR. {ratio}x CBK rate. "
             f"BETTER OPTIONS: {alternatives}"
         )
     elif mapped == RiskVerdict.CAUTION:
         msg = (
+            f"{payment_line}"
             f"CAUTION. {apr}% APR. Above CBK benchmark. "
             f"BETTER OPTIONS: {alternatives}"
         )
     else:
         msg = (
-            f"SAFE. {apr}% APR. Near CBK benchmark. Still read all loan terms. "
-            f"OTHER OPTIONS: {alternatives}"
+            f"{payment_line}"
+            f"SAFE. {apr}% APR. Near CBK benchmark. "
+            f"BEST: {alternatives}"
         )
 
     return _truncate_at_word(msg, 320)
@@ -450,7 +470,14 @@ def decide_loan_by_amount_band(band_key: str) -> LoanResponse:
     monthly = result["interest_rate"]
     apr = result["real_apr"]
     mapped = _map_risk_verdict(result["verdict"], result["risk_level"])
-    short_reply = _build_short_reply_multi(monthly, apr, mapped)
+    short_reply = _build_short_reply_multi(
+        monthly,
+        apr,
+        mapped,
+        principal=result["principal"],
+        total_repayment=result["total_repayment"],
+        term_months=result["term_value"],
+    )
     comparison = truncate_sms(
         f"{result['band_label']} loan ~ {monthly}%/month = {apr}% APR vs CBK CBR {CBK_CBR_RATE}% p.a."
     )
