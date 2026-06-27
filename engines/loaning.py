@@ -1,4 +1,3 @@
-
 from typing import Any
 
 from langchain_core.tools import tool
@@ -244,19 +243,75 @@ def _map_risk_verdict(verdict: str, risk_level: str) -> RiskVerdict:
     return RiskVerdict.SAFE
 
 
+def _get_best_alternative(is_woman: bool = False) -> str:
+    """
+    Return the single best no-collateral lender blurb for SMS.
+    Falls back to AFC hardcoded if loan_engine unavailable.
+    """
+    try:
+        from engines.loan_engine import match_lenders
+        tags = ["cash", "no_collateral"]
+        if is_woman:
+            tags.append("women")
+        lenders = match_lenders(
+            tags=tags,
+            has_collateral=False,
+            is_woman=is_woman,
+            max_results=1,
+        )
+        if lenders:
+            return lenders[0]["sms_blurb"]
+    except Exception:
+        pass
+    return "Try AFC: 10% per YEAR. Dial *234# or call 0800 723 573 FREE."
+
+
+def _get_alternatives_list() -> str:
+    """
+    Return top 3 lender alternatives as a compact SMS string.
+    Used for the MORE/ZAIDI second message.
+    """
+    try:
+        from engines.loan_engine import match_lenders
+        lenders = match_lenders(
+            tags=["cash", "no_collateral", "inputs"],
+            has_collateral=False,
+            is_woman=False,
+            max_results=3,
+        )
+        if lenders:
+            parts = []
+            for i, l in enumerate(lenders, 1):
+                apr_str = f"{l['apr']}% p.a." if l["apr"] else "ask lender"
+                parts.append(f"{i}. {l['name']} {apr_str}: {l['sms_blurb']}")
+            return " | ".join(parts)[:320]
+    except Exception:
+        pass
+    return (
+        "1. AFC: 10% p.a. Dial *234# FREE. "
+        "2. Hustler Fund: 8% p.a. via M-Pesa. "
+        "3. DigiFarm: inputs only, no collateral. Dial *944#."
+    )
+
+
 def _build_short_reply(monthly: float, apr: float, mapped: RiskVerdict) -> str:
     ratio = round(apr / CBK_CBR_RATE, 1) if CBK_CBR_RATE else 0
+    alternative = _get_best_alternative()
+
     if mapped == RiskVerdict.AVOID:
         return truncate_sms(
-            f"DO NOT TAKE THIS LOAN. {apr}% APR. {ratio}x the CBK rate. Try your SACCO."
+            f"DO NOT TAKE THIS LOAN. {apr}% APR. {ratio}x the CBK rate. "
+            f"BETTER: {alternative}"
         )
     if mapped == RiskVerdict.HIGH_RISK:
         return truncate_sms(
-            f"HIGH RISK. {apr}% APR. {ratio}x CBK rate. Negotiate or use SACCO."
+            f"HIGH RISK. {apr}% APR. {ratio}x CBK rate. "
+            f"BETTER: {alternative}"
         )
     if mapped == RiskVerdict.CAUTION:
         return truncate_sms(
-            f"CAUTION. {apr}% APR. Above CBK benchmark. Compare SACCO options first."
+            f"CAUTION. {apr}% APR. Above CBK benchmark. "
+            f"BETTER: {alternative}"
         )
     return truncate_sms(
         f"SAFE. {apr}% APR. Near CBK benchmark. Still read all loan terms."
