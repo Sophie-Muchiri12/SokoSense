@@ -2,81 +2,6 @@
 
 SokoSense turns raw market data into **one clear instruction** for Kenyan smallholder farmers — via SMS, USSD, and demo UI. Three rule-based engines (market, timing, loan) return ≤320-character decisions. Built for Kenya AI Challenge 2026 · AgriFin Track.
 
-## Quick start (FastAPI — under 5 minutes)
-
-1. **Clone and enter the repo:**
-   ```bash
-   cd SokoSense
-   ```
-
-2. **Virtual environment and dependencies:**
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-
-3. **Environment (optional for mock API):**
-   ```bash
-   cp .env.example .env
-   ```
-   Mock endpoints work without API keys. Add keys when wiring LLM parser, Neo4j, and Africa's Talking.
-
-4. **Run the API:**
-   ```bash
-   uvicorn main:app --reload
-   ```
-   Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for interactive Swagger UI.
-
-5. **Smoke test:**
-   ```bash
-   pytest tests/test_api.py -q
-   ```
-
-## API endpoints
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/health` | Health check |
-| POST | `/api/market` | Where to sell — `{ "crop": "maize", "location": "nakuru" }` |
-| POST | `/api/timing` | When to sell — `{ "crop": "maize", "market": "nakuru" }` |
-| POST | `/api/loan` | Loan APR verdict — `{ "monthly_rate_percent": 10 }` |
-| GET | `/api/logs` | Query log (empty until logging middleware) |
-| GET | `/api/market-prices?crop=maize` | Map price table for Ian's dashboard |
-
-Request/response shapes: see **`contract.json`** in the repo root.
-
-### Example — Wanjiku's market decision
-
-```bash
-curl -s -X POST http://127.0.0.1:8000/api/market \
-  -H "Content-Type: application/json" \
-  -d '{"crop":"maize","location":"nakuru"}' | python3 -m json.tool
-```
-
-Expected `short_reply`: *SELL IN ELDORET. KSh 600 more per bag. Worth the trip.*
-
-## Project structure
-
-```
-engines/          # Decision engines  — market, timing, loan
-models/           # Shared Pydantic schemas
-routes/           # FastAPI route handlers
-middleware/       # Query logging (Sophie D1 17:00)
-main.py           # App entry — uvicorn main:app
-contract.json     # API contract for Ian, Lucy, Job
-```
-
-## Legacy CLI — KAMIS Market Price Agent
-
-Job's LangGraph KAMIS scraper still runs separately (research / data prototyping):
-
-```bash
-python index.py "maize nairobi"
-```
-
----
-
 ## Features (KAMIS CLI agent)
 - **Multi-crop / Variety Resolution**: Resolves broad crop queries (e.g., "maize") into specific product varieties (e.g., "Dry Maize", "Green Maize", "Maize Flour") automatically.
 - **Robust Case Insensitivity**: Processes crop names and locations regardless of how they are capitalized (e.g., `dRy MAiZe kAkAmEgA`).
@@ -120,29 +45,78 @@ python index.py "maize nairobi"
 
 ---
 
-## How to Run
+## How to Run (Full Stack)
 
-You can run SokoSense in two ways:
+SokoSense has two parts: a **FastAPI backend** (decision engines + agent API) and a
+**React/Vite frontend** (demo UI). Run them in two separate terminals.
 
-### 1. Single-Shot CLI Query
-Pass your query directly as a command-line argument:
+### 1. Backend API (FastAPI)
+From the project root, with the virtual environment activated and dependencies installed:
 ```bash
-python index.py "maize nairobi"
+source venv/bin/activate          # or: python3 -m venv venv && pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+- API root: `http://localhost:8000`
+- Health check: `http://localhost:8000/health`
+- Interactive API docs (Swagger): `http://localhost:8000/docs`
+
+Quick test:
+```bash
+curl -X POST http://localhost:8000/api/loan \
+  -H "Content-Type: application/json" \
+  -d '{"monthly_rate_percent": 10.0}'
+
+curl -X POST http://localhost:8000/api/agent \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What are the current maize prices in Nakuru?"}'
 ```
 
-### 2. Interactive CLI Mode
-Run the script without arguments to enter an interactive session:
+### 2. Frontend (React + Vite)
+In a second terminal:
 ```bash
-python index.py
+cd frontend
+npm install        # first time only (bun also works if installed)
+npm run dev
 ```
-You can then ask questions sequentially:
-```text
-Welcome to the SokoSense KAMIS Market Price Agent!
-Type your query below (e.g. 'What is the price of Tomatoes in Meru county?')
-Type 'exit' or 'quit' to close.
+The UI is served at `http://localhost:8080` and talks to the backend live.
 
-Ask SokoSense> What is the price of tomatoes in Meru?
-...
+The frontend reads the backend URL from `frontend/.env`:
+```env
+VITE_API_URL=http://localhost:8000
+```
+Start the backend first so the UI can reach it. Pages wired to the live API:
+- **Simulator** (`/simulator`) → `POST /api/agent` (full LangGraph agent)
+- **Loan Analyzer** (`/loans`) → `POST /api/loan` (live APR + risk verdict)
+- **Market Map** (`/market`) → `GET /api/market-prices` (live price feed)
+- **Operations** (`/admin`) → `GET /health` (live API status badge)
+
+### Available API endpoints
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET  | `/health` | Service health check |
+| POST | `/api/agent` | Full LangGraph agent (price, advisory, weather, loan) |
+| POST | `/api/market` | Market decision engine |
+| POST | `/api/timing` | Sell-timing engine |
+| POST | `/api/loan` | Loan-risk engine |
+| POST | `/api/advisory` | RAG crop advisory |
+| GET  | `/api/market-prices` | KAMIS market prices |
+| GET  | `/api/logs` | Decision logs |
+| POST | `/ussd` | Africa's Talking USSD webhook |
+| POST | `/webhook/sms` | Africa's Talking SMS webhook |
+
+> **Note:** Some features need API keys in `.env` (Featherless/Groq for the agent,
+> Neo4j for advisory, Africa's Talking for SMS/USSD). Copy `.env.example` to `.env`
+> and fill in credentials. The rule-based engines (`/api/loan`, `/api/timing`,
+> `/api/market`) work without any keys.
+
+---
+
+## CLI agent (KAMIS price tool, optional)
+
+The standalone KAMIS market-price agent can also be run directly:
+```bash
+python engines/index.py "maize nairobi"     # single query
+python engines/index.py                      # interactive mode
 ```
 
 ---
@@ -173,3 +147,4 @@ When querying for prices in a location, SokoSense outputs a structured JSON bloc
   ]
 }
 ```
+
