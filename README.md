@@ -45,29 +45,78 @@ SokoSense turns raw market data into **one clear instruction** for Kenyan smallh
 
 ---
 
-## How to Run
+## How to Run (Full Stack)
 
-You can run SokoSense in two ways:
+SokoSense has two parts: a **FastAPI backend** (decision engines + agent API) and a
+**React/Vite frontend** (demo UI). Run them in two separate terminals.
 
-### 1. Single-Shot CLI Query
-Pass your query directly as a command-line argument:
+### 1. Backend API (FastAPI)
+From the project root, with the virtual environment activated and dependencies installed:
 ```bash
-python index.py "maize nairobi"
+source venv/bin/activate          # or: python3 -m venv venv && pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+- API root: `http://localhost:8000`
+- Health check: `http://localhost:8000/health`
+- Interactive API docs (Swagger): `http://localhost:8000/docs`
+
+Quick test:
+```bash
+curl -X POST http://localhost:8000/api/loan \
+  -H "Content-Type: application/json" \
+  -d '{"monthly_rate_percent": 10.0}'
+
+curl -X POST http://localhost:8000/api/agent \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What are the current maize prices in Nakuru?"}'
 ```
 
-### 2. Interactive CLI Mode
-Run the script without arguments to enter an interactive session:
+### 2. Frontend (React + Vite)
+In a second terminal:
 ```bash
-python index.py
+cd frontend
+npm install        # first time only (bun also works if installed)
+npm run dev
 ```
-You can then ask questions sequentially:
-```text
-Welcome to the SokoSense KAMIS Market Price Agent!
-Type your query below (e.g. 'What is the price of Tomatoes in Meru county?')
-Type 'exit' or 'quit' to close.
+The UI is served at `http://localhost:8080` and talks to the backend live.
 
-Ask SokoSense> What is the price of tomatoes in Meru?
-...
+The frontend reads the backend URL from `frontend/.env`:
+```env
+VITE_API_URL=http://localhost:8000
+```
+Start the backend first so the UI can reach it. Pages wired to the live API:
+- **Simulator** (`/simulator`) → `POST /api/agent` (full LangGraph agent)
+- **Loan Analyzer** (`/loans`) → `POST /api/loan` (live APR + risk verdict)
+- **Market Map** (`/market`) → `GET /api/market-prices` (live price feed)
+- **Operations** (`/admin`) → `GET /health` (live API status badge)
+
+### Available API endpoints
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET  | `/health` | Service health check |
+| POST | `/api/agent` | Full LangGraph agent (price, advisory, weather, loan) |
+| POST | `/api/market` | Market decision engine |
+| POST | `/api/timing` | Sell-timing engine |
+| POST | `/api/loan` | Loan-risk engine |
+| POST | `/api/advisory` | RAG crop advisory |
+| GET  | `/api/market-prices` | KAMIS market prices |
+| GET  | `/api/logs` | Decision logs |
+| POST | `/ussd` | Africa's Talking USSD webhook |
+| POST | `/webhook/sms` | Africa's Talking SMS webhook |
+
+> **Note:** Some features need API keys in `.env` (Featherless/Groq for the agent,
+> Neo4j for advisory, Africa's Talking for SMS/USSD). Copy `.env.example` to `.env`
+> and fill in credentials. The rule-based engines (`/api/loan`, `/api/timing`,
+> `/api/market`) work without any keys.
+
+---
+
+## CLI agent (KAMIS price tool, optional)
+
+The standalone KAMIS market-price agent can also be run directly:
+```bash
+python engines/index.py "maize nairobi"     # single query
+python engines/index.py                      # interactive mode
 ```
 
 ---
