@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
 import { postAgent, postLoan, type LoanResponse } from "@/lib/sokosense-api";
+=======
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+
+import { api, type LoanResponse } from "@/lib/api/client";
+>>>>>>> development
 
 export const Route = createFileRoute("/loans")({
   head: () => ({
@@ -94,6 +101,16 @@ function LoanRiskAnalyzer() {
 
     return { effectiveAPR, monthlyPayment, totalRepayment, totalInterest, risk, vsCBR };
   }, [monthlyRate, amount, months]);
+
+  // Live verdict from the SokoSense loan engine (debounced so dragging the
+  // slider doesn't flood the backend).
+  const debouncedRate = useDebounced(monthlyRate, 350);
+  const verdict = useQuery({
+    queryKey: ["loan", debouncedRate],
+    queryFn: () => api.loan(debouncedRate),
+    staleTime: 60_000,
+    placeholderData: (prev) => prev,
+  });
 
   const riskColor =
     calc.risk === "Safe"
@@ -274,6 +291,14 @@ function LoanRiskAnalyzer() {
               <Stat label="Total repayment" value={`KSh ${Math.round(calc.totalRepayment).toLocaleString()}`} />
             </div>
           </div>
+
+          {/* Live verdict from the backend loan engine */}
+          <LiveVerdictCard
+            monthlyRate={debouncedRate}
+            data={verdict.data}
+            isLoading={verdict.isLoading}
+            isError={verdict.isError}
+          />
         </div>
       </div>
 
@@ -417,5 +442,81 @@ function CostRow({ label, value, flat }: { label: string; value: number; flat?: 
         {flat ? `KSh ${value.toLocaleString()}` : `KSh ${Math.round(value).toLocaleString()}`}
       </span>
     </li>
+  );
+}
+
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(handle);
+  }, [value, delayMs]);
+  return debounced;
+}
+
+const VERDICT_STYLE: Record<LoanResponse["risk_verdict"], { badge: string; text: string }> = {
+  SAFE: { badge: "bg-green text-paper", text: "text-green-deep" },
+  CAUTION: { badge: "bg-amber text-paper", text: "text-amber" },
+  HIGH_RISK: { badge: "bg-rose text-paper", text: "text-rose" },
+  AVOID: { badge: "bg-rose text-paper", text: "text-rose" },
+};
+
+function LiveVerdictCard({
+  monthlyRate,
+  data,
+  isLoading,
+  isError,
+}: {
+  monthlyRate: number;
+  data?: LoanResponse;
+  isLoading: boolean;
+  isError: boolean;
+}) {
+  return (
+    <div className="card-surface p-7 bg-ink text-paper border-ink">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="eyebrow text-teal-glow">SokoSense engine · live</p>
+          <h3 className="font-serif text-[20px] mt-1">Official SMS verdict</h3>
+        </div>
+        {data && (
+          <span
+            className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-medium ${VERDICT_STYLE[data.risk_verdict].badge}`}
+          >
+            {data.risk_verdict.replace("_", " ")}
+          </span>
+        )}
+      </div>
+
+      {isError ? (
+        <p className="mt-4 text-[13px] text-paper/80">
+          Couldn&apos;t reach the loan engine. Confirm the API is running on{" "}
+          <code className="font-mono">localhost:8000</code>.
+        </p>
+      ) : !data ? (
+        <p className="mt-4 text-[13px] text-paper/60">{isLoading ? "Scoring…" : "Adjust the rate to score this loan."}</p>
+      ) : (
+        <>
+          <div className="mt-5 grid grid-cols-2 gap-px bg-ink-soft border border-ink-soft rounded-lg overflow-hidden">
+            <div className="bg-ink p-4">
+              <p className="text-[10px] uppercase tracking-wider text-mist">Real APR</p>
+              <p className="font-serif text-[24px] mt-1 tabular text-paper">{data.apr_percent}%</p>
+            </div>
+            <div className="bg-ink p-4">
+              <p className="text-[10px] uppercase tracking-wider text-mist">CBK benchmark</p>
+              <p className="font-serif text-[24px] mt-1 tabular text-teal-glow">{data.cbk_rate_percent}%</p>
+            </div>
+          </div>
+          <div className="mt-4 rounded-lg bg-paper/5 border border-paper/10 p-4">
+            <p className="text-[10px] uppercase tracking-wider text-mist">160-char SMS reply</p>
+            <p className="mt-1.5 text-[13.5px] leading-relaxed text-paper">{data.short_reply}</p>
+          </div>
+          <p className="mt-3 text-[11.5px] text-mist">
+            {data.comparison_phrase} · scored at {monthlyRate}%/month via{" "}
+            <code className="font-mono text-paper/80">/api/loan</code>
+          </p>
+        </>
+      )}
+    </div>
   );
 }
