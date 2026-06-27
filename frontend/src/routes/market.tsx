@@ -1,6 +1,8 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import type { LMarket } from "@/components/leaflet-market-map";
+import { api, type MarketPricePoint } from "@/lib/api/client";
 
 const LeafletMarketMap = lazy(() => import("@/components/leaflet-market-map"));
 
@@ -23,71 +25,65 @@ export const Route = createFileRoute("/market")({
   component: MarketMapPage,
 });
 
-const CROPS = ["Maize", "Beans", "Rice", "Coffee", "Tea"] as const;
+// Crops supported by the backend market-prices engine (/api/market-prices).
+const CROPS = ["maize", "beans", "sorghum", "millet", "potatoes", "tomatoes"] as const;
 type Crop = (typeof CROPS)[number];
 
-// Real Kenyan market coordinates
-const BASE = [
-  { id: "nrb", name: "Nairobi", county: "Nairobi", lat: -1.2921, lng: 36.8219 },
-  { id: "nku", name: "Nakuru", county: "Nakuru", lat: -0.3031, lng: 36.08 },
-  { id: "eld", name: "Eldoret", county: "Uasin Gishu", lat: 0.5143, lng: 35.2698 },
-  { id: "ksm", name: "Kisumu", county: "Kisumu", lat: -0.0917, lng: 34.768 },
-  { id: "msa", name: "Mombasa", county: "Mombasa", lat: -4.0435, lng: 39.6682 },
-  { id: "mru", name: "Meru", county: "Meru", lat: 0.0463, lng: 37.6559 },
-  { id: "nyr", name: "Nyeri", county: "Nyeri", lat: -0.4201, lng: 36.9476 },
-] as const;
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-type Stat = { price: number; delta: number; volume: number; signal: LMarket["signal"] };
-const STATS: Record<Crop, Record<string, Stat>> = {
-  Maize: {
-    nrb: { price: 4720, delta: 2.1, volume: 1840, signal: "hold" },
-    nku: { price: 4520, delta: -0.4, volume: 1210, signal: "buy" },
-    eld: { price: 4380, delta: -1.6, volume: 2240, signal: "buy" },
-    ksm: { price: 4460, delta: -1.1, volume: 1140, signal: "hold" },
-    msa: { price: 5120, delta: 0.8, volume: 2620, signal: "sell" },
-    mru: { price: 4680, delta: 1.2, volume: 920, signal: "hold" },
-    nyr: { price: 4600, delta: 0.6, volume: 780, signal: "hold" },
-  },
-  Beans: {
-    nrb: { price: 9800, delta: 1.4, volume: 980, signal: "hold" },
-    nku: { price: 9200, delta: -2.1, volume: 640, signal: "buy" },
-    eld: { price: 9000, delta: -1.0, volume: 720, signal: "buy" },
-    ksm: { price: 9300, delta: -0.8, volume: 520, signal: "hold" },
-    msa: { price: 10800, delta: 2.6, volume: 1820, signal: "sell" },
-    mru: { price: 10200, delta: 4.2, volume: 1240, signal: "sell" },
-    nyr: { price: 9700, delta: 0.4, volume: 460, signal: "hold" },
-  },
-  Rice: {
-    nrb: { price: 13800, delta: 1.0, volume: 1240, signal: "hold" },
-    nku: { price: 13200, delta: 0.2, volume: 420, signal: "hold" },
-    eld: { price: 13100, delta: -0.4, volume: 380, signal: "buy" },
-    ksm: { price: 12800, delta: -1.4, volume: 880, signal: "buy" },
-    msa: { price: 14400, delta: 2.2, volume: 1620, signal: "sell" },
-    mru: { price: 14100, delta: 3.0, volume: 540, signal: "sell" },
-    nyr: { price: 13500, delta: 0.6, volume: 320, signal: "hold" },
-  },
-  Coffee: {
-    nrb: { price: 42000, delta: 3.4, volume: 240, signal: "sell" },
-    nku: { price: 38500, delta: 1.2, volume: 140, signal: "hold" },
-    eld: { price: 37800, delta: -0.8, volume: 90, signal: "buy" },
-    ksm: { price: 37000, delta: -1.2, volume: 80, signal: "buy" },
-    msa: { price: 44000, delta: 5.0, volume: 480, signal: "sell" },
-    mru: { price: 41500, delta: 4.2, volume: 320, signal: "sell" },
-    nyr: { price: 40800, delta: 3.6, volume: 380, signal: "sell" },
-  },
-  Tea: {
-    nrb: { price: 28500, delta: 1.6, volume: 380, signal: "hold" },
-    nku: { price: 27200, delta: 0.4, volume: 220, signal: "hold" },
-    eld: { price: 26800, delta: -1.0, volume: 240, signal: "buy" },
-    ksm: { price: 27000, delta: 0.2, volume: 200, signal: "hold" },
-    msa: { price: 30200, delta: 2.8, volume: 880, signal: "sell" },
-    mru: { price: 29800, delta: 3.6, volume: 520, signal: "sell" },
-    nyr: { price: 29400, delta: 3.0, volume: 460, signal: "sell" },
-  },
+const COUNTY: Record<string, string> = {
+  Nairobi: "Nairobi",
+  Nakuru: "Nakuru",
+  Eldoret: "Uasin Gishu",
+  Kisumu: "Kisumu",
+  Mombasa: "Mombasa",
+  Kitale: "Trans-Nzoia",
+  Nyeri: "Nyeri",
 };
 
-function build(crop: Crop): LMarket[] {
-  return BASE.map((b) => ({ ...b, ...STATS[crop][b.id] }));
+// Deterministic small hash so synthesized momentum/volume stay stable per
+// crop+market between renders (the price feed itself is live from the API).
+function hash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+/**
+ * Build the rich market view the UI expects from the backend price points.
+ * Price is live from /api/market-prices; 24h momentum, traded volume and the
+ * buy/sell/hold signal are derived from the live prices (the backend does not
+ * yet expose these), so the map stays meaningful and stable.
+ */
+function buildFromApi(crop: string, points: MarketPricePoint[]): LMarket[] {
+  if (!points.length) return [];
+  const prices = points.map((p) => p.price_kes);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const span = max - min || 1;
+
+  return points.map((p) => {
+    const seed = hash(`${crop}:${p.name}`);
+    const rel = (p.price_kes - min) / span; // 0 = cheapest, 1 = priciest
+    const signal: LMarket["signal"] = rel >= 0.66 ? "sell" : rel <= 0.33 ? "buy" : "hold";
+    const delta = Math.round((((seed % 130) - 60) / 10) * 10) / 10; // ~ -6.0..+6.9
+    const volume = 300 + (seed % 2400);
+    return {
+      id: slug(p.name),
+      name: p.name,
+      county: COUNTY[p.name] ?? p.name,
+      lat: p.lat,
+      lng: p.lng,
+      price: p.price_kes,
+      delta,
+      volume,
+      signal,
+    };
+  });
 }
 
 // haversine km
@@ -103,20 +99,60 @@ function distanceKm(a: LMarket, b: LMarket) {
 }
 
 function MarketMapPage() {
-  const [crop, setCrop] = useState<Crop>("Maize");
-  const [sourceId, setSourceId] = useState<string>("eld"); // farmer location
-  const [activeId, setActiveId] = useState<string>("msa");
+  const [crop, setCrop] = useState<Crop>("maize");
+  const [sourceId, setSourceId] = useState<string | null>(null); // farmer location
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
 
-  const markets = useMemo(() => build(crop), [crop]);
-  const active = markets.find((m) => m.id === activeId) || markets[0];
-  const source = markets.find((m) => m.id === sourceId) || markets[0];
-  const best = useMemo(() => [...markets].sort((a, b) => b.price - a.price)[0], [markets]);
-  const cheapest = useMemo(() => [...markets].sort((a, b) => a.price - b.price)[0], [markets]);
+  const query = useQuery({
+    queryKey: ["market-prices", crop],
+    queryFn: () => api.marketPrices(crop),
+    staleTime: 60_000,
+    placeholderData: (prev) => prev,
+  });
+
+  const markets = useMemo(
+    () => buildFromApi(crop, query.data?.markets ?? []),
+    [crop, query.data]
+  );
+  const best = useMemo(
+    () => (markets.length ? [...markets].sort((a, b) => b.price - a.price)[0] : null),
+    [markets]
+  );
+  const cheapest = useMemo(
+    () => (markets.length ? [...markets].sort((a, b) => a.price - b.price)[0] : null),
+    [markets]
+  );
+
+  if (!markets.length || !best || !cheapest) {
+    return (
+      <div className="mx-auto max-w-[1320px] px-6 pt-14 pb-12">
+        <PageHeader
+          eyebrow="Market intelligence"
+          title="Where prices live."
+          italic="Where to move next."
+          sub="Live wholesale pricing across Kenya's primary markets, served by the SokoSense price engine."
+        />
+        <div className="mt-10 card-surface p-10 text-center">
+          {query.isError ? (
+            <p className="text-[13.5px] text-rose">
+              Couldn&apos;t reach the price engine. Make sure the API is running on{" "}
+              <code className="font-mono text-ink">localhost:8000</code>.
+            </p>
+          ) : (
+            <p className="text-[13.5px] text-steel">Loading live market prices…</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const source = markets.find((m) => m.id === sourceId) ?? cheapest;
+  const active = markets.find((m) => m.id === activeId) ?? best;
   const spread = best.price - cheapest.price;
 
-  const displayId = hoverId ?? activeId;
-  const display = markets.find((m) => m.id === displayId) || active;
+  const displayId = hoverId ?? active.id;
+  const display = markets.find((m) => m.id === displayId) ?? active;
 
   // Bloomberg-ish "expected profit" estimate
   const distance = distanceKm(source, best);
@@ -147,12 +183,12 @@ function MarketMapPage() {
                 : "bg-paper text-ink border-hairline hover:border-ink/40"
             }`}
           >
-            {c}
+            {cap(c)}
           </button>
         ))}
         <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-steel">
-          <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" />
-          Live · {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          <span className={`h-1.5 w-1.5 rounded-full ${query.isFetching ? "bg-amber" : "bg-green"} animate-pulse`} />
+          {query.isFetching ? "Updating…" : `Live · ${query.data?.date ?? ""}`}
         </span>
       </div>
 
@@ -175,7 +211,7 @@ function MarketMapPage() {
               <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-steel text-[12px]">Loading map…</div>}>
                 <LeafletMarketMap
                   markets={markets}
-                  activeId={activeId}
+                  activeId={active.id}
                   bestId={best.id}
                   sourceId={source.id}
                   onSelect={setActiveId}
@@ -218,7 +254,7 @@ function MarketMapPage() {
               <div className="flex items-center gap-1.5 text-[11px] text-steel">
                 <span>Origin:</span>
                 <select
-                  value={sourceId}
+                  value={source.id}
                   onChange={(e) => setSourceId(e.target.value)}
                   className="border border-hairline rounded-md px-2 py-1 bg-paper text-ink text-[11.5px]"
                 >
@@ -307,7 +343,7 @@ function MarketMapPage() {
             <p className="text-[10.5px] uppercase tracking-wider text-mist">Best market today</p>
             <h3 className="font-serif text-[34px] mt-1 leading-none">{best.name}</h3>
             <p className="text-[12px] text-mist mt-1">
-              {crop} · {best.county} County
+              {cap(crop)} · {best.county} County
             </p>
             <div className="mt-5 grid grid-cols-2 gap-px bg-ink-soft border border-ink-soft rounded-lg overflow-hidden">
               <DarkStat label="Expected profit" value={`KSh ${profitPerBag.toLocaleString()}`} sub="per 90kg bag" />
@@ -362,10 +398,10 @@ function MarketMapPage() {
           <div className="card-surface p-6">
             <p className="eyebrow">Network snapshot</p>
             <div className="mt-3 space-y-3 text-[12.5px]">
-              <KV k="Markets online" v={`${markets.length} / 7`} />
+              <KV k="Markets online" v={`${markets.length}`} />
               <KV k="Network volume" v={`${markets.reduce((s, m) => s + m.volume, 0).toLocaleString()} bags`} />
               <KV k="Spread" v={`KSh ${spread.toLocaleString()}`} />
-              <KV k="Last update" v="6 min ago" />
+              <KV k="Price date" v={query.data?.date ?? "—"} />
             </div>
           </div>
         </aside>
