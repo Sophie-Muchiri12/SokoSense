@@ -76,7 +76,7 @@ def post_agent(body: AgentRequest) -> AgentResponse:
         )
 
     except Exception as exc:
-        logger.error("Agent invocation failed: %s", exc)
+        logger.exception("Agent invocation failed: %s", exc)
         return AgentResponse(
             response=f"Sorry, I encountered an error processing your request. Please try again.",
             type="general",

@@ -1,5 +1,6 @@
 import os
 import io
+import time
 import urllib3
 import requests
 import pandas as pd
@@ -10,6 +11,19 @@ from engines.rate_limiter import kamis_http_limiter
 
 # Suppress SSL certificate warning from urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Max total time (seconds) a single price lookup may spend waiting on the KAMIS
+# rate limiter. Keeps /api/agent (and the SMS/USSD path) responsive instead of
+# blocking up to 60s per outgoing call. Override via env if needed.
+KAMIS_MAX_WAIT_SECONDS = float(os.getenv("KAMIS_MAX_WAIT_SECONDS", "12"))
+
+# Broad listing endpoint (recent rows across all counties).
+KAMIS_MARKET_URL = "https://kamis.kilimo.go.ke/site/market"
+# Server-side filtered endpoint. Accepts `county`, `market` and `product` GET
+# params so a location query (e.g. Nakuru) returns that county's rows directly
+# instead of relying on the requested county happening to appear in the most
+# recent page of the broad listing.
+KAMIS_SEARCH_URL = "https://kamis.kilimo.go.ke/site/market_search"
 
 # Full crop name to product ID mapping as extracted from the select2 dropdown options of the website
 CROP_MAPPING = {
@@ -287,74 +301,114 @@ def scrape_kamis_prices(
         county_name: Optional name of the county to filter by (e.g. 'Meru', 'Kakamega', 'Nairobi'). Case-insensitive.
         limit: Number of records to return. Maximum is 10. Do NOT change this value.
     """
-    url = "https://kamis.kilimo.go.ke/site/market"
     limit = min(limit, 10)  # Hard cap — never return more than 10 rows
 
     clean_crop_name = crop_name.strip() if crop_name else None
     clean_market_name = market_name.strip() if market_name else None
     clean_county_name = county_name.strip() if county_name else None
 
-    # If a location filter is set, fetch more rows from the server so the local
-    # filter has enough data to find matches. Without a filter, 10 is enough.
     has_location = bool(clean_market_name or clean_county_name)
-    server_per_page = 100 if has_location else 10
-
     product_ids = resolve_crop_ids(clean_crop_name)
-    dfs = []
 
-    if product_ids:
-        for pid in product_ids:
-            params = {
-                "product": pid,
-                "per_page": server_per_page
-            }
-            try:
-                kamis_http_limiter.acquire()  # ← rate-limit each outgoing HTTP call
-                response = requests.get(url, params=params, verify=False, timeout=15)
-                if response.status_code == 200:
-                    sub_dfs = pd.read_html(io.StringIO(response.text))
-                    if sub_dfs:
-                        dfs.append(sub_dfs[0])
-            except Exception:
-                pass
-    else:
-        params = {"per_page": server_per_page}
+    # Shared wait budget for the whole lookup so a multi-variety crop (e.g.
+    # "maize" → several product IDs) can't stack up multiple 60s rate-limit
+    # waits and hang the agent.
+    deadline = time.monotonic() + KAMIS_MAX_WAIT_SECONDS
+    fetch_state = {"skipped": False, "errored": False}
+
+    def _fetch_table(url: str, params: dict):
+        """Rate-limited single fetch that respects the shared wait budget."""
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not kamis_http_limiter.acquire(timeout=max(remaining, 0)):
+            fetch_state["skipped"] = True
+            return None
         try:
-            kamis_http_limiter.acquire()  # ← rate-limit the fallback HTTP call
             response = requests.get(url, params=params, verify=False, timeout=20)
             if response.status_code == 200:
-                sub_dfs = pd.read_html(io.StringIO(response.text))
-                if sub_dfs:
-                    dfs.append(sub_dfs[0])
-        except Exception as e:
-            return f"An error occurred while fetching KAMIS data: {str(e)}"
+                tables = pd.read_html(io.StringIO(response.text))
+                if tables:
+                    return tables[0]
+        except Exception:
+            fetch_state["errored"] = True
+        return None
 
-    if not dfs:
+    def _fetch_products(url: str, base_params: dict, per_page: int) -> list:
+        """Fetch one table per resolved product id (or a single broad table)."""
+        frames = []
+        if product_ids:
+            for pid in product_ids:
+                if time.monotonic() >= deadline:
+                    fetch_state["skipped"] = True
+                    break
+                df = _fetch_table(url, {**base_params, "product": pid, "per_page": per_page})
+                if df is not None:
+                    frames.append(df)
+        else:
+            df = _fetch_table(url, {**base_params, "per_page": per_page})
+            if df is not None:
+                frames.append(df)
+        return frames
+
+    def _combine(frames: list):
+        if not frames:
+            return None
+        combined = pd.concat(frames, ignore_index=True)
+        combined.columns = [c.strip() for c in combined.columns]
+        return combined.drop_duplicates()
+
+    def _apply_filters(df):
+        """Local case-insensitive filter — a safety net even when KAMIS filters
+        server-side (handles case/slug mismatches and stray rows)."""
+        if df is None or df.empty:
+            return df
+        out = df
+        if clean_crop_name and 'Commodity' in out.columns:
+            out = out[out['Commodity'].str.contains(clean_crop_name, case=False, na=False)]
+        if clean_market_name and clean_county_name:
+            cond = pd.Series(False, index=out.index)
+            if 'Market' in out.columns:
+                cond = cond | out['Market'].str.contains(clean_market_name, case=False, na=False)
+            if 'County' in out.columns:
+                cond = cond | out['County'].str.contains(clean_county_name, case=False, na=False)
+            out = out[cond]
+        else:
+            if clean_market_name and 'Market' in out.columns:
+                out = out[out['Market'].str.contains(clean_market_name, case=False, na=False)]
+            if clean_county_name and 'County' in out.columns:
+                out = out[out['County'].str.contains(clean_county_name, case=False, na=False)]
+        return out
+
+    # 1. Primary fetch. With a location filter, hit the server-side search
+    #    endpoint so the requested county/market is returned directly.
+    if has_location:
+        location_params = {}
+        if clean_county_name:
+            location_params["county"] = clean_county_name
+        if clean_market_name:
+            location_params["market"] = clean_market_name
+        frames = _fetch_products(KAMIS_SEARCH_URL, location_params, per_page=100)
+    else:
+        frames = _fetch_products(KAMIS_MARKET_URL, {}, per_page=10)
+
+    df = _apply_filters(_combine(frames))
+
+    # 2. Fallback: location query returned nothing (KAMIS ignored the filter,
+    #    a county slug mismatch, etc.). Pull a broad recent window from the main
+    #    endpoint and filter locally — degrades gracefully instead of failing.
+    if has_location and (df is None or df.empty) and time.monotonic() < deadline:
+        fallback_frames = _fetch_products(KAMIS_MARKET_URL, {}, per_page=100)
+        if fallback_frames:
+            df = _apply_filters(_combine(fallback_frames))
+
+    if df is None:
+        if fetch_state["skipped"]:
+            return (
+                "KAMIS price service is busy right now (rate limit reached). "
+                "Please try again in a minute."
+            )
         return "No price data could be retrieved from the KAMIS website."
 
-    # Combine and clean
-    df = pd.concat(dfs, ignore_index=True)
-    df.columns = [c.strip() for c in df.columns]
-    df = df.drop_duplicates()
-
-    # Filter in pandas (Case-Insensitive)
-    if clean_crop_name:
-        df = df[df['Commodity'].str.contains(clean_crop_name, case=False, na=False)]
-
-    if clean_market_name and clean_county_name:
-        # Match either market OR county
-        df = df[
-            df['Market'].str.contains(clean_market_name, case=False, na=False) |
-            df['County'].str.contains(clean_county_name, case=False, na=False)
-        ]
-    else:
-        if clean_market_name:
-            df = df[df['Market'].str.contains(clean_market_name, case=False, na=False)]
-        if clean_county_name:
-            df = df[df['County'].str.contains(clean_county_name, case=False, na=False)]
-
-    total_rows = len(df)
-    if total_rows == 0:
+    if len(df) == 0:
         msg = "No price data found matching your query."
         if crop_name:
             msg += f" Crop: '{crop_name}' (Resolved IDs: {product_ids})."
