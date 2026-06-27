@@ -76,6 +76,7 @@ class Neo4jClient:
     def __init__(self) -> None:
         self._driver = None
         self._enabled = False
+        self._database = None
         self._connect()
 
     # ── connection management ──────────────────────────────────────────────
@@ -88,8 +89,9 @@ class Neo4jClient:
 
     def _connect(self) -> None:
         uri = os.getenv("NEO4J_URI")
-        user = os.getenv("NEO4J_USER", "neo4j")
+        user = os.getenv("NEO4J_USER") or os.getenv("NEO4J_USERNAME", "neo4j")
         password = os.getenv("NEO4J_PASSWORD")
+        self._database = os.getenv("NEO4J_DATABASE")
 
         if not uri or not password:
             logger.warning(
@@ -105,12 +107,23 @@ class Neo4jClient:
             self._driver = GraphDatabase.driver(
                 uri, auth=(user, password), max_connection_lifetime=3600
             )
+            self._driver.verify_connectivity()
             self._enabled = True
             logger.info("Connected to Neo4j at %s", uri)
             self._ensure_vector_index()
         except Exception as exc:
             logger.error("Failed to connect to Neo4j: %s", exc)
+            if self._driver:
+                self._driver.close()
+                self._driver = None
             self._enabled = False
+
+    def _session(self):
+        """Open a driver session, honouring NEO4J_DATABASE when set."""
+        kwargs = {}
+        if self._database:
+            kwargs["database"] = self._database
+        return self.driver.session(**kwargs)
 
     def close(self) -> None:
         if self._driver:
@@ -125,7 +138,7 @@ class Neo4jClient:
         if not self._enabled:
             return
         try:
-            with self.driver.session() as session:
+            with self._session() as session:
                 # Check if index already exists
                 result = session.run(
                     "SHOW INDEXES WHERE name = $name",
@@ -189,7 +202,7 @@ class Neo4jClient:
             "chunk_idx": meta.get("chunk_idx", 0),
         }
         try:
-            with self.driver.session() as session:
+            with self._session() as session:
                 session.run(query, **params)
             return True
         except Exception as exc:
@@ -253,7 +266,7 @@ class Neo4jClient:
                score
         """
         try:
-            with self.driver.session() as session:
+            with self._session() as session:
                 result = session.run(
                     cypher,
                     index_name=VECTOR_INDEX_NAME,
@@ -291,7 +304,7 @@ class Neo4jClient:
         LIMIT 25
         """
         try:
-            with self.driver.session() as session:
+            with self._session() as session:
                 result = session.run(query, crop=crop, disease=disease)
                 rows = [dict(r) for r in result]
                 return rows if rows else self._sample_data(crop, disease)
@@ -311,7 +324,7 @@ class Neo4jClient:
         LIMIT 15
         """
         try:
-            with self.driver.session() as session:
+            with self._session() as session:
                 result = session.run(query, location=location.title())
                 return [dict(r) for r in result]
         except Exception as exc:
@@ -328,7 +341,7 @@ class Neo4jClient:
 
         queries = _SEED_CYPHER
         try:
-            with self.driver.session() as session:
+            with self._session() as session:
                 for q in queries:
                     session.run(q)
             return f"Seeded {len(queries)} Cypher statements into Neo4j."
@@ -341,7 +354,7 @@ class Neo4jClient:
         if not self._enabled:
             return False
         try:
-            with self.driver.session() as session:
+            with self._session() as session:
                 session.run("MATCH (n:DocumentChunk) DETACH DELETE n")
             logger.info("Cleared all DocumentChunk nodes from Neo4j.")
             return True

@@ -14,6 +14,7 @@ Usage:
 
 import os
 import re
+import json
 import logging
 from typing import Any
 
@@ -27,6 +28,39 @@ from engines.weather import get_farmer_weather, _geocode_location, _fetch_weathe
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_answer_text(raw: str) -> str:
+    """Unwrap JSON LLM output into plain farmer-facing text."""
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.strip("`").strip()
+        if text.lower().startswith("json"):
+            text = text[4:].strip()
+
+    candidates = [text]
+    if not text.startswith("{"):
+        candidates.append("{" + text)
+    if text.startswith('response"'):
+        candidates.insert(0, '{"' + text)
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(parsed, dict) and isinstance(parsed.get("response"), str):
+            return parsed["response"]
+
+    for pattern in (
+        r'"response"\s*:\s*"((?:[^"\\]|\\.)*)"',
+        r'response"\s*:\s*"((?:[^"\\]|\\.)*)"',
+    ):
+        match = re.search(pattern, text)
+        if match:
+            return bytes(match.group(1), "utf-8").decode("unicode_escape")
+
+    return text
 
 # ── keyword extraction (lightweight — no extra model call) ─────────────────
 
@@ -275,7 +309,7 @@ def answer_farmer_question(
 
     try:
         response = llm.invoke([system_prompt, user_message])
-        answer = response.content.strip()
+        answer = _extract_answer_text(response.content.strip())
     except Exception as exc:
         logger.warning("Featherless LLM call failed in advisory: %s", exc)
         answer = (

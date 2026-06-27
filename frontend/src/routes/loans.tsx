@@ -1,13 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
 import { postAgent, postLoan, type LoanResponse } from "@/lib/sokosense-api";
-=======
-import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-
-import { api, type LoanResponse } from "@/lib/api/client";
->>>>>>> development
 
 export const Route = createFileRoute("/loans")({
   head: () => ({
