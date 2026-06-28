@@ -10,20 +10,38 @@ Pipeline:
 Usage:
     from engines.advisory import answer_farmer_question
     result = answer_farmer_question("What causes maize rust in Nakuru?")
+
+Terminal:
+    python engines/advisory.py "What causes maize rust in Nakuru?"
 """
+
+import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parents[1]
+_ENGINES = Path(__file__).resolve().parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+if str(_ENGINES) not in sys.path:
+    sys.path.insert(0, str(_ENGINES))
 
 import os
 import re
 import json
 import logging
+import argparse
 from typing import Any
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
-from engines.neo4j_client import Neo4jClient
-from engines.weather import get_farmer_weather, _geocode_location, _fetch_weather, _weatheradvice
+if __package__ in (None, ""):
+    from neo4j_client import Neo4jClient
+    from weather import _geocode_location, _fetch_weather, _weatheradvice
+else:
+    from engines.neo4j_client import Neo4jClient
+    from engines.weather import _geocode_location, _fetch_weather, _weatheradvice
 
 load_dotenv()
 
@@ -334,3 +352,76 @@ def answer_farmer_question(
         "weather": weather_data,
         "sources": sources,
     }
+
+
+def run_query(query: str, *, include_weather: bool = True) -> dict[str, Any]:
+    """Run advisory pipeline and print a readable terminal summary."""
+    print("=" * 60)
+    print(f"FARMER QUESTION: {query}")
+    print("=" * 60)
+
+    kw = _extract_keywords(query)
+    print("\nDetected keywords:")
+    print(f"  crop:     {kw['crop'] or '—'}")
+    print(f"  disease:  {kw['disease'] or '—'}")
+    print(f"  location: {kw['location'] or '—'}")
+
+    print("\nRunning advisory pipeline (Neo4j + Featherless LLM)…")
+    result = answer_farmer_question(query, include_weather=include_weather)
+
+    if result.get("sources"):
+        print("\nSources:")
+        for source in result["sources"]:
+            print(f"  • {source}")
+
+    weather = result.get("weather")
+    if weather and "current" in weather:
+        current = weather["current"]
+        print("\nWeather:")
+        print(f"  {current.get('condition', 'N/A')}, {current.get('temperature_c', 'N/A')}°C")
+
+    print("\nAdvisory answer:")
+    print(result.get("answer", "(no answer)"))
+    print("=" * 60 + "\n")
+    return result
+
+
+def main() -> None:
+    load_dotenv()
+
+    parser = argparse.ArgumentParser(
+        description="SokoSense advisory CLI — Neo4j RAG + weather + Featherless LLM",
+    )
+    parser.add_argument(
+        "query",
+        nargs="*",
+        help='Farmer question (e.g. "What causes maize rust in Nakuru?")',
+    )
+    parser.add_argument(
+        "--no-weather",
+        action="store_true",
+        help="Skip weather lookup even if a location is detected",
+    )
+    args = parser.parse_args()
+
+    if args.query:
+        run_query(" ".join(args.query), include_weather=not args.no_weather)
+        return
+
+    print("SokoSense Advisory CLI")
+    print("Ask a crop, pest, or farming question. Type 'exit' or 'quit' to close.\n")
+    while True:
+        try:
+            query = input("Ask SokoSense> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nExiting...")
+            break
+        if not query:
+            continue
+        if query.lower() in {"exit", "quit"}:
+            break
+        run_query(query, include_weather=not args.no_weather)
+
+
+if __name__ == "__main__":
+    main()
