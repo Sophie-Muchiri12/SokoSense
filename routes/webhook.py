@@ -194,17 +194,21 @@ async def ussd_handler(
     if service == "3":
         if depth == 2:
             if is_sw:
-                return "CON Ingiza kiwango cha riba kwa mwezi\n(mfano: 5 kwa 5%):"
-            return "CON Enter monthly rate\n(e.g. 5 for 5%):"
+                return (
+                    "CON Chagua kiasi cha mkopo:\n"
+                    "1.KSh 5,000 2.KSh 20,000\n"
+                    "3.KSh 50,000 4.KSh 100,000\n"
+                    "5.KSh 200,000+"
+                )
+            return (
+                "CON Select loan amount:\n"
+                "1.KSh 5,000 2.KSh 20,000\n"
+                "3.KSh 50,000 4.KSh 100,000\n"
+                "5.KSh 200,000+"
+            )
         if depth == 3:
-            try:
-                req = LoanRequest(monthly_rate_percent=float(parts[2]))
-                result = loaning.decide_loan(req)
-                return f"END {result.short_reply}"
-            except ValueError:
-                if is_sw:
-                    return "END Kiwango batili. Jaribu tena."
-                return "END Invalid rate. Try again."
+            result = loaning.decide_loan_by_amount_band(parts[2])
+            return f"END {result.short_reply}"
 
     if is_sw:
         return "END Ingizo batili. Tuma HELP kwa maagizo."

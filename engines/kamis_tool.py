@@ -270,6 +270,23 @@ def resolve_crop_ids(crop_name: str) -> list[int]:
             
     return matched_ids
 
+def _build_tavily_query(
+    crop_name: Optional[str],
+    market_name: Optional[str],
+    county_name: Optional[str],
+) -> str:
+    """Builds a natural-language KAMIS price query for the Tavily fallback."""
+    parts = []
+    if crop_name:
+        parts.append(crop_name)
+    parts.append("market price")
+    if market_name:
+        parts.append(f"in {market_name}")
+    if county_name:
+        parts.append(f"{county_name} county")
+    return " ".join(parts).strip() or "latest market prices"
+
+
 @tool
 def scrape_kamis_prices(
     crop_name: Optional[str] = None,
@@ -301,6 +318,7 @@ def scrape_kamis_prices(
 
     product_ids = resolve_crop_ids(clean_crop_name)
     dfs = []
+    had_fetch_error = False
 
     if product_ids:
         for pid in product_ids:
@@ -316,7 +334,7 @@ def scrape_kamis_prices(
                     if sub_dfs:
                         dfs.append(sub_dfs[0])
             except Exception:
-                pass
+                had_fetch_error = True
     else:
         params = {"per_page": server_per_page}
         try:
@@ -326,10 +344,23 @@ def scrape_kamis_prices(
                 sub_dfs = pd.read_html(io.StringIO(response.text))
                 if sub_dfs:
                     dfs.append(sub_dfs[0])
-        except Exception as e:
-            return f"An error occurred while fetching KAMIS data: {str(e)}"
+        except Exception:
+            had_fetch_error = True
 
     if not dfs:
+        # Direct KAMIS access is sometimes blocked (e.g. the host firewalls the
+        # hosting provider's IPs, surfacing as connection timeouts). When the
+        # direct fetch yields nothing — especially after a network error — fall
+        # back to Tavily, which retrieves KAMIS content from its own infra.
+        if had_fetch_error:
+            fallback_query = _build_tavily_query(clean_crop_name, clean_market_name, clean_county_name)
+            tavily_text = _search_kamis_via_tavily(fallback_query)
+            if tavily_text and not tavily_text.startswith(("Error:", "An error occurred")):
+                return (
+                    "Direct KAMIS access was unavailable; results below come from a "
+                    "Tavily web search of the KAMIS site and may be less precise.\n\n"
+                    + tavily_text
+                )
         return "No price data could be retrieved from the KAMIS website."
 
     # Combine and clean
@@ -382,6 +413,48 @@ def scrape_kamis_prices(
     df_limited = df.head(limit)
     return df_limited.to_json(orient="records", indent=2)
 
+def _search_kamis_via_tavily(query: str) -> str:
+    """
+    Plain (non-tool) implementation of the Tavily KAMIS search so it can be reused
+    as a fallback by other code paths (e.g. when direct KAMIS scraping is blocked).
+    """
+    tavily_key = os.getenv("TAVILY_API_KEY")
+    if not tavily_key:
+        return "Error: TAVILY_API_KEY is not set in the environment variables."
+
+    client = TavilyClient(api_key=tavily_key)
+
+    # Force search to focus on the KAMIS website
+    modified_query = f"{query} site:kamis.kilimo.go.ke"
+
+    try:
+        # Perform advanced search
+        search_result = client.search(
+            query=modified_query,
+            search_depth="advanced",
+            max_results=5,
+            include_answer=True
+        )
+
+        answer = search_result.get("answer")
+        results = search_result.get("results", [])
+
+        response_text = ""
+        if answer:
+            response_text += f"**Direct Answer from Tavily Search:**\n{answer}\n\n"
+
+        response_text += "**Search Results from KAMIS Site:**\n"
+        for idx, res in enumerate(results, 1):
+            title = res.get("title", "No Title")
+            url = res.get("url", "No URL")
+            content = res.get("content", "No Content")
+            response_text += f"{idx}. **[{title}]({url})**\n   {content}\n\n"
+
+        return response_text
+    except Exception as e:
+        return f"An error occurred during Tavily Search: {str(e)}"
+
+
 @tool
 def search_kamis_via_tavily(query: str) -> str:
     """
@@ -391,38 +464,4 @@ def search_kamis_via_tavily(query: str) -> str:
     Args:
         query: Search query containing the crop name, market, and locations (e.g. 'Tomatoes price in Meru county').
     """
-    tavily_key = os.getenv("TAVILY_API_KEY")
-    if not tavily_key:
-        return "Error: TAVILY_API_KEY is not set in the environment variables."
-        
-    client = TavilyClient(api_key=tavily_key)
-    
-    # Force search to focus on the KAMIS website
-    modified_query = f"{query} site:kamis.kilimo.go.ke"
-    
-    try:
-        # Perform advanced search
-        search_result = client.search(
-            query=modified_query,
-            search_depth="advanced",
-            max_results=5,
-            include_answer=True
-        )
-        
-        answer = search_result.get("answer")
-        results = search_result.get("results", [])
-        
-        response_text = ""
-        if answer:
-            response_text += f"**Direct Answer from Tavily Search:**\n{answer}\n\n"
-            
-        response_text += "**Search Results from KAMIS Site:**\n"
-        for idx, res in enumerate(results, 1):
-            title = res.get("title", "No Title")
-            url = res.get("url", "No URL")
-            content = res.get("content", "No Content")
-            response_text += f"{idx}. **[{title}]({url})**\n   {content}\n\n"
-            
-        return response_text
-    except Exception as e:
-        return f"An error occurred during Tavily Search: {str(e)}"
+    return _search_kamis_via_tavily(query)

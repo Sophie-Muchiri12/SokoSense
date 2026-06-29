@@ -6,6 +6,7 @@ All responses are wrapped in JSON format for USSD/SMS integration.
 
 import os
 import logging
+import uuid
 
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage
@@ -22,21 +23,70 @@ logger = logging.getLogger(__name__)
 
 # ── LLM initialisation ─────────────────────────────────────────────────────
 
-featherless_api_key = os.getenv("FEATHERLSS_API_KEY")
-featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "deepseek-ai/DeepSeek-V4-Flash")
+# Bounded timeout + retries so an unreachable/slow LLM provider fails fast with a
+# clean error instead of hanging the SMS/USSD request path for ~90s (the default
+# client retries with exponential backoff, which is unusable for a gateway).
+LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "45"))
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "1"))
 
-if not featherless_api_key:
-    raise ValueError("FEATHERLSS_API_KEY is not set in .env")
 
-llm = ChatOpenAI(
-    model=featherless_model,
-    temperature=0.0,
-    openai_api_key=featherless_api_key,
-    openai_api_base="https://api.featherless.ai/v1",
-)
-logger.info("Using Featherless LLM: %s", featherless_model)
+def _build_groq_llm_with_tools():
+    """Primary LLM: Groq. Requires GROQ_API_KEY and langchain-groq installed."""
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        return None
+    try:
+        from langchain_groq import ChatGroq
+    except ImportError:
+        logger.warning("GROQ_API_KEY set but langchain-groq not installed; skipping Groq.")
+        return None
+    groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    groq_llm = ChatGroq(
+        model=groq_model,
+        temperature=0.0,
+        api_key=groq_api_key,
+        timeout=LLM_TIMEOUT_SECONDS,
+        max_retries=LLM_MAX_RETRIES,
+    )
+    logger.info("Using Groq LLM: %s", groq_model)
+    return groq_llm.bind_tools(TOOLS)
 
-llm_with_tools = llm.bind_tools(TOOLS)
+
+def _build_featherless_llm_with_tools():
+    """Optional Featherless fallback (requires a plan with API access enabled)."""
+    featherless_api_key = os.getenv("FEATHERLSS_API_KEY")
+    if not featherless_api_key:
+        return None
+    featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "deepseek-ai/DeepSeek-V4-Flash")
+    llm = ChatOpenAI(
+        model=featherless_model,
+        temperature=0.0,
+        openai_api_key=featherless_api_key,
+        openai_api_base="https://api.featherless.ai/v1",
+        timeout=LLM_TIMEOUT_SECONDS,
+        max_retries=LLM_MAX_RETRIES,
+    )
+    logger.info("Featherless fallback LLM enabled: %s", featherless_model)
+    return llm.bind_tools(TOOLS)
+
+
+_groq_llm_with_tools = _build_groq_llm_with_tools()
+_featherless_llm_with_tools = _build_featherless_llm_with_tools()
+
+# Prefer Groq as the primary; fall back to Featherless if Groq is unavailable.
+if _groq_llm_with_tools is not None:
+    llm_with_tools = _groq_llm_with_tools
+    if _featherless_llm_with_tools is not None:
+        # LangChain runs the primary first and only invokes the fallback if the
+        # primary raises (e.g. connection error / timeout).
+        llm_with_tools = llm_with_tools.with_fallbacks([_featherless_llm_with_tools])
+elif _featherless_llm_with_tools is not None:
+    logger.warning("Groq unavailable; running on Featherless alone.")
+    llm_with_tools = _featherless_llm_with_tools
+else:
+    raise ValueError(
+        "No LLM provider configured. Set GROQ_API_KEY (recommended) or FEATHERLSS_API_KEY in .env"
+    )
 
 # ── System prompt ──────────────────────────────────────────────────────────
 
@@ -65,6 +115,25 @@ SYSTEM_PROMPT = SystemMessage(
 # ── Graph nodes ────────────────────────────────────────────────────────────
 
 
+def _ensure_tool_call_ids(message):
+    """Guarantee every tool call has a non-empty string id.
+
+    Some OpenAI-compatible models (e.g. MiniMax via Featherless) intermittently
+    emit tool calls with a missing/``None`` id. LangGraph's ToolNode builds a
+    ``ToolMessage(tool_call_id=call["id"])`` for these calls — most notably when
+    validating a hallucinated tool name — and a ``None`` id raises a pydantic
+    ValidationError that crashes the whole graph. Backfilling a valid id keeps
+    the agent loop alive so the model can recover from its own bad output.
+    """
+    for tc in (getattr(message, "tool_calls", None) or []):
+        if not tc.get("id"):
+            tc["id"] = f"call_{uuid.uuid4().hex}"
+    for tc in (getattr(message, "invalid_tool_calls", None) or []):
+        if not tc.get("id"):
+            tc["id"] = f"call_{uuid.uuid4().hex}"
+    return message
+
+
 def call_model(state: AgentState):
     """Call the LLM with the current message history."""
     messages = state["messages"]
@@ -76,7 +145,7 @@ def call_model(state: AgentState):
         messages_to_send = list(messages)
 
     response = llm_with_tools.invoke(messages_to_send)
-    return {"messages": [response]}
+    return {"messages": [_ensure_tool_call_ids(response)]}
 
 
 def should_continue(state: AgentState) -> str:

@@ -1,5 +1,6 @@
 """Market decision engine — uses live KAMIS data via price pipeline, falls back to mock."""
 
+from models.common import truncate_sms
 from models.market import MarketDecisionRequest, MarketDecisionResponse
 
 # ---------------------------------------------------------------------------
@@ -17,6 +18,23 @@ _MOCK_PRICES: dict[str, dict[str, float]] = {
 }
 
 _PRICE_DIFF_THRESHOLD = 0.08  # 8% minimum to recommend travel
+
+
+def parse_price(val) -> float | None:
+    """Convert a KAMIS price string to KSh per 90kg bag (None if unparseable)."""
+    if not val or str(val).strip() in ("-", "", "nan"):
+        return None
+    try:
+        cleaned = "".join(c for c in str(val) if c.isdigit() or c == ".")
+        if cleaned:
+            price = float(cleaned)
+            # KAMIS reports per KG — convert to 90kg bag
+            if price < 500:
+                price = price * 90
+            return round(price, 0)
+    except Exception:
+        pass
+    return None
 
 
 def decide_market(request: MarketDecisionRequest) -> MarketDecisionResponse:
@@ -49,7 +67,17 @@ def decide_market(request: MarketDecisionRequest) -> MarketDecisionResponse:
         best_market = max(mock, key=mock.get)
         best_price  = mock[best_market]
 
-    # ── 4. Decision ───────────────────────────────────────────────────────
+    # ── 4. Trend signal (real, derived from cross-market variance) ────────
+    trend_note = ""
+    try:
+        from data.price_pipeline import get_trend
+        trend = get_trend(crop, location)
+        if trend.get("trend") == "up" and trend.get("wait_days", 0) > 0:
+            trend_note = f" Price trending up — consider waiting {trend['wait_days']}d if you can."
+    except Exception:
+        pass
+
+    # ── 5. Decision ───────────────────────────────────────────────────────
     display_location = location.title()
     display_best     = best_market.title() if best_market else display_location
 
@@ -58,7 +86,10 @@ def decide_market(request: MarketDecisionRequest) -> MarketDecisionResponse:
             crop=crop,
             location=display_location,
             recommendation="SELL_HERE",
-            short_reply=f"SELL HERE. {display_location} has the best price at KSh {local_price:,.0f}/bag today.",
+            short_reply=truncate_sms(
+                f"SELL HERE. {display_location} has the best price at KSh {local_price:,.0f}/bag today."
+                f"{trend_note}"
+            ),
             market_name=display_location,
             best_market=display_location,
             local_price_kes=local_price,
@@ -74,7 +105,10 @@ def decide_market(request: MarketDecisionRequest) -> MarketDecisionResponse:
             crop=crop,
             location=display_location,
             recommendation="SELL_IN_MARKET",
-            short_reply=f"SELL IN {display_best.upper()}. KSh {diff:,.0f} more per bag. Worth the trip.",
+            short_reply=truncate_sms(
+                f"SELL IN {display_best.upper()}. KSh {diff:,.0f} more per bag. Worth the trip."
+                f"{trend_note}"
+            ),
             market_name=display_location,
             best_market=display_best,
             local_price_kes=local_price,
@@ -86,7 +120,10 @@ def decide_market(request: MarketDecisionRequest) -> MarketDecisionResponse:
         crop=crop,
         location=display_location,
         recommendation="WAIT",
-        short_reply=f"WAIT. {display_location} price is competitive at KSh {local_price:,.0f}/bag. No better market today.",
+        short_reply=truncate_sms(
+            f"WAIT. {display_location} price is competitive at KSh {local_price:,.0f}/bag. No better market today."
+            f"{trend_note}"
+        ),
         market_name=display_location,
         best_market=display_best,
         local_price_kes=local_price,

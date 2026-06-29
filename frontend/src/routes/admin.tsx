@@ -1,14 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-<<<<<<< HEAD
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "./market";
 import { getHealth, getLogs, type LogItem } from "@/lib/sokosense-api";
-=======
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { PageHeader } from "./market";
-import { api } from "@/lib/api/client";
->>>>>>> development
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -71,7 +64,6 @@ function AdminPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [q, setQ] = useState("");
 
-<<<<<<< HEAD
   // Health check
   const [health, setHealth] = useState<"ok" | "error" | "loading">("loading");
   const [healthService, setHealthService] = useState<string | null>(null);
@@ -121,15 +113,6 @@ function AdminPage() {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
-=======
-  const health = useQuery({
-    queryKey: ["health"],
-    queryFn: () => api.health(),
-    refetchInterval: 15_000,
-    retry: false,
-  });
-  const apiOk = health.data?.status === "ok";
->>>>>>> development
 
   const filtered = useMemo(() => {
     return logs.filter((l) => {
@@ -177,31 +160,10 @@ function AdminPage() {
         />
         <div className="flex items-center gap-2">
           <span
-<<<<<<< HEAD
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] ${healthCls}`}
           >
             <span className={`h-1.5 w-1.5 rounded-full ${dotCls}`} />
             {healthLabel}
-=======
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] ${
-              health.isLoading
-                ? "bg-canvas text-steel"
-                : apiOk
-                ? "bg-green-surface text-green-deep"
-                : "bg-rose/10 text-rose"
-            }`}
-          >
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                health.isLoading ? "bg-mist" : apiOk ? "bg-green animate-pulse" : "bg-rose"
-              }`}
-            />
-            {health.isLoading
-              ? "Checking API…"
-              : apiOk
-              ? `API online · ${health.data?.service ?? "sokosense"}`
-              : "API unreachable"}
->>>>>>> development
           </span>
           <div className="inline-flex rounded-full border border-hairline bg-paper p-0.5">
             {DATE_RANGES.map((r) => (
