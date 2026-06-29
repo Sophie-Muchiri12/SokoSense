@@ -1,5 +1,6 @@
 import os
 import io
+import logging
 import urllib3
 import requests
 import pandas as pd
@@ -8,8 +9,25 @@ from langchain_core.tools import tool
 from tavily import TavilyClient
 from engines.rate_limiter import kamis_http_limiter
 
+logger = logging.getLogger(__name__)
+
 # Suppress SSL certificate warning from urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+def _wfp_fallback(
+    crop_name: Optional[str],
+    market_name: Optional[str],
+    county_name: Optional[str],
+    limit: int,
+) -> Optional[str]:
+    """Try the structured WFP backup dataset. Returns text or None on miss/error."""
+    try:
+        from engines.wfp_tool import get_wfp_prices
+        return get_wfp_prices(crop_name, market_name, county_name, limit)
+    except Exception as exc:
+        logger.warning("WFP fallback failed: %s", exc)
+        return None
 
 # Full crop name to product ID mapping as extracted from the select2 dropdown options of the website
 CROP_MAPPING = {
@@ -311,10 +329,15 @@ def scrape_kamis_prices(
     clean_market_name = market_name.strip() if market_name else None
     clean_county_name = county_name.strip() if county_name else None
 
-    # If a location filter is set, fetch more rows from the server so the local
-    # filter has enough data to find matches. Without a filter, 10 is enough.
+    # If a location filter is set, fetch a deep history from the server so the
+    # local filter can find markets that report infrequently. KAMIS has no
+    # server-side market/county filter — it only returns the most recent N rows
+    # across all markets — so a small window misses markets that haven't
+    # reported lately (e.g. Nakuru maize, last seen mid-2025). Without a filter,
+    # 10 recent rows is enough.
     has_location = bool(clean_market_name or clean_county_name)
-    server_per_page = 100 if has_location else 10
+    server_per_page = 1500 if has_location else 10
+    fetch_timeout = 40 if has_location else 20
 
     product_ids = resolve_crop_ids(clean_crop_name)
     dfs = []
@@ -328,7 +351,7 @@ def scrape_kamis_prices(
             }
             try:
                 kamis_http_limiter.acquire()  # ← rate-limit each outgoing HTTP call
-                response = requests.get(url, params=params, verify=False, timeout=15)
+                response = requests.get(url, params=params, verify=False, timeout=fetch_timeout)
                 if response.status_code == 200:
                     sub_dfs = pd.read_html(io.StringIO(response.text))
                     if sub_dfs:
@@ -339,7 +362,7 @@ def scrape_kamis_prices(
         params = {"per_page": server_per_page}
         try:
             kamis_http_limiter.acquire()  # ← rate-limit the fallback HTTP call
-            response = requests.get(url, params=params, verify=False, timeout=20)
+            response = requests.get(url, params=params, verify=False, timeout=fetch_timeout)
             if response.status_code == 200:
                 sub_dfs = pd.read_html(io.StringIO(response.text))
                 if sub_dfs:
@@ -349,9 +372,13 @@ def scrape_kamis_prices(
 
     if not dfs:
         # Direct KAMIS access is sometimes blocked (e.g. the host firewalls the
-        # hosting provider's IPs, surfacing as connection timeouts). When the
-        # direct fetch yields nothing — especially after a network error — fall
-        # back to Tavily, which retrieves KAMIS content from its own infra.
+        # hosting provider's IPs, surfacing as connection timeouts). Fall back
+        # first to the structured WFP backup dataset, then to a fuzzy Tavily web
+        # search as a last resort.
+        wfp_text = _wfp_fallback(clean_crop_name, clean_market_name, clean_county_name, limit)
+        if wfp_text:
+            return wfp_text
+
         if had_fetch_error:
             fallback_query = _build_tavily_query(clean_crop_name, clean_market_name, clean_county_name)
             tavily_text = _search_kamis_via_tavily(fallback_query)
@@ -392,6 +419,25 @@ def scrape_kamis_prices(
 
     total_rows = len(df)
     if total_rows == 0:
+        # KAMIS returned data, but nothing matched the requested location — the
+        # market simply hasn't reported this crop within the fetched history.
+        # Rather than dead-ending the farmer, try the structured WFP backup
+        # first (it covers many markets KAMIS reports infrequently), then fall
+        # back to a Tavily web search of the KAMIS site.
+        wfp_text = _wfp_fallback(clean_crop_name, clean_market_name, clean_county_name, limit)
+        if wfp_text:
+            return wfp_text
+
+        fallback_query = _build_tavily_query(clean_crop_name, clean_market_name, clean_county_name)
+        tavily_text = _search_kamis_via_tavily(fallback_query)
+        if tavily_text and not tavily_text.startswith(("Error:", "An error occurred")):
+            return (
+                "No recent KAMIS price entries matched that market directly, so the "
+                "results below come from a Tavily web search of the KAMIS site and "
+                "may reference nearby markets or older reports.\n\n"
+                + tavily_text
+            )
+
         msg = "No price data found matching your query."
         if crop_name:
             msg += f" Crop: '{crop_name}' (Resolved IDs: {product_ids})."
