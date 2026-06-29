@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { postAgent, type AgentResponse } from "@/lib/sokosense-api";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -22,43 +23,11 @@ export const Route = createFileRoute("/")({
 
 type SmsTurn = { from: "farmer" | "engine"; text: string; meta?: string };
 
-const SCRIPTS: { id: string; farmer: string; analysis: { label: string; value: string }[]; reply: string }[] = [
-  {
-    id: "maize",
-    farmer: "PRICE MAIZE NAKURU",
-    analysis: [
-      { label: "Intent", value: "Spot price · maize · Nakuru" },
-      { label: "Market signal", value: "Eldoret KSh 4,820 / 90kg (+6.2%)" },
-      { label: "Logistics", value: "Distance 162km · transport KSh 280/bag" },
-      { label: "Recommendation", value: "Hold 2 weeks · sell Eldoret" },
-    ],
-    reply:
-      "Maize Nakuru: KSh 4,520. Eldoret pays KSh 4,820 (+6.2%). After transport you gain KSh 20/bag. We suggest holding 14 days — forecast +KSh 180.",
-  },
-  {
-    id: "loan",
-    farmer: "LOAN 35000 BEANS 6 MONTHS",
-    analysis: [
-      { label: "Intent", value: "Credit eligibility · input loan" },
-      { label: "Risk band", value: "Tier B · 0.72 confidence" },
-      { label: "Suggested APR", value: "18.4% · 6 month bullet" },
-      { label: "Decision", value: "Pre-approved subject to SACCO review" },
-    ],
-    reply:
-      "KSh 35,000 beans loan, 6m: Pre-approved at 18.4% APR. Monthly KSh 6,420. Visit Tumaini SACCO branch with national ID to finalize.",
-  },
-  {
-    id: "weather",
-    farmer: "WEATHER MERU NEXT 7 DAYS",
-    analysis: [
-      { label: "Intent", value: "Localized weather · 7d" },
-      { label: "Signal", value: "Rain 38mm cumulative · 3 wet days" },
-      { label: "Risk", value: "Late blight pressure rising" },
-      { label: "Recommendation", value: "Apply preventative fungicide" },
-    ],
-    reply:
-      "Meru 7d: 38mm rain, wet Tue–Thu. Blight risk HIGH for potato. Spray Mancozeb before Tuesday. Next check Friday.",
-  },
+/** Pre-seeded demo prompts — click any to fire a real agent call */
+const DEMO_PROMPTS = [
+  { id: "maize",   farmer: "PRICE MAIZE NAKURU" },
+  { id: "loan",    farmer: "LOAN 35000 BEANS 6 MONTHS" },
+  { id: "weather", farmer: "WEATHER MERU NEXT 7 DAYS" },
 ];
 
 function LandingPage() {
@@ -105,7 +74,7 @@ function Hero() {
         </div>
         <div className="mx-auto mt-10 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-[12px] text-steel">
           <Inline icon="📡" text="Works on USSD & SMS" />
-          <Inline icon="●" text="42 markets · 8 counties live" iconClass="text-teal" />
+          <Inline icon="●" text="Live market intelligence" iconClass="text-teal" />
           <Inline icon="◇" text="SACCO-grade credit engine" />
           <Inline icon="✓" text="Swahili · English · Kikuyu" />
         </div>
@@ -124,26 +93,59 @@ function Inline({ icon, text, iconClass = "" }: { icon: string; text: string; ic
 }
 
 function SmsSimulator() {
-  const [active, setActive] = useState(SCRIPTS[0]);
+  const [activeId, setActiveId] = useState(DEMO_PROMPTS[0].id);
   const [turns, setTurns] = useState<SmsTurn[]>([
-    { from: "farmer", text: SCRIPTS[0].farmer, meta: "+254 7•• ••• 421 · 03:42" },
-    { from: "engine", text: SCRIPTS[0].reply, meta: "SokoSense · 03:42" },
+    { from: "farmer", text: DEMO_PROMPTS[0].farmer, meta: "+254 7•• ••• 421 · tap to run" },
   ]);
+  const [loading, setLoading] = useState(false);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [lastResponse, setLastResponse] = useState<AgentResponse | null>(null);
+  const cancelRef = useRef(false);
 
-  const onSelect = (id: string) => {
-    const s = SCRIPTS.find((x) => x.id === id)!;
-    setActive(s);
+  const runPrompt = async (id: string) => {
+    const prompt = DEMO_PROMPTS.find((p) => p.id === id);
+    if (!prompt || loading) return;
+
+    cancelRef.current = false;
+    setActiveId(id);
+    setLoading(true);
+    setLatencyMs(null);
+    setLastResponse(null);
     setTurns([
-      { from: "farmer", text: s.farmer, meta: "+254 7•• ••• 421 · just now" },
-      { from: "engine", text: s.reply, meta: "SokoSense · just now" },
+      { from: "farmer", text: prompt.farmer, meta: "+254 7•• ••• 421 · just now" },
     ]);
+
+    try {
+      const start = performance.now();
+      const result = await postAgent(prompt.farmer);
+      if (cancelRef.current) return;
+      const elapsed = Math.round(performance.now() - start);
+      setLatencyMs(elapsed);
+      setLastResponse(result);
+      setTurns([
+        { from: "farmer", text: prompt.farmer, meta: "+254 7•• ••• 421 · just now" },
+        { from: "engine", text: result.response, meta: `SokoSense · ${elapsed}ms` },
+      ]);
+    } catch {
+      if (cancelRef.current) return;
+      setTurns((prev) => [
+        ...prev,
+        {
+          from: "engine",
+          text: "Sorry, the engine is not reachable right now. Please try again.",
+          meta: "SokoSense · error",
+        },
+      ]);
+    } finally {
+      if (!cancelRef.current) setLoading(false);
+    }
   };
 
   return (
     <section className="mx-auto max-w-[1240px] px-5 sm:px-6">
       <div className="card-surface overflow-hidden">
         <div className="grid lg:grid-cols-[1.05fr_1.35fr_0.95fr]">
-          {/* Left: phone */}
+          {/* Left: prompt picker */}
           <div className="bg-[radial-gradient(120%_120%_at_0%_0%,#0F7E70_0%,#0D9280_40%,#0a6a5e_100%)] p-10 text-paper relative">
             <p className="eyebrow text-paper/70">Live SMS simulator</p>
             <h2 className="font-serif text-[36px] leading-[1.05] mt-3 text-paper">
@@ -152,21 +154,21 @@ function SmsSimulator() {
               <span className="italic">We listen.</span>
             </h2>
             <p className="mt-4 text-[13px] leading-relaxed text-paper/80 max-w-sm">
-              Tap any prompt to see how SokoSense parses the message, queries our intelligence graph, and replies
-              within 1.4 seconds.
+              Tap any prompt to fire a real message to the SokoSense AI agent. Responses come live from the engine.
             </p>
             <div className="mt-6 flex flex-col gap-2">
-              {SCRIPTS.map((s) => (
+              {DEMO_PROMPTS.map((p) => (
                 <button
-                  key={s.id}
-                  onClick={() => onSelect(s.id)}
-                  className={`text-left rounded-xl border px-4 py-3 text-[12px] transition ${
-                    active.id === s.id
+                  key={p.id}
+                  onClick={() => runPrompt(p.id)}
+                  disabled={loading}
+                  className={`text-left rounded-xl border px-4 py-3 text-[12px] transition disabled:opacity-60 ${
+                    activeId === p.id
                       ? "border-paper/40 bg-paper/10 text-paper"
                       : "border-paper/15 bg-paper/5 text-paper/80 hover:border-paper/30"
                   }`}
                 >
-                  <span className="font-mono tracking-wider">{s.farmer}</span>
+                  <span className="font-mono tracking-wider">{p.farmer}</span>
                 </button>
               ))}
             </div>
@@ -179,8 +181,11 @@ function SmsSimulator() {
                 <p className="text-[11px] uppercase tracking-[0.14em] text-steel">SMS thread</p>
                 <p className="font-serif text-[20px] text-ink mt-0.5">Shortcode 21455</p>
               </div>
-              <span className="chip">● delivered</span>
+              <span className={`chip ${loading ? "border-amber/40 text-amber" : "border-teal/40 text-teal"}`}>
+                {loading ? "● running…" : turns.length > 1 ? "● delivered" : "○ idle"}
+              </span>
             </div>
+
             <div className="mt-6 space-y-4">
               {turns.map((t, i) => (
                 <div key={i} className={`flex ${t.from === "farmer" ? "justify-start" : "justify-end"}`}>
@@ -198,33 +203,82 @@ function SmsSimulator() {
                   </div>
                 </div>
               ))}
+
+              {loading && (
+                <div className="flex justify-end">
+                  <div className="max-w-[88%]">
+                    <div className="rounded-2xl bg-ink/80 px-5 py-4 rounded-br-md">
+                      <span className="inline-flex gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-paper/60 animate-bounce [animation-delay:0ms]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-paper/60 animate-bounce [animation-delay:150ms]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-paper/60 animate-bounce [animation-delay:300ms]" />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className="mt-6 rounded-xl border border-dashed border-fog bg-paper px-4 py-3 flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-teal animate-pulse" />
+              <div className={`h-2 w-2 rounded-full ${loading ? "bg-amber animate-pulse" : "bg-teal"}`} />
               <p className="text-[12px] text-steel">
-                Engine response time <span className="tabular text-ink font-medium">1.42s</span> · 14 tokens · model
-                gemini-flash-agri
+                {loading
+                  ? "Agent is thinking…"
+                  : latencyMs !== null
+                  ? <>Engine response time <span className="tabular text-ink font-medium">{latencyMs}ms</span> · powered by SokoSense AI</>
+                  : "Tap a prompt to run the engine"}
               </p>
             </div>
           </div>
 
-          {/* Right: analysis */}
+          {/* Right: engine trace */}
           <div className="bg-paper p-8">
             <p className="eyebrow">Engine trace</p>
             <h3 className="font-serif text-[22px] text-ink mt-2">How we decided</h3>
-            <ul className="mt-5 divide-y divide-hairline">
-              {active.analysis.map((a) => (
-                <li key={a.label} className="py-3">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-mist">{a.label}</p>
-                  <p className="mt-1 text-[14px] text-ink tabular">{a.value}</p>
+            {turns.length > 1 ? (
+              <ul className="mt-5 divide-y divide-hairline">
+                <li className="py-3">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-mist">Intent</p>
+                  <p className="mt-1 text-[14px] text-ink tabular">
+                    {DEMO_PROMPTS.find((p) => p.id === activeId)?.farmer ?? "—"}
+                  </p>
                 </li>
-              ))}
-            </ul>
+                <li className="py-3">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-mist">Response type</p>
+                  <p className="mt-1 text-[14px] text-ink tabular capitalize">
+                    {lastResponse?.type ?? "—"}
+                  </p>
+                </li>
+                {lastResponse?.raw?.messages?.some((m) => m.tool_calls?.length) && (
+                  <li className="py-3">
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-mist">Tools</p>
+                    <p className="mt-1 text-[12px] text-ink font-mono">
+                      {lastResponse.raw.messages
+                        .flatMap((m) => m.tool_calls?.map((t) => t.name) ?? [])
+                        .join(", ")}
+                    </p>
+                  </li>
+                )}
+                <li className="py-3">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-mist">Latency</p>
+                  <p className="mt-1 text-[14px] text-ink tabular">
+                    {latencyMs !== null ? `${latencyMs}ms` : "—"}
+                  </p>
+                </li>
+                <li className="py-3">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-mist">Powered by</p>
+                  <p className="mt-1 text-[14px] text-ink tabular">SokoSense Agent</p>
+                </li>
+              </ul>
+            ) : (
+              <p className="mt-5 text-[13px] text-mist">Tap a prompt to see the engine trace.</p>
+            )}
             <div className="mt-6 rounded-xl bg-green-surface p-4">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-green-deep/70">Confidence</p>
+              <p className="text-[11px] uppercase tracking-[0.12em] text-green-deep/70">Status</p>
               <div className="mt-2 flex items-end gap-2">
-                <span className="font-serif text-[40px] leading-none text-green-deep tabular">92%</span>
-                <span className="text-[11px] text-green-deep/80 pb-1.5">cross-checked across 3 markets</span>
+                <span className="font-serif text-[24px] leading-none text-green-deep tabular">
+                  {loading ? "Running…" : turns.length > 1 ? "Ready" : "Idle"}
+                </span>
               </div>
             </div>
           </div>
@@ -236,10 +290,10 @@ function SmsSimulator() {
 
 function Stats() {
   const data = [
-    { v: "42", l: "Live markets across Kenya" },
-    { v: "1.4s", l: "Median SMS round-trip latency" },
-    { v: "18,420", l: "Farmers reached this quarter" },
-    { v: "KSh 240M", l: "Loan portfolio underwritten" },
+    { v: "7", l: "Live markets across Kenya" },
+    { v: "Real-time", l: "AI-powered agent responses" },
+    { v: "SMS + USSD", l: "Delivery channels supported" },
+    { v: "Neo4j RAG", l: "Knowledge graph powering advisory" },
   ];
   return (
     <section className="mx-auto max-w-[1240px] px-5 sm:px-6 mt-20">
@@ -282,9 +336,27 @@ function ProductGrid() {
       tag: "Field",
     },
     {
+      to: "/timing",
+      title: "Sell Timing Engine",
+      desc: "SELL_TODAY or WAIT — KAMIS price trends tell farmers when to move their harvest.",
+      tag: "Timing",
+    },
+    {
+      to: "/advisory",
+      title: "Crop Advisory (RAG)",
+      desc: "Neo4j knowledge graph + weather for disease, pest and agronomy questions.",
+      tag: "Advisory",
+    },
+    {
+      to: "/simulator",
+      title: "SMS Intelligence Simulator",
+      desc: "Send any message to the live agent and inspect the full pipeline — intent, market signal, LLM reply.",
+      tag: "Live Agent",
+    },
+    {
       to: "/admin",
       title: "Operations Dashboard",
-      desc: "Engine health, API traffic, model latency and message volumes for the SokoSense team.",
+      desc: "Engine health, API status and request logs for the SokoSense team.",
       tag: "Internal",
     },
   ];
@@ -320,15 +392,6 @@ function ProductGrid() {
             <p className="mt-6 text-[12px] font-medium text-teal">Open module →</p>
           </Link>
         ))}
-        <div className="card-surface p-6 bg-ink text-paper flex flex-col">
-          <span className="chip bg-paper/10 text-paper">API · v2</span>
-          <h3 className="font-serif text-[24px] mt-6 leading-tight">Developer API</h3>
-          <p className="mt-3 text-[13.5px] leading-relaxed text-paper/70 flex-1">
-            REST + webhook access to the prices, scoring and advisory engines. Bring SokoSense intelligence into
-            your own field apps.
-          </p>
-          <p className="mt-6 text-[12px] font-medium text-teal-glow">Read the docs →</p>
-        </div>
       </div>
     </section>
   );
@@ -337,18 +400,15 @@ function ProductGrid() {
 function NetworkSection() {
   const markets = useMemo(
     () => [
-      { x: 38, y: 64, label: "Nairobi", trend: "+2.1%" },
-      { x: 33, y: 50, label: "Nakuru", trend: "-0.4%" },
-      { x: 25, y: 38, label: "Eldoret", trend: "+6.2%" },
-      { x: 28, y: 28, label: "Kitale", trend: "+3.7%" },
-      { x: 50, y: 42, label: "Meru", trend: "+1.2%" },
-      { x: 55, y: 30, label: "Marsabit", trend: "+4.0%" },
-      { x: 18, y: 70, label: "Kisumu", trend: "-1.1%" },
-      { x: 72, y: 78, label: "Mombasa", trend: "+0.8%" },
-      { x: 60, y: 60, label: "Garissa", trend: "+5.4%" },
-      { x: 42, y: 75, label: "Machakos", trend: "+0.2%" },
+      { x: 38, y: 64, label: "Nairobi",  trend: "+2.1%" },
+      { x: 33, y: 50, label: "Nakuru",   trend: "-0.4%" },
+      { x: 25, y: 38, label: "Eldoret",  trend: "+6.2%" },
+      { x: 28, y: 28, label: "Kitale",   trend: "+3.7%" },
+      { x: 50, y: 42, label: "Meru",     trend: "+1.2%" },
+      { x: 18, y: 70, label: "Kisumu",   trend: "-1.1%" },
+      { x: 72, y: 78, label: "Mombasa",  trend: "+0.8%" },
     ],
-    []
+    [],
   );
 
   return (
@@ -362,7 +422,7 @@ function NetworkSection() {
             <span className="italic text-teal">where food moves.</span>
           </h2>
           <p className="mt-5 text-[14px] leading-relaxed text-steel max-w-md">
-            We ingest pricing from 42 wholesale markets every hour, blend it with weather, transport corridors and
+            We ingest pricing from wholesale markets every hour, blend it with weather, transport corridors and
             cooperative reporting — and route advice back to the farmer who needs it most.
           </p>
           <ul className="mt-8 space-y-3 text-[13px] text-ink">
@@ -394,18 +454,20 @@ function Bullet({ children }: { children: React.ReactNode }) {
   );
 }
 
-function KenyaMiniMap({ markets }: { markets: { x: number; y: number; label: string; trend: string }[] }) {
+function KenyaMiniMap({
+  markets,
+}: {
+  markets: { x: number; y: number; label: string; trend: string }[];
+}) {
   return (
     <div className="relative w-full aspect-[5/4] rounded-xl border border-hairline bg-paper overflow-hidden">
       <svg viewBox="0 0 100 80" className="absolute inset-0 w-full h-full">
-        {/* abstract Kenya silhouette */}
         <path
           d="M14,28 L20,18 L40,12 L62,16 L78,22 L82,38 L72,52 L78,68 L60,78 L36,80 L22,72 L14,58 Z"
           fill="#F5F7F4"
           stroke="#DCE2DA"
           strokeWidth="0.4"
         />
-        {/* routes */}
         {[
           [38, 64, 33, 50],
           [33, 50, 25, 38],
@@ -413,9 +475,6 @@ function KenyaMiniMap({ markets }: { markets: { x: number; y: number; label: str
           [38, 64, 50, 42],
           [38, 64, 18, 70],
           [38, 64, 72, 78],
-          [50, 42, 55, 30],
-          [38, 64, 60, 60],
-          [38, 64, 42, 75],
         ].map(([x1, y1, x2, y2], i) => (
           <line
             key={i}
@@ -457,7 +516,14 @@ function KenyaMiniMap({ markets }: { markets: { x: number; y: number; label: str
 }
 
 function PartnersStrip() {
-  const partners = ["Tumaini SACCO", "Mwea Rice Co-op", "Kakuzi Plc", "Equity Foundation", "Mercy Corps", "One Acre"];
+  const partners = [
+    "Tumaini SACCO",
+    "Mwea Rice Co-op",
+    "Kakuzi Plc",
+    "Equity Foundation",
+    "Mercy Corps",
+    "One Acre Fund",
+  ];
   return (
     <section className="mx-auto max-w-[1240px] px-5 sm:px-6 mt-24">
       <p className="text-center eyebrow">Built with operators on the ground</p>
@@ -484,10 +550,10 @@ function CTA() {
         </div>
         <div className="flex flex-col gap-3 lg:w-auto">
           <Link
-            to="/sacco"
+            to="/simulator"
             className="rounded-full bg-paper px-6 py-3 text-[13px] font-medium text-ink text-center hover:bg-canvas"
           >
-            Pilot SokoSense with your network
+            Try the live agent now
           </Link>
           <Link
             to="/admin"

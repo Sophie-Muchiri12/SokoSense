@@ -49,7 +49,7 @@ def run_query(query: str):
             import re
             retry_match = re.search(r"try again in (\S+)", err_str)
             retry_in = retry_match.group(1) if retry_match else "a few minutes"
-            print(f"\nGroq API rate limit reached. Please try again in {retry_in}.")
+            print(f"\nFeatherless API rate limit reached. Please try again in {retry_in}.")
             print("   (This is a free-tier quota limit — your query and data retrieval worked fine.)")
         elif "recursion_limit" in err_str.lower() or "GraphRecursionError" in err_str:
             print("\nThe agent made too many tool calls without finishing. Please rephrase your query.")

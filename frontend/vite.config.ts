@@ -7,9 +7,24 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  // Force-enable Nitro with the standalone Node server preset so the build always
+  // emits `.output/server/index.mjs` (what render.yaml's startCommand runs).
+  // Without this the plugin auto-skips Nitro when "No Lovable context" is detected
+  // (e.g. on Render), producing only `dist/` and breaking the deploy.
+  nitro: { preset: "node-server" },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+  },
+  vite: {
+    server: {
+      port: 8081,
+      strictPort: true,
+      proxy: {
+        "/api": { target: "http://127.0.0.1:8000", changeOrigin: true },
+        "/health": { target: "http://127.0.0.1:8000", changeOrigin: true },
+      },
+    },
   },
 });

@@ -1,4 +1,3 @@
-
 from typing import Any
 
 from langchain_core.tools import tool
@@ -166,6 +165,70 @@ def evaluate_monthly_rate(monthly_rate_percent: float) -> dict[str, Any]:
     )
 
 
+# ── Amount-band shortcut (USSD) ─────────────────────────────────────────────
+# Farmers on USSD pick a loan SIZE rather than typing a lender's stated rate.
+# Each band carries a representative monthly rate drawn from real Kenyan
+# lending patterns: small/instant loans skew toward mobile-money digital
+# credit (M-Shwari-style, expensive); large loans skew toward formal,
+# collateral-backed lenders (AFC/KCB-style, cheap). This mirrors how credit
+# actually segments in this market — see engines/lenders.json.
+LOAN_AMOUNT_BANDS: dict[str, dict[str, Any]] = {
+    "1": {
+        "label": "KSh 5,000",
+        "label_sw": "KSh 5,000",
+        "max_kes": 5_000,
+        "typical_monthly_rate": 7.5,   # M-Shwari-style instant digital credit
+    },
+    "2": {
+        "label": "KSh 20,000",
+        "label_sw": "KSh 20,000",
+        "max_kes": 20_000,
+        "typical_monthly_rate": 5.0,   # digital/mobile lender, still pricey
+    },
+    "3": {
+        "label": "KSh 50,000",
+        "label_sw": "KSh 50,000",
+        "max_kes": 50_000,
+        "typical_monthly_rate": 2.5,   # SACCO / microfinance range
+    },
+    "4": {
+        "label": "KSh 100,000",
+        "label_sw": "KSh 100,000",
+        "max_kes": 100_000,
+        "typical_monthly_rate": 1.2,   # bank agri-loan range (KCB Mkulima-like)
+    },
+    "5": {
+        "label": "KSh 200,000+",
+        "label_sw": "KSh 200,000+",
+        "max_kes": 200_000,
+        "typical_monthly_rate": 0.83,  # AFC / Hustler Fund formal range
+    },
+}
+
+
+def evaluate_loan_amount_band(band_key: str) -> dict[str, Any]:
+    """
+    USSD entry point: farmer picks an amount band (1-5) instead of typing a rate.
+    Returns the same structured fields as evaluate_monthly_rate(), plus the band.
+    """
+    band = LOAN_AMOUNT_BANDS.get(band_key)
+    if band is None:
+        return {"error": f"Invalid amount band '{band_key}'. Choose 1-5."}
+
+    result = _assess_loan(
+        principal=band["max_kes"],
+        interest_rate=band["typical_monthly_rate"],
+        rate_period="monthly",
+        term_value=12,
+        term_unit="months",
+        compounding_frequency="monthly",
+        is_simple_interest=False,
+    )
+    result["band_key"] = band_key
+    result["band_label"] = band["label"]
+    return result
+
+
 def _format_loan_report(result: dict[str, Any]) -> str:
     if "error" in result:
         return f"Error: {result['error']}"
@@ -244,22 +307,189 @@ def _map_risk_verdict(verdict: str, risk_level: str) -> RiskVerdict:
     return RiskVerdict.SAFE
 
 
+def _get_best_alternative(is_woman: bool = False) -> str:
+    """
+    Return the single best no-collateral lender blurb for SMS.
+    Falls back to AFC hardcoded if loan_engine unavailable.
+    """
+    try:
+        from engines.loan_engine import match_lenders
+        tags = ["cash", "no_collateral"]
+        if is_woman:
+            tags.append("women")
+        lenders = match_lenders(
+            tags=tags,
+            has_collateral=False,
+            is_woman=is_woman,
+            max_results=1,
+        )
+        if lenders:
+            return lenders[0]["sms_blurb"]
+    except Exception:
+        pass
+    return "Try AFC: 10% per YEAR. Dial *234# or call 0800 723 573 FREE."
+
+
+def _get_alternatives_list() -> str:
+    """
+    Return top 3 lender alternatives as a compact SMS string.
+    Used for the MORE/ZAIDI second message.
+    """
+    try:
+        from engines.loan_engine import match_lenders
+        lenders = match_lenders(
+            tags=["cash", "no_collateral", "inputs"],
+            has_collateral=False,
+            is_woman=False,
+            max_results=3,
+        )
+        if lenders:
+            parts = []
+            for i, l in enumerate(lenders, 1):
+                apr_str = f"{l['apr']}% p.a." if l["apr"] else "ask lender"
+                parts.append(f"{i}. {l['name']} {apr_str}: {l['sms_blurb']}")
+            return " | ".join(parts)[:320]
+    except Exception:
+        pass
+    return (
+        "1. AFC: 10% p.a. Dial *234# FREE. "
+        "2. Hustler Fund: 8% p.a. via M-Pesa. "
+        "3. DigiFarm: inputs only, no collateral. Dial *944#."
+    )
+
+
 def _build_short_reply(monthly: float, apr: float, mapped: RiskVerdict) -> str:
     ratio = round(apr / CBK_CBR_RATE, 1) if CBK_CBR_RATE else 0
+    alternative = _get_best_alternative()
+
     if mapped == RiskVerdict.AVOID:
         return truncate_sms(
-            f"DO NOT TAKE THIS LOAN. {apr}% APR. {ratio}x the CBK rate. Try your SACCO."
+            f"DO NOT TAKE THIS LOAN. {apr}% APR. {ratio}x the CBK rate. "
+            f"BETTER: {alternative}"
         )
     if mapped == RiskVerdict.HIGH_RISK:
         return truncate_sms(
-            f"HIGH RISK. {apr}% APR. {ratio}x CBK rate. Negotiate or use SACCO."
+            f"HIGH RISK. {apr}% APR. {ratio}x CBK rate. "
+            f"BETTER: {alternative}"
         )
     if mapped == RiskVerdict.CAUTION:
         return truncate_sms(
-            f"CAUTION. {apr}% APR. Above CBK benchmark. Compare SACCO options first."
+            f"CAUTION. {apr}% APR. Above CBK benchmark. "
+            f"BETTER: {alternative}"
         )
     return truncate_sms(
         f"SAFE. {apr}% APR. Near CBK benchmark. Still read all loan terms."
+    )
+
+
+def _build_short_reply_multi(
+    monthly: float,
+    apr: float,
+    mapped: RiskVerdict,
+    principal: float = None,
+    total_repayment: float = None,
+    term_months: float = None,
+) -> str:
+    """
+    USSD amount-band variant: shows the payment breakdown (amount, monthly
+    payment, total repayment) plus all 3 lender alternatives in one screen,
+    instead of just a rate-only danger verdict. Still capped at 320 chars to
+    satisfy LoanResponse.short_reply's max_length — real lender blurbs from
+    lenders.json can be long enough to exceed it, so we truncate defensively
+    at a word boundary rather than letting Pydantic reject the response.
+    """
+    ratio = round(apr / CBK_CBR_RATE, 1) if CBK_CBR_RATE else 0
+    alternatives = _get_alternatives_list()
+
+    payment_line = ""
+    if principal is not None and total_repayment is not None and term_months:
+        monthly_payment = total_repayment / term_months
+        payment_line = (
+            f"KSh {principal:,.0f} over {term_months:.0f}mo: "
+            f"~KSh {monthly_payment:,.0f}/month, total KSh {total_repayment:,.0f}. "
+        )
+
+    if mapped == RiskVerdict.AVOID:
+        msg = (
+            f"{payment_line}"
+            f"DO NOT TAKE THIS LOAN. {apr}% APR. {ratio}x the CBK rate. "
+            f"BETTER OPTIONS: {alternatives}"
+        )
+    elif mapped == RiskVerdict.HIGH_RISK:
+        msg = (
+            f"{payment_line}"
+            f"HIGH RISK. {apr}% APR. {ratio}x CBK rate. "
+            f"BETTER OPTIONS: {alternatives}"
+        )
+    elif mapped == RiskVerdict.CAUTION:
+        msg = (
+            f"{payment_line}"
+            f"CAUTION. {apr}% APR. Above CBK benchmark. "
+            f"BETTER OPTIONS: {alternatives}"
+        )
+    else:
+        msg = (
+            f"{payment_line}"
+            f"SAFE. {apr}% APR. Near CBK benchmark. "
+            f"BEST: {alternatives}"
+        )
+
+    return _truncate_at_word(msg, 320)
+
+
+def _truncate_at_word(text: str, max_len: int) -> str:
+    """Truncate to max_len without cutting a word in half."""
+    if len(text) <= max_len:
+        return text
+    cut = text[:max_len]
+    last_space = cut.rfind(" ")
+    if last_space > 0:
+        cut = cut[:last_space]
+    return cut.rstrip(" .,|") + "..."
+
+
+def decide_loan_by_amount_band(band_key: str) -> LoanResponse:
+    """
+    USSD entry point: farmer picked an amount band (1-5) instead of a rate.
+    Maps to the band's representative rate, then reuses the standard
+    risk-mapping and SMS-formatting pipeline.
+    """
+    result = evaluate_loan_amount_band(band_key)
+
+    if "error" in result:
+        return LoanResponse(
+            monthly_rate_percent=0.0,
+            apr_percent=0.0,
+            cbk_rate_percent=CBK_CBR_RATE,
+            risk_verdict=RiskVerdict.AVOID,
+            short_reply=truncate_sms(f"Invalid loan input: {result['error']}"),
+            comparison_phrase=truncate_sms(result["error"]),
+            payment_id=None,
+        )
+
+    monthly = result["interest_rate"]
+    apr = result["real_apr"]
+    mapped = _map_risk_verdict(result["verdict"], result["risk_level"])
+    short_reply = _build_short_reply_multi(
+        monthly,
+        apr,
+        mapped,
+        principal=result["principal"],
+        total_repayment=result["total_repayment"],
+        term_months=result["term_value"],
+    )
+    comparison = truncate_sms(
+        f"{result['band_label']} loan ~ {monthly}%/month = {apr}% APR vs CBK CBR {CBK_CBR_RATE}% p.a."
+    )
+
+    return LoanResponse(
+        monthly_rate_percent=monthly,
+        apr_percent=apr,
+        cbk_rate_percent=CBK_CBR_RATE,
+        risk_verdict=mapped,
+        short_reply=short_reply,
+        comparison_phrase=comparison,
+        payment_id=None,
     )
 
 
