@@ -21,5 +21,6 @@ def post_advisory(body: AdvisoryRequest) -> AdvisoryResponse:
         answer=result["answer"],
         location=result["location"],
         weather=result.get("weather"),
+        market=result.get("market"),
         sources=result.get("sources", []),
     )
