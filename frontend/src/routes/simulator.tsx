@@ -2,9 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { postAgent, type AgentResponse } from "@/lib/sokosense-api";
 
-import { api, ApiError } from "@/lib/api/client";
-import { parseAgent } from "@/lib/api/agent-format";
-
 export const Route = createFileRoute("/simulator")({
   head: () => ({
     meta: [
@@ -29,19 +26,11 @@ type StageState = "pending" | "running" | "completed" | "error";
 type Stage = { id: string; label: string; detail: string };
 
 const STAGES: Stage[] = [
-<<<<<<< HEAD
   { id: "sms-in", label: "SMS received", detail: "Telco gateway · Safaricom 21455" },
   { id: "agent", label: "Agent invoked", detail: "LangGraph · tool-calling loop" },
   { id: "market", label: "Market engine called", detail: "KAMIS price feed · arbitrage graph" },
   { id: "compose", label: "Response generated", detail: "Featherless LLM · 160-char shaping" },
   { id: "sms-out", label: "SMS delivered", detail: "DLR confirmed · session closed" },
-=======
-  { id: "sms-in", label: "Message received", detail: "Inbound query · shortcode 21455" },
-  { id: "agent", label: "Agent engine", detail: "LangGraph orchestrator · /api/agent" },
-  { id: "tools", label: "Tools invoked", detail: "KAMIS prices · loan · weather · RAG" },
-  { id: "compose", label: "Response composed", detail: "Featherless LLM · SMS shaping" },
-  { id: "sms-out", label: "Reply delivered", detail: "JSON returned to gateway" },
->>>>>>> development
 ];
 
 const TYPE_LABEL: Record<string, string> = {
@@ -53,16 +42,9 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 type Recommendation = {
-<<<<<<< HEAD
   type: AgentResponse["type"];
   raw_response: string;
   toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
-=======
-  type: string;
-  reply: string;
-  tool: string | null;
-  data: Record<string, unknown> | null;
->>>>>>> development
 };
 
 const COPY = {
@@ -120,7 +102,6 @@ const COPY = {
   },
 } as const;
 
-<<<<<<< HEAD
 /** Map agent type → badge colours */
 const TYPE_COLORS: Record<AgentResponse["type"], { bg: string; text: string }> = {
   market:   { bg: "bg-teal/10",        text: "text-teal" },
@@ -129,24 +110,14 @@ const TYPE_COLORS: Record<AgentResponse["type"], { bg: string; text: string }> =
   advisory: { bg: "bg-amber/10",       text: "text-amber" },
   general:  { bg: "bg-canvas",         text: "text-steel" },
 };
-=======
-const allPending = () =>
-  Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>;
->>>>>>> development
 
 function SimulatorPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [message, setMessage] = useState("");
   const [rec, setRec] = useState<Recommendation | null>(null);
-<<<<<<< HEAD
   const [stageStates, setStageStates] = useState<Record<string, StageState>>(
     Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>,
   );
-=======
-  const [error, setError] = useState<string | null>(null);
-  const [latencyMs, setLatencyMs] = useState<number | null>(null);
-  const [stageStates, setStageStates] = useState<Record<string, StageState>>(allPending());
->>>>>>> development
   const [running, setRunning] = useState(false);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -155,7 +126,6 @@ function SimulatorPage() {
   const clearTimers = () => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
-<<<<<<< HEAD
     setRec(null);
     setRunning(false);
     setLatencyMs(null);
@@ -182,35 +152,6 @@ function SimulatorPage() {
 
     const tick = (id: string, state: StageState, delay: number) => {
       const h = setTimeout(() => {
-=======
-  };
-
-  const reset = () => {
-    clearTimers();
-    setRec(null);
-    setError(null);
-    setLatencyMs(null);
-    setRunning(false);
-    setStageStates(allPending());
-  };
-
-  const run = async () => {
-    if (!message.trim() || running) return;
-    clearTimers();
-    setRec(null);
-    setError(null);
-    setLatencyMs(null);
-    setRunning(true);
-
-    // Drive the pipeline animation while the real request is in flight.
-    const next = allPending();
-    next["sms-in"] = "completed";
-    next["agent"] = "running";
-    setStageStates({ ...next });
-
-    const advance = (id: string, state: StageState, delay: number) => {
-      const handle = setTimeout(() => {
->>>>>>> development
         next[id] = state;
         setStageStates({ ...next });
       }, delay);
@@ -218,7 +159,6 @@ function SimulatorPage() {
     };
     advance("tools", "running", 500);
 
-<<<<<<< HEAD
     // Show first 3 stages animating while the real request is in flight
     tick("sms-in", "running",   0);
     tick("sms-in", "completed", 300);
@@ -262,32 +202,6 @@ function SimulatorPage() {
         type: "general",
         raw_response: t.error + (err instanceof Error ? ` (${err.message})` : ""),
       });
-=======
-    const started = performance.now();
-    try {
-      const res = await api.agent(message.trim());
-      const parsed = parseAgent(res);
-      clearTimers();
-      setLatencyMs(Math.round(performance.now() - started));
-      setStageStates({
-        "sms-in": "completed",
-        agent: "completed",
-        tools: "completed",
-        compose: "completed",
-        "sms-out": "completed",
-      });
-      setRec({ type: res.type, reply: parsed.text, tool: parsed.tool, data: parsed.data });
-    } catch (e) {
-      clearTimers();
-      const msg = e instanceof ApiError ? e.message : "Unexpected error contacting the agent.";
-      setError(msg);
-      setStageStates((prev) => {
-        const errored = { ...prev };
-        for (const s of STAGES) if (errored[s.id] === "running") errored[s.id] = "error";
-        return errored;
-      });
-    } finally {
->>>>>>> development
       setRunning(false);
     }
   };
@@ -348,12 +262,8 @@ function SimulatorPage() {
 
           <div className="mt-6 flex items-center gap-3">
             <button
-<<<<<<< HEAD
               id="simulator-run-btn"
               onClick={run}
-=======
-              onClick={() => void run()}
->>>>>>> development
               disabled={!message.trim() || running}
               className="rounded-full bg-teal px-5 py-2.5 text-[12.5px] font-medium text-paper hover:bg-teal-soft disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -412,7 +322,6 @@ function SimulatorPage() {
               <p className="text-[13px] text-mist max-w-xs">{t.empty}</p>
             </div>
           ) : (
-<<<<<<< HEAD
             <div className="mt-6 flex flex-col gap-5 flex-1">
               {/* Type badge */}
               <div className="flex items-center gap-2">
@@ -458,38 +367,6 @@ function SimulatorPage() {
                   </ul>
                 </div>
               )}
-=======
-            <div className="mt-6 flex flex-col gap-5">
-              <div className="grid grid-cols-2 gap-px bg-hairline rounded-xl overflow-hidden border border-hairline">
-                <Field label="Response type" value={TYPE_LABEL[rec.type] ?? rec.type} />
-                <Field label="Tool invoked" value={rec.tool ?? "direct answer"} mono />
-              </div>
-
-              <div className="rounded-xl border border-teal/25 bg-teal/4 p-5">
-                <p className="text-[10.5px] uppercase tracking-[0.14em] text-teal/80">{t.rec}</p>
-                <p className="mt-1.5 text-[14.5px] leading-relaxed text-ink whitespace-pre-wrap">
-                  {rec.reply}
-                </p>
-              </div>
-
-              {rec.data && (
-                <div>
-                  <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist">
-                    Structured payload
-                  </p>
-                  <pre className="mt-1.5 max-h-56 overflow-auto rounded-xl border border-hairline bg-canvas p-4 font-mono text-[11.5px] leading-relaxed text-ink">
-                    {JSON.stringify(rec.data, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-              {latencyMs != null && (
-                <p className="text-[11.5px] text-mist">
-                  Live response from <code className="font-mono text-steel">/api/agent</code> ·{" "}
-                  <span className="tabular text-ink">{latencyMs}ms</span>
-                </p>
-              )}
->>>>>>> development
             </div>
           )}
         </section>
@@ -536,18 +413,6 @@ function LangToggle({ lang, onChange, label }: { lang: Lang; onChange: (l: Lang)
   );
 }
 
-<<<<<<< HEAD
-=======
-function Field({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="bg-paper p-4">
-      <p className="text-[10.5px] uppercase tracking-[0.12em] text-mist">{label}</p>
-      <p className={`mt-1.5 text-[14px] text-ink ${mono ? "tabular font-mono" : ""}`}>{value}</p>
-    </div>
-  );
-}
-
->>>>>>> development
 function PipelineLegend() {
   const items: { state: StageState; label: string }[] = [
     { state: "pending",   label: "Pending" },
@@ -572,18 +437,13 @@ function StateDot({ state }: { state: StageState }) {
     return <span className="h-2 w-2 rounded-full bg-teal" />;
   if (state === "running")
     return <span className="h-2 w-2 rounded-full bg-teal animate-pulse ring-2 ring-teal/25" />;
-<<<<<<< HEAD
   if (state === "error")
     return <span className="h-2 w-2 rounded-full bg-rose-500" />;
-=======
-  if (state === "error") return <span className="h-2 w-2 rounded-full bg-rose" />;
->>>>>>> development
   return <span className="h-2 w-2 rounded-full border border-mist" />;
 }
 
 function PipelineStep({ index, stage, state }: { index: number; stage: Stage; state: StageState }) {
   const stateCopy =
-<<<<<<< HEAD
     state === "completed" ? "Completed"
     : state === "running"   ? "Running"
     : state === "error"     ? "Error"
@@ -592,19 +452,6 @@ function PipelineStep({ index, stage, state }: { index: number; stage: Stage; st
     <li
       className={`bg-paper p-5 flex flex-col gap-3 transition-colors ${
         state === "running" ? "bg-teal/[0.04]" : state === "error" ? "bg-rose-50" : ""
-=======
-    state === "completed"
-      ? "Completed"
-      : state === "running"
-      ? "Running"
-      : state === "error"
-      ? "Failed"
-      : "Pending";
-  return (
-    <li
-      className={`bg-paper p-5 flex flex-col gap-3 transition-colors ${
-        state === "running" ? "bg-teal/4" : ""
->>>>>>> development
       }`}
     >
       <div className="flex items-center justify-between">
@@ -619,20 +466,10 @@ function PipelineStep({ index, stage, state }: { index: number; stage: Stage; st
       </div>
       <p
         className={`text-[10.5px] uppercase tracking-[0.14em] tabular ${
-<<<<<<< HEAD
           state === "completed" ? "text-teal"
           : state === "running"   ? "text-ink"
           : state === "error"     ? "text-rose-500"
           : "text-mist"
-=======
-          state === "completed"
-            ? "text-teal"
-            : state === "running"
-            ? "text-ink"
-            : state === "error"
-            ? "text-rose"
-            : "text-mist"
->>>>>>> development
         }`}
       >
         {stateCopy}

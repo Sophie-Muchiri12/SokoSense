@@ -14,6 +14,7 @@ Usage:
 import io
 import json
 import logging
+import os
 import urllib3
 from time import time
 
@@ -133,7 +134,13 @@ def _fetch_kamis(crop: str) -> list[dict]:
             logger.error("KAMIS generic fetch failed: %s", e)
 
     if not dfs:
-        return []
+        # Direct KAMIS access failed (commonly a connection timeout when the host
+        # firewalls the hosting provider's IP range). Try a Tavily-based fallback
+        # that pulls KAMIS page content from Tavily's own infrastructure.
+        rows = _fetch_kamis_via_tavily(crop)
+        if rows:
+            logger.info("KAMIS data recovered via Tavily fallback for %s", crop)
+        return rows
 
     df = pd.concat(dfs, ignore_index=True)
     df.columns = [c.strip() for c in df.columns]
@@ -141,6 +148,61 @@ def _fetch_kamis(crop: str) -> list[dict]:
 
     # Filter to this crop
     df = df[df["Commodity"].str.contains(crop, case=False, na=False)]
+
+    return df.to_dict(orient="records")
+
+
+def _fetch_kamis_via_tavily(crop: str) -> list[dict]:
+    """
+    Best-effort fallback used when the direct KAMIS request is blocked.
+
+    Asks Tavily for the KAMIS market page content (raw HTML when available) and
+    tries to parse the price table out of it. Returns row dicts in the same shape
+    as _fetch_kamis, or [] if nothing usable can be recovered (callers then fall
+    back to mock data).
+    """
+    tavily_key = os.getenv("TAVILY_API_KEY")
+    if not tavily_key:
+        logger.warning("TAVILY_API_KEY not set — skipping KAMIS Tavily fallback")
+        return []
+
+    try:
+        from tavily import TavilyClient
+
+        client = TavilyClient(api_key=tavily_key)
+        result = client.search(
+            query=f"{crop} market price site:kamis.kilimo.go.ke",
+            search_depth="advanced",
+            max_results=5,
+            include_raw_content=True,
+        )
+    except Exception as e:
+        logger.warning("KAMIS Tavily fallback search failed for %s: %s", crop, e)
+        return []
+
+    dfs = []
+    for res in result.get("results", []):
+        raw = res.get("raw_content")
+        if not raw:
+            continue
+        try:
+            tables = pd.read_html(io.StringIO(raw))
+        except Exception:
+            continue
+        for table in tables:
+            cols = {str(c).strip() for c in table.columns}
+            # Only keep tables that look like the KAMIS price table
+            if {"Commodity", "County"} & cols:
+                dfs.append(table)
+
+    if not dfs:
+        return []
+
+    df = pd.concat(dfs, ignore_index=True)
+    df.columns = [str(c).strip() for c in df.columns]
+    df = df.drop_duplicates()
+    if "Commodity" in df.columns:
+        df = df[df["Commodity"].str.contains(crop, case=False, na=False)]
 
     return df.to_dict(orient="records")
 
