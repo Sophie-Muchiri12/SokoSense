@@ -1,6 +1,5 @@
 import os
 import io
-import time
 import urllib3
 import requests
 import pandas as pd
@@ -11,19 +10,6 @@ from engines.rate_limiter import kamis_http_limiter
 
 # Suppress SSL certificate warning from urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# Max total time (seconds) a single price lookup may spend waiting on the KAMIS
-# rate limiter. Keeps /api/agent (and the SMS/USSD path) responsive instead of
-# blocking up to 60s per outgoing call. Override via env if needed.
-KAMIS_MAX_WAIT_SECONDS = float(os.getenv("KAMIS_MAX_WAIT_SECONDS", "12"))
-
-# Broad listing endpoint (recent rows across all counties).
-KAMIS_MARKET_URL = "https://kamis.kilimo.go.ke/site/market"
-# Server-side filtered endpoint. Accepts `county`, `market` and `product` GET
-# params so a location query (e.g. Nakuru) returns that county's rows directly
-# instead of relying on the requested county happening to appear in the most
-# recent page of the broad listing.
-KAMIS_SEARCH_URL = "https://kamis.kilimo.go.ke/site/market_search"
 
 # Full crop name to product ID mapping as extracted from the select2 dropdown options of the website
 CROP_MAPPING = {
@@ -318,13 +304,18 @@ def scrape_kamis_prices(
         county_name: Optional name of the county to filter by (e.g. 'Meru', 'Kakamega', 'Nairobi'). Case-insensitive.
         limit: Number of records to return. Maximum is 10. Do NOT change this value.
     """
+    url = "https://kamis.kilimo.go.ke/site/market"
     limit = min(limit, 10)  # Hard cap — never return more than 10 rows
 
     clean_crop_name = crop_name.strip() if crop_name else None
     clean_market_name = market_name.strip() if market_name else None
     clean_county_name = county_name.strip() if county_name else None
 
+    # If a location filter is set, fetch more rows from the server so the local
+    # filter has enough data to find matches. Without a filter, 10 is enough.
     has_location = bool(clean_market_name or clean_county_name)
+    server_per_page = 100 if has_location else 10
+
     product_ids = resolve_crop_ids(clean_crop_name)
     dfs = []
     had_fetch_error = False
