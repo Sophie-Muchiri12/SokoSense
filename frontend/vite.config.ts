@@ -22,6 +22,12 @@ export default defineConfig({
       port: 8081,
       strictPort: true,
       proxy: {
+        // Must be before the /api catch-all — rewrites to FastAPI POST /ussd.
+        "/api/ussd": {
+          target: "http://127.0.0.1:8000",
+          changeOrigin: true,
+          rewrite: () => "/ussd",
+        },
         "/api": { target: "http://127.0.0.1:8000", changeOrigin: true },
         "/health": { target: "http://127.0.0.1:8000", changeOrigin: true },
       },

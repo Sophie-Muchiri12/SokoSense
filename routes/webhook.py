@@ -15,6 +15,15 @@ from models.market import MarketDecisionRequest
 from models.timing import TimingRequest
 from models.loan import LoanRequest
 from masumi_hook import charge_query
+from routes.ussd_i18n import (
+    CROP_SW,
+    HELP_TEXT_SW,
+    is_swahili_sms,
+    loan_reply_sw,
+    market_reply_sw,
+    normalize_sms_text,
+    timing_reply_sw,
+)
 
 router = APIRouter(tags=["webhook"])
 
@@ -34,7 +43,7 @@ CROP_ALIASES = {
     "nyanya": "tomatoes",
 }
 
-TIMING_KEYWORDS = {"TIMING", "WHEN", "SHOULD I SELL", "WAIT", "LINI"}
+TIMING_KEYWORDS = {"TIMING", "WHEN", "SHOULD I SELL", "WAIT", "LINI", "KUUZA", "WAKATI"}
 LOAN_KEYWORDS   = {"LOAN", "INTEREST", "MKOPO", "BORROW", "%"}
 HELP_KEYWORDS   = {"HELP", "MSAADA", "START", "HI", "HELLO"}
 
@@ -43,7 +52,7 @@ def parse_sms(text: str) -> dict:
     clean  = text.strip().upper()
     tokens = clean.split()
 
-    if any(kw in clean for kw in HELP_KEYWORDS) and len(tokens) <= 2:
+    if len(tokens) <= 2 and {t.upper() for t in tokens} & HELP_KEYWORDS:
         return {"intent": "help"}
 
     if any(kw in clean for kw in LOAN_KEYWORDS):
@@ -84,24 +93,31 @@ HELP_TEXT = (
 
 def route_sms(text: str) -> str:
     """Pure routing function — testable without HTTP, reusable by USSD handler."""
+    text, forced_lang = normalize_sms_text(text)
     parsed = parse_sms(text)
     intent = parsed.get("intent")
+    is_sw = forced_lang == "sw" or (forced_lang is None and is_swahili_sms(text))
+
+    if intent == "help":
+        return HELP_TEXT_SW if is_sw else HELP_TEXT
 
     if intent == "market":
         req = MarketDecisionRequest(crop=parsed["crop"], location=parsed["location"])
-        return market.decide_market(req).short_reply
+        result = market.decide_market(req)
+        return market_reply_sw(result) if is_sw else result.short_reply
 
     if intent == "timing":
         req = TimingRequest(crop=parsed["crop"], market=parsed["market"])
-        return timing.decide_timing(req).short_reply
+        result = timing.decide_timing(req)
+        return timing_reply_sw(result) if is_sw else result.short_reply
 
     if intent == "loan":
         req = LoanRequest(monthly_rate_percent=parsed["monthly_rate_percent"])
         result = loaning.decide_loan(req)
         charge_query("loan", payer="demo-sacco")
-        return result.short_reply
+        return loan_reply_sw(result) if is_sw else result.short_reply
 
-    return HELP_TEXT
+    return HELP_TEXT_SW if is_sw else HELP_TEXT
 
 
 # ---------------------------------------------------------------------------
@@ -135,8 +151,7 @@ async def ussd_handler(
     parts = [p for p in text.split("*")] if text else []
     depth = len(parts)
 
-    CROPS_EN = {"1": "maize", "2": "beans", "3": "potatoes", "4": "tomatoes"}
-    CROPS_SW = {"1": "maize", "2": "beans", "3": "viazi",    "4": "nyanya"}
+    CROPS    = {"1": "maize", "2": "beans", "3": "potatoes", "4": "tomatoes"}
     LOCS     = {"1": "nairobi", "2": "nakuru", "3": "eldoret", "4": "kisumu"}
 
     # Level 0: Language selection
@@ -155,7 +170,6 @@ async def ussd_handler(
         return "END Invalid input."
 
     service = parts[1]
-    crops   = CROPS_SW if is_sw else CROPS_EN
 
     # Option 1: Market Price / Bei ya Soko
     if service == "1":
@@ -164,17 +178,19 @@ async def ussd_handler(
                 return "CON Chagua zao:\n1.Mahindi 2.Maharagwe\n3.Viazi 4.Nyanya"
             return "CON Select crop:\n1.Maize 2.Beans\n3.Potatoes 4.Tomatoes"
         if depth == 3:
-            crop = crops.get(parts[2], "maize")
+            crop = CROPS.get(parts[2], "maize")
             if is_sw:
-                return f"CON Soko la {crop.upper()}:\n1.Nairobi 2.Nakuru\n3.Eldoret 4.Kisumu"
+                label = CROP_SW.get(crop, crop).upper()
+                return f"CON Soko la {label}:\n1.Nairobi 2.Nakuru\n3.Eldoret 4.Kisumu"
             return f"CON {crop.upper()} market:\n1.Nairobi 2.Nakuru\n3.Eldoret 4.Kisumu"
         if depth == 4:
             req = MarketDecisionRequest(
-                crop=crops.get(parts[2], "maize"),
+                crop=CROPS.get(parts[2], "maize"),
                 location=LOCS.get(parts[3], "nairobi"),
             )
             result = market.decide_market(req)
-            return f"END {result.short_reply}"
+            reply = market_reply_sw(result) if is_sw else result.short_reply
+            return f"END {reply}"
 
     # Option 2: When to Sell / Wakati wa Kuuza
     if service == "2":
@@ -184,11 +200,12 @@ async def ussd_handler(
             return "CON Select crop:\n1.Maize 2.Beans\n3.Potatoes 4.Tomatoes"
         if depth == 3:
             req = TimingRequest(
-                crop=crops.get(parts[2], "maize"),
+                crop=CROPS.get(parts[2], "maize"),
                 market="nairobi",
             )
             result = timing.decide_timing(req)
-            return f"END {result.short_reply}"
+            reply = timing_reply_sw(result) if is_sw else result.short_reply
+            return f"END {reply}"
 
     # Option 3: Loan Check / Mkopo
     if service == "3":
@@ -208,7 +225,8 @@ async def ussd_handler(
             )
         if depth == 3:
             result = loaning.decide_loan_by_amount_band(parts[2])
-            return f"END {result.short_reply}"
+            reply = loan_reply_sw(result) if is_sw else result.short_reply
+            return f"END {reply}"
 
     if is_sw:
         return "END Ingizo batili. Tuma HELP kwa maagizo."

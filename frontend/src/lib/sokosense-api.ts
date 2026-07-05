@@ -201,6 +201,61 @@ export async function getHealth(): Promise<HealthResponse> {
   return apiFetch<HealthResponse>("/health");
 }
 
+// ─── USSD (Africa's Talking webhook shape) ───────────────────────────────────
+
+export interface UssdRequest {
+  sessionId: string;
+  serviceCode: string;
+  phoneNumber: string;
+  text: string;
+}
+
+export type UssdResponseKind = "CON" | "END";
+
+export interface UssdResponse {
+  kind: UssdResponseKind;
+  body: string;
+  raw: string;
+}
+
+const USSD_SERVICE_CODE = "*384*543#";
+
+/** Parse a CON/END USSD screen from the FastAPI plain-text handler. */
+export function parseUssdResponse(raw: string): UssdResponse {
+  const trimmed = raw.trimStart();
+  if (trimmed.startsWith("END ")) {
+    return { kind: "END", body: trimmed.slice(4), raw };
+  }
+  if (trimmed.startsWith("CON ")) {
+    return { kind: "CON", body: trimmed.slice(4), raw };
+  }
+  return { kind: "END", body: trimmed, raw };
+}
+
+/** Invoke the live USSD webhook (same path Africa's Talking POSTs to). */
+export async function postUssd(params: UssdRequest): Promise<UssdResponse> {
+  const body = new URLSearchParams({
+    sessionId: params.sessionId,
+    serviceCode: params.serviceCode,
+    phoneNumber: params.phoneNumber,
+    text: params.text,
+  });
+  // In dev the /ussd URL is the React page route (GET only). Proxy via /api/ussd instead.
+  const path = BASE_URL ? "/ussd" : "/api/ussd";
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`SokoSense USSD ${res.status}: ${text}`);
+  }
+  return parseUssdResponse(await res.text());
+}
+
+export { USSD_SERVICE_CODE };
+
 /** Fetch recent request logs (page / page_size). */
 export async function getLogs(
   page = 1,
