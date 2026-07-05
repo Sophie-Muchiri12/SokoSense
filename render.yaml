@@ -26,14 +26,10 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.4
       # --- Secrets: set these in the Render dashboard (never commit values) ---
-      - key: FEATHERLSS_API_KEY
-        sync: false
-      - key: LLM_MODEL_FEATHERLESS
-        value: MiniMaxAI/MiniMax-M3
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
-        sync: false
+        value: llama-3.3-70b-versatile
       - key: TAVILY_API_KEY
         sync: false
       - key: NEO4J_URI

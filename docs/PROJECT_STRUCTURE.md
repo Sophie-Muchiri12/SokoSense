@@ -44,7 +44,6 @@ SokoSense/
 │   └── masumi_hook.py            # Lucy — payment log on /api/loan
 │
 ├── parser/                       # Sophie + Job — SMS input only (NOT decisions)
-│   ├── sms_parser.py             # Featherless: raw SMS → {crop, location, intent}
 │   ├── prompts.py
 │   └── regex_fallback.py
 │
@@ -53,6 +52,7 @@ SokoSense/
 │   ├── decisions.py              # POST /api/market, /timing, /loan
 │   ├── logs.py                   # GET /api/logs
 │   ├── market_data.py            # GET /api/market-prices
+│   ├── webhook.py                # SMS parser + USSD handler (rule-based, EN/SW)
 │   ├── webhook_sms.py            # POST /webhook/sms — Lucy (Africa's Talking)
 │   └── webhook_ussd.py           # POST /webhook/ussd — Lucy (*384*543#)
 │

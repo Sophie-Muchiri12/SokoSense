@@ -29,7 +29,7 @@ const STAGES: Stage[] = [
   { id: "sms-in", label: "SMS received", detail: "Telco gateway · Safaricom 21455" },
   { id: "agent", label: "Agent invoked", detail: "LangGraph · tool-calling loop" },
   { id: "market", label: "Market engine called", detail: "KAMIS price feed · arbitrage graph" },
-  { id: "compose", label: "Response generated", detail: "Featherless LLM · 160-char shaping" },
+  { id: "compose", label: "Response generated", detail: "Groq LLM · 160-char shaping" },
   { id: "sms-out", label: "SMS delivered", detail: "DLR confirmed · session closed" },
 ];
 

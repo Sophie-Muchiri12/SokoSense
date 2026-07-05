@@ -29,9 +29,8 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Dimension of embeddings. We use OpenAI text-embedding-3-small (1536 dims)
-# via the Featherless API. If Featherless is not available, fall back to
-# a simple character-level hash embedding for development.
+# Dimension of embeddings (1536). Production would use a real embedding API;
+# development uses a deterministic hash-based fallback.
 VECTOR_DIMENSION = 1536
 VECTOR_INDEX_NAME = "document_chunks"
 
@@ -39,33 +38,10 @@ VECTOR_INDEX_NAME = "document_chunks"
 def get_embedding(text: str) -> list[float]:
     """Generate embedding vector for a text string.
 
-    Uses OpenAI-compatible embeddings API via Featherless if configured,
-    otherwise returns a deterministic zero vector as development fallback.
+    Uses a deterministic hash-based embedding for development when no
+    embedding API is configured.
     """
-    featherless_key = os.getenv("FEATHERLSS_API_KEY")
-    if False:  # Featherless does not support embeddings (404), use fallback
-        try:
-            import httpx
-            resp = httpx.post(
-                "https://api.featherless.ai/v1/embeddings",
-                headers={
-                    "Authorization": f"Bearer {featherless_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "text-embedding-3-small",
-                    "input": text[:8000],  # token limit safety
-                },
-                timeout=15,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data["data"][0]["embedding"]
-        except Exception as exc:
-            logger.warning("Featherless embedding failed: %s — using fallback", exc)
-
     # Fallback: deterministic hash-based embedding for development
-   
     rng = np.random.default_rng(int(hashlib.md5(text.encode()).hexdigest()[:8], 16))
     return rng.uniform(-0.01, 0.01, VECTOR_DIMENSION).tolist()
 

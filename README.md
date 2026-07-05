@@ -37,8 +37,8 @@ SokoSense turns raw market data into **one clear instruction** for Kenyan smallh
    cp .env.example .env
    Fill in your credentials:
    ```env
-   FEATHERLSS_API_KEY=your_featherless_api_key_here
-   LLM_MODEL_FEATHERLESS=MiniMaxAI/MiniMax-M3
+   GROQ_API_KEY=your_groq_api_key_here
+   GROQ_MODEL=llama-3.3-70b-versatile
    TAVILY_API_KEY=your_tavily_api_key_here
    ```
 
@@ -103,7 +103,7 @@ Start the backend first so the UI can reach it. Pages wired to the live API:
 | POST | `/ussd` | Africa's Talking USSD webhook |
 | POST | `/webhook/sms` | Africa's Talking SMS webhook |
 
-> **Note:** Some features need API keys in `.env` (Featherless/Groq for the agent,
+> **Note:** Some features need API keys in `.env` (Groq for the agent and advisory,
 > Neo4j for advisory, Africa's Talking for SMS/USSD). Copy `.env.example` to `.env`
 > and fill in credentials. The rule-based engines (`/api/loan`, `/api/timing`,
 > `/api/market`) work without any keys.

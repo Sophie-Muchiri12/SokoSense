@@ -1,294 +1,365 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { PageHeader } from "./market";
+import { useCallback, useRef, useState } from "react";
+import {
+  postUssd,
+  USSD_SERVICE_CODE,
+  type UssdResponse,
+} from "@/lib/sokosense-api";
 
 export const Route = createFileRoute("/ussd")({
   head: () => ({
     meta: [
-      { title: "USSD Flow Explorer — SokoSense" },
+      { title: "USSD Simulator — SokoSense" },
       {
         name: "description",
         content:
-          "Interactive walkthrough of the *384*543# USSD journey: main menu, crop selection, location and AI recommendation.",
+          "Live *384*543# USSD simulator — dial the shortcode, pick menu options, and fetch real market, timing and loan decisions from the backend.",
       },
-      { property: "og:title", content: "USSD Flow Explorer — SokoSense" },
+      { property: "og:title", content: "USSD Simulator — SokoSense" },
       {
         property: "og:description",
-        content: "Visual explorer of the SokoSense USSD experience for feature phones.",
+        content: "Interactive feature-phone USSD simulator wired to the live SokoSense gateway.",
       },
     ],
   }),
   component: UssdPage,
 });
 
-// ─────────────────────────── data ───────────────────────────
-
-type Node = {
-  id: string;
-  label: string;
-  step: number;
+type SessionStep = {
   input: string;
-  screen: string[];
-  explanation: string;
-  latency: string;
-  children?: string[];
+  response: UssdResponse;
+  latencyMs: number;
 };
 
-const NODES: Record<string, Node> = {
-  dial: {
-    id: "dial",
-    label: "Dial code",
-    step: 0,
-    input: "*384*543#",
-    screen: [
-      "Connecting to SokoSense...",
-      "",
-      "Session established.",
-      "Carrier: Safaricom",
-    ],
-    explanation:
-      "The farmer dials the shortcode on any feature phone. Our USSD aggregator routes the request to the SokoSense gateway in under 400ms.",
-    latency: "~380ms",
-    children: ["main"],
-  },
-  main: {
-    id: "main",
-    label: "Main menu",
-    step: 1,
-    input: "(menu shown)",
-    screen: [
-      "SokoSense · Karibu Achieng",
-      "",
-      "1. Market prices",
-      "2. Sell my crop",
-      "3. Loan check",
-      "4. Weather alerts",
-      "5. My account",
-      "0. English / Kiswahili",
-    ],
-    explanation:
-      "Farmer-personalised greeting using their registered name. Menu is intentionally 5 items — under the 182-character USSD limit and readable on a Nokia 105 screen.",
-    latency: "120ms",
-    children: ["crop"],
-  },
-  crop: {
-    id: "crop",
-    label: "Crop selection",
-    step: 2,
-    input: "2",
-    screen: [
-      "Which crop are you selling?",
-      "",
-      "1. Maize",
-      "2. Beans",
-      "3. Coffee",
-      "4. Dairy",
-      "5. Horticulture",
-      "9. More crops",
-      "0. Back",
-    ],
-    explanation:
-      "Top 5 crops are pre-loaded based on the farmer's county and historical queries — 94% of queries are served from this shortlist without pagination.",
-    latency: "140ms",
-    children: ["location"],
-  },
-  location: {
-    id: "location",
-    label: "Location selection",
-    step: 3,
-    input: "1",
-    screen: [
-      "Maize · Where are you?",
-      "",
-      "1. Kitale (home)",
-      "2. Eldoret",
-      "3. Nakuru",
-      "4. Nairobi",
-      "5. Other...",
-      "0. Back",
-    ],
-    explanation:
-      "Defaults to the farmer's registered village. Other markets are sorted by transport feasibility — Kitale → Eldoret is 70km, well within a single-day truck round-trip.",
-    latency: "160ms",
-    children: ["recommend"],
-  },
-  recommend: {
-    id: "recommend",
-    label: "AI recommendation",
-    step: 4,
-    input: "2",
-    screen: [
-      "MAIZE · ELDORET",
-      "Price: KSh 4,820/bag",
-      "Trend: +6.2% (7d)",
-      "",
-      "✓ SELL this week",
-      "Net: +KSh 412/bag",
-      "after transport",
-      "",
-      "1. SMS full report",
-      "0. Main menu",
-    ],
-    explanation:
-      "Engine combines live market feed, transport cost model and a 14-day price forecast (LSTM). The final SMS is sent free-of-charge with the full breakdown and 3 trusted buyer contacts.",
-    latency: "620ms",
-  },
-};
+const DEMO_PHONE = "+254712345678";
 
-const ORDER = ["dial", "main", "crop", "location", "recommend"];
-
-// ─────────────────────────── page ───────────────────────────
+function newSessionId(): string {
+  return crypto.randomUUID();
+}
 
 function UssdPage() {
-  const [activeId, setActiveId] = useState("main");
-  const active = NODES[activeId];
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionText, setSessionText] = useState("");
+  const [screenBody, setScreenBody] = useState<string | null>(null);
+  const [sessionOpen, setSessionOpen] = useState(false);
+  const [currentInput, setCurrentInput] = useState("");
+  const [steps, setSteps] = useState<SessionStep[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const reset = useCallback(() => {
+    setSessionId(null);
+    setSessionText("");
+    setScreenBody(null);
+    setSessionOpen(false);
+    setCurrentInput("");
+    setSteps([]);
+    setLoading(false);
+    setConnecting(false);
+    setError(null);
+    setLastLatencyMs(null);
+  }, []);
+
+  const invokeUssd = useCallback(
+    async (text: string, inputLabel: string, overrideSessionId?: string) => {
+      const sid = overrideSessionId ?? sessionId ?? newSessionId();
+      setSessionId(sid);
+
+      setLoading(true);
+      setError(null);
+      const start = performance.now();
+
+      try {
+        const response = await postUssd({
+          sessionId: sid,
+          serviceCode: USSD_SERVICE_CODE,
+          phoneNumber: DEMO_PHONE,
+          text,
+        });
+        const latencyMs = Math.round(performance.now() - start);
+        setLastLatencyMs(latencyMs);
+        setSessionText(text);
+        setScreenBody(response.body);
+        setSessionOpen(response.kind === "CON");
+        setSteps((prev) => [...prev, { input: inputLabel, response, latencyMs }]);
+        setCurrentInput("");
+        return response;
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "USSD request failed — is the backend running on localhost:8000?",
+        );
+        throw err;
+      } finally {
+        setLoading(false);
+        setConnecting(false);
+      }
+    },
+    [sessionId],
+  );
+
+  const dial = async () => {
+    if (loading || connecting) return;
+    reset();
+    setConnecting(true);
+    await invokeUssd("", "(dial)", newSessionId());
+  };
+
+  const sendInput = async () => {
+    if (!sessionOpen || loading || !currentInput.trim()) return;
+    const next =
+      sessionText === ""
+        ? currentInput.trim()
+        : `${sessionText}*${currentInput.trim()}`;
+    await invokeUssd(next, currentInput.trim());
+  };
+
+  const appendDigit = (digit: string) => {
+    if (!sessionOpen || loading) return;
+    setCurrentInput((v) => (v + digit).slice(0, 12));
+    inputRef.current?.focus();
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") void sendInput();
+  };
+
+  const lastStep = steps[steps.length - 1];
+  const sessionEnded = steps.length > 0 && lastStep?.response.kind === "END";
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-        <PageHeader
-          eyebrow="USSD flow explorer · *384*543#"
-          title="The journey on"
-          italic="every feature phone."
-          sub="Click any node to inspect the input the farmer dials, the screen the carrier renders, and the engine call behind it."
-        />
-        <div className="flex items-center gap-2 text-[11.5px]">
-          <span className="chip">No data plan required</span>
-          <span className="chip">Works on Nokia 105+</span>
-        </div>
-      </div>
+    <div className="mx-auto max-w-[1240px] px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
+      <header className="max-w-3xl">
+        <p className="eyebrow">USSD simulator · {USSD_SERVICE_CODE}</p>
+        <h1 className="display mt-4 text-[40px] sm:text-[56px] text-ink leading-[1.02]">
+          Dial the code.
+          <br />
+          <span className="italic text-teal">Get a real decision.</span>
+        </h1>
+        <p className="mt-5 text-[14px] leading-relaxed text-steel">
+          Same feature-phone flow as Safaricom USSD — wired to the live{" "}
+          <code className="font-mono text-[13px] text-ink">POST /ussd</code> handler.
+          Pick menu options and the market, timing and loan engines respond with real data.
+        </p>
+      </header>
 
-      <div className="mt-10 grid lg:grid-cols-[1.35fr_1fr] gap-6">
-        {/* Tree column */}
-        <div className="card-surface p-7">
-          <div className="flex items-center justify-between">
-            <p className="eyebrow">Menu tree</p>
-            <span className="text-[11px] text-mist tabular">5 steps · avg 1.4s end-to-end</span>
+      <div className="mt-12 grid lg:grid-cols-2 gap-6">
+        {/* Phone */}
+        <section className="card-surface p-7 bg-ink text-paper flex flex-col">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="eyebrow text-teal-glow">Feature phone</p>
+              <h2 className="font-serif text-[22px] text-paper mt-2">
+                {USSD_SERVICE_CODE}
+              </h2>
+            </div>
+            <span
+              className={`chip border-paper/20 ${
+                sessionEnded
+                  ? "text-paper/70"
+                  : sessionOpen
+                    ? "border-teal-glow/40 text-teal-glow"
+                    : "text-paper/60"
+              }`}
+            >
+              {connecting || loading
+                ? "● connecting"
+                : sessionEnded
+                  ? "○ session ended"
+                  : sessionOpen
+                    ? "● live session"
+                    : "○ idle"}
+            </span>
           </div>
 
-          <ol className="mt-6 relative">
-            <span className="absolute left-[18px] top-2 bottom-2 w-px bg-hairline" />
-            {ORDER.map((id, i) => {
-              const n = NODES[id];
-              const isActive = id === activeId;
-              return (
-                <li key={id} className="relative pl-12 pb-4 last:pb-0">
-                  <button
-                    onClick={() => setActiveId(id)}
-                    className={`absolute left-0 top-1 inline-flex h-9 w-9 items-center justify-center rounded-full border text-[12px] tabular transition ${
-                      isActive
-                        ? "bg-teal text-paper border-teal shadow-card"
-                        : "bg-paper text-steel border-hairline hover:border-teal/40 hover:text-teal"
-                    }`}
-                    aria-label={`Step ${i}`}
-                  >
-                    {i}
-                  </button>
-                  <button
-                    onClick={() => setActiveId(id)}
-                    className={`block w-full text-left rounded-xl border p-4 transition ${
-                      isActive
-                        ? "border-teal/40 bg-teal/5"
-                        : "border-hairline bg-paper hover:border-ink/30"
-                    }`}
-                  >
-                    <div className="flex items-baseline justify-between gap-3">
-                      <div>
-                        <p className="text-[10.5px] uppercase tracking-wider text-mist">Step {i}</p>
-                        <h3 className="font-serif text-[18px] text-ink mt-0.5">{n.label}</h3>
-                      </div>
-                      <span className="font-mono text-[11px] text-teal whitespace-nowrap">{n.input}</span>
-                    </div>
-                    <p className="mt-2 text-[12.5px] text-steel line-clamp-2">{n.explanation}</p>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-
-        {/* Inspector column */}
-        <div className="space-y-5">
-          {/* Phone */}
-          <div className="card-surface p-7 bg-ink text-paper">
-            <div className="flex items-center justify-between">
-              <p className="eyebrow text-teal-glow">Live screen</p>
-              <span className="text-[10.5px] tabular text-paper/60">Safaricom · 21:14</span>
-            </div>
-            <div className="mt-4 mx-auto max-w-[280px] rounded-[28px] border border-paper/10 bg-[#0A1109] p-3 shadow-card">
-              <div className="rounded-[18px] bg-[#C5D2A8] text-[#102610] font-mono p-4 min-h-[260px] text-[12.5px] leading-[1.65] whitespace-pre-wrap">
-                {active.screen.join("\n")}
-                <div className="mt-3 border-t border-[#102610]/20 pt-2 text-[10.5px] text-[#102610]/70">
-                  Reply | Cancel
+          {/* Nokia-style screen */}
+          <div className="mt-6 mx-auto w-full max-w-[300px]">
+            <div className="rounded-[32px] border-2 border-paper/15 bg-[#1a1f18] p-3 shadow-card">
+              <div className="rounded-t-[20px] bg-[#0A1109] px-4 py-2 flex items-center justify-between text-[10px] text-paper/50">
+                <span>Safaricom</span>
+                <span className="tabular">21:14</span>
+              </div>
+              <div className="rounded-b-[20px] bg-[#C5D2A8] text-[#102610] font-mono p-4 min-h-[280px] text-[12.5px] leading-[1.65] whitespace-pre-wrap flex flex-col">
+                <div className="flex-1">
+                  {connecting && !screenBody ? (
+                    <>
+                      Connecting to SokoSense…
+                      {"\n\n"}
+                      Session establishing.
+                    </>
+                  ) : screenBody ? (
+                    screenBody
+                  ) : (
+                    <>
+                      Dial {USSD_SERVICE_CODE}
+                      {"\n\n"}
+                      Press the green call button to start a live USSD session.
+                    </>
+                  )}
+                </div>
+                <div className="mt-3 border-t border-[#102610]/20 pt-2 text-[10.5px] text-[#102610]/70 flex justify-between">
+                  <span>Reply</span>
+                  <span>Cancel</span>
                 </div>
               </div>
             </div>
-            <div className="mt-4 flex items-center justify-between text-[11px] text-paper/60">
-              <span>Input: <span className="font-mono text-teal-glow">{active.input}</span></span>
-              <span>Latency: <span className="tabular text-paper">{active.latency}</span></span>
-            </div>
-          </div>
 
-          {/* Explanation */}
-          <div className="card-surface p-7">
-            <p className="eyebrow">What happens here</p>
-            <h4 className="font-serif text-[20px] text-ink mt-1">{active.label}</h4>
-            <p className="mt-3 text-[13.5px] text-ink/85 leading-relaxed">{active.explanation}</p>
-
-            <div className="mt-5 grid grid-cols-2 gap-px bg-hairline rounded-lg overflow-hidden border border-hairline">
-              <div className="bg-paper px-4 py-3">
-                <p className="text-[10px] uppercase tracking-wider text-mist">User input</p>
-                <p className="font-mono text-[13px] text-ink mt-1">{active.input}</p>
-              </div>
-              <div className="bg-paper px-4 py-3">
-                <p className="text-[10px] uppercase tracking-wider text-mist">Engine latency</p>
-                <p className="font-mono text-[13px] text-teal mt-1">{active.latency}</p>
-              </div>
-            </div>
-
-            {active.children && (
-              <div className="mt-5 pt-5 border-t border-hairline">
-                <p className="text-[11px] uppercase tracking-wider text-mist">Next step</p>
+            {/* Keypad + input */}
+            <div className="mt-5 space-y-3">
+              <label className="block text-[10.5px] uppercase tracking-[0.14em] text-paper/50">
+                Menu input
+              </label>
+              <div className="flex gap-2">
+                <input
+                  ref={inputRef}
+                  id="ussd-input"
+                  value={currentInput}
+                  onChange={(e) => setCurrentInput(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  disabled={!sessionOpen || loading}
+                  placeholder={sessionOpen ? "e.g. 1" : "Dial first"}
+                  inputMode="numeric"
+                  className="flex-1 rounded-xl border border-paper/15 bg-[#0A1109] px-4 py-2.5 font-mono text-[14px] text-paper placeholder:text-paper/30 focus:border-teal-glow/50 focus:outline-none focus:ring-2 focus:ring-teal-glow/15 disabled:opacity-40"
+                />
                 <button
-                  onClick={() => setActiveId(active.children![0])}
-                  className="mt-2 inline-flex items-center gap-2 text-[13px] text-teal font-medium hover:text-teal-soft"
+                  id="ussd-send-btn"
+                  onClick={() => void sendInput()}
+                  disabled={!sessionOpen || loading || !currentInput.trim()}
+                  className="rounded-xl bg-teal px-4 py-2.5 text-[12.5px] font-medium text-paper hover:bg-teal-soft disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  {NODES[active.children[0]].label} →
+                  Send
                 </button>
               </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => (key === "*" || key === "#" ? undefined : appendDigit(key))}
+                    disabled={!sessionOpen || loading || key === "*" || key === "#"}
+                    className="rounded-lg border border-paper/10 bg-[#0A1109] py-2.5 font-mono text-[15px] text-paper hover:border-teal-glow/30 hover:bg-teal/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {key}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              id="ussd-dial-btn"
+              onClick={() => void dial()}
+              disabled={loading || connecting}
+              className="rounded-full bg-teal px-5 py-2.5 text-[12.5px] font-medium text-paper hover:bg-teal-soft disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {connecting ? "Connecting…" : `Dial ${USSD_SERVICE_CODE}`}
+            </button>
+            <button
+              id="ussd-reset-btn"
+              onClick={reset}
+              disabled={loading && !screenBody}
+              className="rounded-full border border-paper/20 bg-transparent px-4 py-2.5 text-[12.5px] font-medium text-paper hover:border-paper/40 disabled:opacity-50 transition-colors"
+            >
+              Cancel session
+            </button>
+            {lastLatencyMs !== null && (
+              <span className="ml-auto text-[11px] text-paper/50 tabular">
+                Last hop: {lastLatencyMs}ms
+              </span>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Bottom: pipeline summary */}
-      <div className="mt-6 card-surface p-7">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="eyebrow">End-to-end journey</p>
-            <h3 className="font-serif text-[22px] text-ink mt-1">From dial to decision in 1.4 seconds</h3>
+          {sessionText && (
+            <p className="mt-4 text-[11px] text-paper/45 font-mono break-all">
+              Session path: {sessionText || "(root)"}
+            </p>
+          )}
+        </section>
+
+        {/* Session log */}
+        <section className="card-surface p-7 flex flex-col">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="eyebrow">Session trace</p>
+              <h2 className="font-serif text-[22px] text-ink mt-2">
+                Live gateway hops
+              </h2>
+            </div>
+            <span className="chip">{steps.length} hop{steps.length === 1 ? "" : "s"}</span>
           </div>
-          <span className="chip">5 hops · 1 SMS confirmation</span>
-        </div>
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
-          {ORDER.map((id, i) => {
-            const n = NODES[id];
-            const isActive = id === activeId;
-            return (
-              <button
-                key={id}
-                onClick={() => setActiveId(id)}
-                className={`text-left bg-paper px-4 py-4 hover:bg-canvas transition ${
-                  isActive ? "ring-2 ring-inset ring-teal/40" : ""
-                }`}
-              >
-                <p className="text-[10px] uppercase tracking-wider text-mist">Hop {i}</p>
-                <p className="font-serif text-[16px] text-ink mt-1">{n.label}</p>
-                <p className="mt-1 font-mono text-[10.5px] text-teal">{n.latency}</p>
-              </button>
-            );
-          })}
-        </div>
+
+          {error ? (
+            <div className="mt-8 flex-1 rounded-xl border border-rose/30 bg-rose/4 p-6">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-rose/80">
+                Request failed
+              </p>
+              <p className="mt-2 text-[13.5px] leading-relaxed text-ink">{error}</p>
+              <p className="mt-3 text-[12px] text-steel">
+                Start the backend with{" "}
+                <code className="font-mono text-ink">uvicorn main:app --port 8000</code>.
+              </p>
+            </div>
+          ) : steps.length === 0 ? (
+            <div className="mt-8 flex-1 rounded-xl border border-dashed border-fog bg-canvas/60 p-10 flex items-center justify-center text-center">
+              <p className="text-[13px] text-mist max-w-xs">
+                Dial the shortcode to open a session, then reply with menu numbers (e.g.{" "}
+                <span className="font-mono text-steel">1</span> for English →{" "}
+                <span className="font-mono text-steel">1</span> for market prices).
+              </p>
+            </div>
+          ) : (
+            <ol className="mt-6 space-y-4 flex-1 overflow-y-auto max-h-[520px] pr-1">
+              {steps.map((step, i) => (
+                <li
+                  key={`${i}-${step.input}`}
+                  className="rounded-xl border border-hairline bg-canvas/40 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist">
+                      Hop {i + 1} · input{" "}
+                      <span className="font-mono text-ink">{step.input}</span>
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${
+                          step.response.kind === "CON"
+                            ? "bg-teal/10 text-teal"
+                            : "bg-green-surface text-green-deep"
+                        }`}
+                      >
+                        {step.response.kind}
+                      </span>
+                      <span className="text-[11px] tabular text-steel">
+                        {step.latencyMs}ms
+                      </span>
+                    </div>
+                  </div>
+                  <pre className="mt-3 font-mono text-[12.5px] text-ink whitespace-pre-wrap leading-relaxed">
+                    {step.response.body}
+                  </pre>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          <div className="mt-6 pt-5 border-t border-hairline">
+            <p className="text-[11px] uppercase tracking-wider text-mist">Quick path</p>
+            <p className="mt-2 text-[12.5px] text-steel leading-relaxed">
+              Market price for maize in Nairobi: dial, then send{" "}
+              <code className="font-mono text-ink bg-canvas px-1 rounded">1</code>,{" "}
+              <code className="font-mono text-ink bg-canvas px-1 rounded">1</code>,{" "}
+              <code className="font-mono text-ink bg-canvas px-1 rounded">1</code>,{" "}
+              <code className="font-mono text-ink bg-canvas px-1 rounded">1</code>{" "}
+              (English → Market → Maize → Nairobi).
+            </p>
+          </div>
+        </section>
       </div>
     </div>
   );

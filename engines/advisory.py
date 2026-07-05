@@ -7,22 +7,21 @@ Pipeline:
   4. Fetch live KAMIS market prices for the crop (prices live in the KAMIS
      pipeline, not Neo4j) → best market + price trend
   5. Build a prompt with retrieved context + weather + market context
-  6. Call Featherless LLM → generate final answer
+  6. Call Groq LLM → generate final answer
 
 Usage:
     from engines.advisory import answer_farmer_question
     result = answer_farmer_question("What causes maize rust in Nakuru?")
 """
 
-import os
 import re
 import logging
 from typing import Any
 
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
+from engines.llm import get_groq_llm
 from engines.neo4j_client import Neo4jClient
 from engines.weather import get_farmer_weather, _geocode_location, _fetch_weather, _weatheradvice
 
@@ -317,32 +316,22 @@ def answer_farmer_question(
         )
     )
 
-    # Initialize the LLM (Featherless API)
-    featherless_api_key = os.getenv("FEATHERLSS_API_KEY")
-    featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "MiniMaxAI/MiniMax-M3")
-
-    if not featherless_api_key:
+    llm = get_groq_llm(temperature=0.3)
+    if llm is None:
         return {
             "query": query,
-            "answer": "FEATHERLSS_API_KEY is not set in .env.",
+            "answer": "GROQ_API_KEY is not set in .env.",
             "location": location,
             "weather": weather_data,
             "market": market_data,
             "sources": sources,
         }
 
-    llm = ChatOpenAI(
-        model=featherless_model,
-        temperature=0.3,
-        openai_api_key=featherless_api_key,
-        openai_api_base="https://api.featherless.ai/v1",
-    )
-
     try:
         response = llm.invoke([system_prompt, user_message])
         answer = response.content.strip()
     except Exception as exc:
-        logger.warning("Featherless LLM call failed in advisory: %s", exc)
+        logger.warning("Groq LLM call failed in advisory: %s", exc)
         answer = (
             f"I'm sorry, I couldn't generate a complete answer right now. "
             f"Based on my records: {graph_context[:300]}"
