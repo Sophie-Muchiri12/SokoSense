@@ -159,3 +159,83 @@
   100% { background-position: -200% 0; }
 }
 
+/* Splash screen */
+.splash-bg-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  pointer-events: none;
+}
+.splash-bg-orb-a {
+  width: min(480px, 70vw);
+  height: min(480px, 70vw);
+  top: -12%;
+  left: -8%;
+  background: color-mix(in oklab, var(--color-teal) 18%, transparent);
+  animation: splash-orb-drift-a 8s ease-in-out infinite;
+}
+.splash-bg-orb-b {
+  width: min(360px, 55vw);
+  height: min(360px, 55vw);
+  bottom: -10%;
+  right: -6%;
+  background: color-mix(in oklab, var(--color-green) 14%, transparent);
+  animation: splash-orb-drift-b 10s ease-in-out infinite;
+}
+
+@keyframes splash-orb-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(24px, 18px) scale(1.06); }
+}
+@keyframes splash-orb-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-20px, -14px) scale(1.05); }
+}
+
+@keyframes splash-rise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.splash-rise {
+  animation: splash-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.splash-rise-delay-1 { animation-delay: 180ms; }
+.splash-rise-delay-2 { animation-delay: 320ms; }
+.splash-rise-delay-3 { animation-delay: 460ms; }
+.splash-rise-delay-4 { animation-delay: 600ms; }
+.splash-rise-delay-5 { animation-delay: 740ms; }
+
+@keyframes splash-logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.splash-logo-float {
+  animation: splash-logo-float 3.2s ease-in-out 900ms infinite;
+}
+
+@keyframes splash-glow-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.92); }
+  50% { opacity: 0.65; transform: scale(1.08); }
+}
+.splash-glow-pulse {
+  animation: splash-glow-pulse 3s ease-in-out infinite;
+}
+
+@keyframes splash-path-draw {
+  to { stroke-dashoffset: 0; }
+}
+.splash-path-draw {
+  animation: splash-path-draw 900ms cubic-bezier(0.65, 0, 0.35, 1) 200ms forwards;
+}
+.splash-path-draw-delay {
+  animation-delay: 550ms;
+}
+
+@keyframes splash-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.splash-progress-bar {
+  animation: splash-progress 4.5s linear forwards;
+}
+
