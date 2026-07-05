@@ -73,6 +73,54 @@ def _build_featherless_llm_with_tools():
 _groq_llm_with_tools = _build_groq_llm_with_tools()
 _featherless_llm_with_tools = _build_featherless_llm_with_tools()
 
+# Plain, tool-free LLM used to summarize tool output (e.g. scraped KAMIS rows)
+# into a useful SMS reply. Built lazily and memoized so importing this module
+# stays cheap and a missing summarizer never breaks the agent.
+_summarizer_llm = None
+_summarizer_built = False
+
+
+def get_summarizer_llm():
+    """Return a tool-free LLM for grounded post-tool summarization, or ``None``.
+
+    Uses the same provider preference as the agent (Groq first, then
+    Featherless) but without tools bound, so it produces plain text instead of
+    attempting more tool calls. Memoized; returns ``None`` if no provider is
+    configured so callers can fall back to deterministic formatting.
+    """
+    global _summarizer_llm, _summarizer_built
+    if _summarizer_built:
+        return _summarizer_llm
+    _summarizer_built = True
+
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if groq_api_key:
+        try:
+            from langchain_groq import ChatGroq
+            _summarizer_llm = ChatGroq(
+                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                temperature=0.0,
+                api_key=groq_api_key,
+                timeout=LLM_TIMEOUT_SECONDS,
+                max_retries=LLM_MAX_RETRIES,
+            )
+            return _summarizer_llm
+        except ImportError:
+            logger.warning("langchain-groq not installed; summarizer falling back to Featherless.")
+
+    featherless_api_key = os.getenv("FEATHERLSS_API_KEY")
+    if featherless_api_key:
+        _summarizer_llm = ChatOpenAI(
+            model=os.getenv("LLM_MODEL_FEATHERLESS", "deepseek-ai/DeepSeek-V4-Flash"),
+            temperature=0.0,
+            openai_api_key=featherless_api_key,
+            openai_api_base="https://api.featherless.ai/v1",
+            timeout=LLM_TIMEOUT_SECONDS,
+            max_retries=LLM_MAX_RETRIES,
+        )
+
+    return _summarizer_llm
+
 # Prefer Groq as the primary; fall back to Featherless if Groq is unavailable.
 if _groq_llm_with_tools is not None:
     llm_with_tools = _groq_llm_with_tools
