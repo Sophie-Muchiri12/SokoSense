@@ -64,6 +64,9 @@
   * {
     border-color: var(--color-border);
   }
+  html {
+    overflow-x: clip;
+  }
   html, body {
     background-color: var(--color-canvas);
     color: var(--color-ink);
@@ -72,6 +75,10 @@
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "ss01", "cv11";
     text-rendering: optimizeLegibility;
+  }
+  body {
+    overflow-x: clip;
+    min-width: 0;
   }
   ::selection {
     background: color-mix(in oklab, var(--color-teal) 22%, transparent);
@@ -157,5 +164,150 @@
 @keyframes skeleton-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+/* ── Market intelligence map ─────────────────────────────────────────── */
+.market-flat-card {
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: 4px;
+}
+
+.market-crop-pill {
+  border-radius: 4px;
+}
+
+.market-panel {
+  border-radius: 4px;
+  animation: market-panel-in 280ms ease forwards;
+}
+
+.market-panel--side {
+  width: 100%;
+}
+
+.market-bottom-sheet {
+  position: relative;
+  max-height: min(52vh, 28rem);
+  animation: market-sheet-up 320ms ease forwards;
+}
+
+@media (min-width: 1024px) {
+  .market-bottom-sheet {
+    max-height: none;
+  }
+}
+
+.market-subcounty-item {
+  border-radius: 4px;
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+@keyframes market-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes market-sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.soko-market-marker-wrap {
+  background: transparent !important;
+  border: none !important;
+}
+
+.soko-market-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.soko-market-marker__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--signal, #516880);
+  border: 2px solid var(--color-paper);
+  flex-shrink: 0;
+}
+
+.soko-market-marker__price {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink);
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.soko-market-marker--active .soko-market-marker__dot {
+  width: 14px;
+  height: 14px;
+  border-color: var(--color-ink);
+}
+
+.soko-market-marker--active .soko-market-marker__price {
+  border-color: var(--color-ink);
+}
+
+.soko-subcounty-pin-wrap {
+  background: transparent !important;
+  border: none !important;
+}
+
+.soko-subcounty-pin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-ink);
+  border: 2px solid var(--color-paper);
+  box-shadow: none;
+}
+
+.soko-map-tt {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--color-hairline);
+  box-shadow: none;
+  padding: 4px 8px;
+}
+
+.soko-marker-skeleton {
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-panel,
+  .market-bottom-sheet,
+  .market-subcounty-item {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 

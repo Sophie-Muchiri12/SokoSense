@@ -63,7 +63,7 @@ function AdvisoryPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
+    <div className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
       <PageHeader
         eyebrow="Crop advisory"
         title="Ask anything about"
@@ -72,7 +72,7 @@ function AdvisoryPage() {
       />
 
       <div className="mt-10 grid lg:grid-cols-2 gap-6">
-        <section className="card-surface p-7">
+        <section className="card-surface p-5 sm:p-7">
           <p className="eyebrow">Your question</p>
           <textarea
             value={query}
@@ -118,7 +118,7 @@ function AdvisoryPage() {
           </div>
         </section>
 
-        <section className="card-surface p-7 flex flex-col">
+        <section className="card-surface p-5 sm:p-7 flex flex-col">
           <p className="eyebrow">Answer</p>
           {error && (
             <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700">

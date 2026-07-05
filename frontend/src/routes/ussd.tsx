@@ -132,7 +132,7 @@ function UssdPage() {
   const sessionEnded = steps.length > 0 && lastStep?.response.kind === "END";
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
+    <div className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
       <header className="max-w-3xl">
         <p className="eyebrow">USSD simulator · {USSD_SERVICE_CODE}</p>
         <h1 className="display mt-4 text-[40px] sm:text-[56px] text-ink leading-[1.02]">
@@ -149,7 +149,7 @@ function UssdPage() {
 
       <div className="mt-12 grid lg:grid-cols-2 gap-6">
         {/* Phone */}
-        <section className="card-surface p-7 bg-ink text-paper flex flex-col">
+        <section className="card-surface p-5 sm:p-7 bg-ink text-paper flex flex-col">
           <div className="flex items-start justify-between">
             <div>
               <p className="eyebrow text-teal-glow">Feature phone</p>
@@ -283,7 +283,7 @@ function UssdPage() {
         </section>
 
         {/* Session log */}
-        <section className="card-surface p-7 flex flex-col">
+        <section className="card-surface p-5 sm:p-7 flex flex-col">
           <div className="flex items-start justify-between">
             <div>
               <p className="eyebrow">Session trace</p>

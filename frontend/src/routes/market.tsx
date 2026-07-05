@@ -1,7 +1,19 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import type { LMarket } from "@/components/leaflet-market-map";
-import { getMarketPrices, type MarketPricePoint } from "@/lib/sokosense-api";
+import {
+  MarketSubcountyPanel,
+  type SubcountyRecord,
+} from "@/components/market-subcounty-panel";
+import { TRANSPORT_KSH_PER_KM_BAG } from "@/lib/config";
+import { haversineKm, nearestTrackedMarket } from "@/lib/geo";
+import {
+  assignMarketSignals,
+  decideMarketRecommendation,
+  recommendationHeadline,
+} from "@/lib/marketSignals";
+import type { MarketPricePoint } from "@/lib/sokosense-api";
+import { useMarketPrices } from "@/lib/useMarketPrices";
 
 const LeafletMarketMap = lazy(() => import("@/components/leaflet-market-map"));
 
@@ -12,7 +24,7 @@ export const Route = createFileRoute("/market")({
       {
         name: "description",
         content:
-          "Live wholesale crop pricing, demand heatmaps and arbitrage intelligence across Kenya's seven primary markets.",
+          "Live wholesale crop pricing and arbitrage intelligence across Kenya's seven primary markets.",
       },
       { property: "og:title", content: "Market Intelligence Map — SokoSense" },
       {
@@ -24,420 +36,484 @@ export const Route = createFileRoute("/market")({
   component: MarketMapPage,
 });
 
-// ─── crop config ─────────────────────────────────────────────────────────────
+const CROPS = [
+  { label: "Maize", key: "maize", emoji: "🌽" },
+  { label: "Beans", key: "beans", emoji: "🫘" },
+  { label: "Sorghum", key: "sorghum", emoji: "🌾" },
+  { label: "Millet", key: "millet", emoji: "🌿" },
+  { label: "Potatoes", key: "potatoes", emoji: "🥔" },
+  { label: "Tomatoes", key: "tomatoes", emoji: "🍅" },
+] as const;
 
-/** Frontend label → backend crop key */
-const CROP_MAP: Record<string, string> = {
-  Maize:    "maize",
-  Beans:    "beans",
-  Sorghum:  "sorghum",
-  Millet:   "millet",
-  Potatoes: "potatoes",
-  Tomatoes: "tomatoes",
-};
-
-const CROPS = Object.keys(CROP_MAP);
-
-/** County name by market (static metadata — not available from API) */
 const COUNTY_MAP: Record<string, string> = {
   Nairobi: "Nairobi",
-  Nakuru:  "Nakuru",
+  Nakuru: "Nakuru",
   Eldoret: "Uasin Gishu",
-  Kisumu:  "Kisumu",
+  Kisumu: "Kisumu",
   Mombasa: "Mombasa",
-  Kitale:  "Trans-Nzoia",
-  Nyeri:   "Nyeri",
+  Kitale: "Trans-Nzoia",
+  Nyeri: "Nyeri",
 };
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
-
-/** Convert API market points to Leaflet map format, deriving signal from rank. */
-function toLeafletMarkets(points: MarketPricePoint[]): LMarket[] {
-  if (!points.length) return [];
-  const sorted = [...points].sort((a, b) => b.price_kes - a.price_kes);
-  const topIdx = sorted.length - 1;
-  return points.map((p) => {
-    const rank = sorted.findIndex((s) => s.name === p.name);
-    const signal: LMarket["signal"] =
-      rank === 0 ? "sell" : rank >= topIdx ? "buy" : "hold";
-    return {
-      id:     p.name.toLowerCase().replace(/\s+/g, "-"),
-      name:   p.name,
-      county: COUNTY_MAP[p.name] ?? p.name,
-      lat:    p.lat,
-      lng:    p.lng,
-      price:  Math.round(p.price_kes),
-      delta:  0,         // API does not provide 24h delta yet
-      volume: 0,         // API does not provide volume yet
-      signal,
-    };
-  });
+function toMarkets(points: MarketPricePoint[]): LMarket[] {
+  const base = points.map((p) => ({
+    id: p.name.toLowerCase().replace(/\s+/g, "-"),
+    name: p.name,
+    lat: p.lat,
+    lng: p.lng,
+    price: Math.round(p.price_kes),
+  }));
+  const signals = assignMarketSignals(base);
+  return base.map((m) => ({ ...m, signal: signals.get(m.id) ?? "hold" }));
 }
-
-// haversine km
-function distanceKm(a: LMarket, b: LMarket) {
-  const R = 6371;
-  const toRad = (x: number) => (x * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const s =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return Math.round(2 * R * Math.asin(Math.sqrt(s)));
-}
-
-// ─── page ─────────────────────────────────────────────────────────────────────
 
 function MarketMapPage() {
-  const [crop, setCrop] = useState(CROPS[0]);
-  const [sourceId, setSourceId] = useState<string>("");
-  const [activeId, setActiveId] = useState<string>("");
-  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [cropIdx, setCropIdx] = useState(0);
+  const crop = CROPS[cropIdx];
+  const { data, loading, error, isStale, lastUpdated, sourceDate, retry } =
+    useMarketPrices(crop.key);
 
-  const [markets, setMarkets] = useState<LMarket[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [selectedCounty, setSelectedCounty] = useState<string | null>(null);
+  const [selectedSubcounty, setSelectedSubcounty] = useState<SubcountyRecord | null>(null);
+  const [activeMarketId, setActiveMarketId] = useState("");
+  const [hoverMarketId, setHoverMarketId] = useState<string | null>(null);
 
-  // Fetch from API whenever crop changes
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    getMarketPrices(CROP_MAP[crop] ?? crop.toLowerCase())
-      .then((data) => {
-        if (cancelled) return;
-        const lm = toLeafletMarkets(data.markets);
-        setMarkets(lm);
-        setLastUpdated(new Date());
-        // Set initial selections to cheapest → most-expensive
-        if (lm.length) {
-          const sorted = [...lm].sort((a, b) => a.price - b.price);
-          setSourceId((prev) => (prev && lm.find((m) => m.id === prev) ? prev : sorted[0].id));
-          setActiveId((prev) => (prev && lm.find((m) => m.id === prev) ? prev : sorted[sorted.length - 1].id));
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load prices");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [crop]);
+  const markets = useMemo(() => toMarkets(data?.markets ?? []), [data]);
 
-  const source = markets.find((m) => m.id === sourceId) ?? markets[0];
-  const active = markets.find((m) => m.id === activeId) ?? markets[0];
-  const best    = useMemo(() => [...markets].sort((a, b) => b.price - a.price)[0], [markets]);
-  const cheapest = useMemo(() => [...markets].sort((a, b) => a.price - b.price)[0], [markets]);
+  const originResolution = useMemo(() => {
+    if (!selectedSubcounty) return null;
+    const { market, distanceKm } = nearestTrackedMarket(
+      selectedSubcounty.lat,
+      selectedSubcounty.lng,
+    );
+    const live = markets.find((m) => m.id === market.id);
+    return {
+      marketId: market.id,
+      marketName: market.name,
+      distanceKm,
+      price: live?.price ?? 0,
+    };
+  }, [selectedSubcounty, markets]);
+
+  const originMarketId = originResolution?.marketId ?? "";
+  const best = useMemo(
+    () => [...markets].sort((a, b) => b.price - a.price)[0],
+    [markets],
+  );
+  const cheapest = useMemo(
+    () => [...markets].sort((a, b) => a.price - b.price)[0],
+    [markets],
+  );
   const spread = best && cheapest ? best.price - cheapest.price : 0;
 
-  const displayId = hoverId ?? activeId;
-  const display = markets.find((m) => m.id === displayId) ?? active;
+  const origin = markets.find((m) => m.id === originMarketId);
+  const active = markets.find((m) => m.id === activeMarketId) ?? best;
+  const display = markets.find((m) => m.id === (hoverMarketId ?? activeMarketId)) ?? active;
 
-  const distance = best && source ? distanceKm(source, best) : 0;
-  const transportCostPerBag = Math.round(distance * 6.2);
-  const grossPerBag = best && source ? best.price - source.price : 0;
+  useEffect(() => {
+    if (best?.id) setActiveMarketId((prev) => (markets.some((m) => m.id === prev) ? prev : best.id));
+  }, [best?.id, markets]);
+
+  const distanceToBest =
+    origin && best ? haversineKm(origin.lat, origin.lng, best.lat, best.lng) : 0;
+  const transportCostPerBag = Math.round(distanceToBest * TRANSPORT_KSH_PER_KM_BAG);
+  const grossPerBag = origin && best ? best.price - origin.price : 0;
   const profitPerBag = Math.max(0, grossPerBag - transportCostPerBag);
-  const confidence = best
-    ? Math.min(0.97, 0.62 + Math.abs(best.delta) * 0.04)
-    : 0;
+
+  const recommendation = origin && best
+    ? decideMarketRecommendation(origin.price, best.price, origin.id === best.id)
+    : null;
+
+  const updatedLabel = lastUpdated
+    ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "—";
+
+  function handleCountySelect(county: string) {
+    setSelectedCounty(county);
+    setSelectedSubcounty(null);
+  }
+
+  function handleResetCounties() {
+    setSelectedCounty(null);
+    setSelectedSubcounty(null);
+  }
+
+  function handleSelectSubcounty(sub: SubcountyRecord) {
+    setSelectedSubcounty(sub);
+  }
+
+  const showArbitrage = Boolean(selectedSubcounty && origin && best && !loading && markets.length);
 
   return (
-    <div className="mx-auto max-w-[1320px] px-6 pt-14 pb-12">
+    <div className="mx-auto max-w-[1320px] min-w-0 px-4 sm:px-6 pt-10 sm:pt-14 pb-10 sm:pb-12">
       <PageHeader
         eyebrow="Market intelligence"
         title="Where prices live."
         italic="Where to move next."
-        sub="Live wholesale pricing across Kenya's primary markets. SokoSense reconciles transport, volume and demand to surface the highest-margin destination for your harvest."
+        sub="Live wholesale pricing across Kenya's primary markets. Select your county and subcounty — SokoSense maps you to the nearest wholesale market and estimates whether travel pays."
       />
 
-      {/* Filters */}
-      <div className="mt-10 flex flex-wrap items-center gap-2">
-        <span className="text-[12px] text-steel mr-1 uppercase tracking-wider">Commodity</span>
-        {CROPS.map((c) => (
+      {/* Crop pills */}
+      <div className="mt-8 sm:mt-10 flex flex-wrap items-center gap-2">
+        <span className="w-full sm:w-auto text-[12px] text-steel sm:mr-1 uppercase tracking-wider">Commodity</span>
+        {CROPS.map((c, i) => (
           <button
-            key={c}
-            id={`crop-filter-${c.toLowerCase()}`}
-            onClick={() => setCrop(c)}
-            className={`rounded-full px-4 py-1.5 text-[12.5px] font-medium border transition ${
-              crop === c
+            key={c.key}
+            type="button"
+            id={`crop-filter-${c.key}`}
+            onClick={() => setCropIdx(i)}
+            className={`market-crop-pill px-3 py-1.5 text-[12.5px] font-medium border transition ${
+              cropIdx === i
                 ? "bg-ink text-paper border-ink"
                 : "bg-paper text-ink border-hairline hover:border-ink/40"
             }`}
           >
-            {cap(c)}
+            <span aria-hidden="true">{c.emoji}</span> {c.label}
           </button>
         ))}
-        <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-steel">
-          {loading ? (
-            <span className="h-1.5 w-1.5 rounded-full bg-amber animate-pulse" />
-          ) : (
-            <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" />
-          )}
-          {loading
-            ? "Loading…"
-            : lastUpdated
-            ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-            : "Live"}
-        </span>
       </div>
 
-      {/* Error banner */}
-      {error && (
-        <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-5 py-3 text-[13px] text-rose-700">
-          Could not fetch market prices: {error}. Showing cached data if available.
+      <p className="mt-3 text-[11.5px] text-steel tabular">
+        Prices updated: {updatedLabel}
+        {sourceDate ? ` · KAMIS ${sourceDate}` : ""} · Source: KAMIS
+        {loading && <span className="ml-2 text-amber">Refreshing…</span>}
+      </p>
+
+      {isStale && error && (
+        <div
+          className="mt-3 border border-amber/40 bg-[#FFF8E8] px-4 py-2.5 text-[12.5px] text-ink"
+          role="status"
+        >
+          Showing last successful prices — live feed unavailable ({error}).
+          <button type="button" onClick={retry} className="ml-2 underline text-teal">
+            Retry
+          </button>
         </div>
       )}
 
-      <div className="mt-6 grid lg:grid-cols-[1.65fr_1fr] gap-5">
-        {/* Map + comparison */}
-        <div className="space-y-5">
-          <div className="card-surface p-0 overflow-hidden">
-            <div className="flex items-start justify-between px-6 py-5 border-b border-hairline">
-              <div>
-                <p className="eyebrow">Kenya · {crop.toLowerCase()} network</p>
-                <h2 className="font-serif text-[24px] text-ink mt-1">
-                  {markets.length} markets · spread{" "}
-                  <span className="text-teal tabular">KSh {spread.toLocaleString()}</span>{" "}
-                  <span className="text-steel text-[14px]">/ 90kg</span>
-                </h2>
-              </div>
-              <Legend />
-            </div>
-            <div className="relative h-[460px] w-full bg-canvas">
-              {loading ? (
-                <div className="absolute inset-0 grid place-items-center text-steel text-[12px]">
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
-                    Loading market data…
-                  </span>
-                </div>
-              ) : markets.length > 0 ? (
-                <Suspense
-                  fallback={
-                    <div className="absolute inset-0 grid place-items-center text-steel text-[12px]">
-                      Loading map…
-                    </div>
-                  }
-                >
-                  <LeafletMarketMap
-                    markets={markets}
-                    activeId={activeId}
-                    bestId={best?.id ?? ""}
-                    sourceId={source?.id ?? ""}
-                    onSelect={setActiveId}
-                    onHover={setHoverId}
-                  />
-                </Suspense>
-              ) : (
-                <div className="absolute inset-0 grid place-items-center text-steel text-[12px]">
-                  No market data available.
-                </div>
-              )}
-
-              {/* Floating hover/active price card */}
-              {display && (
-                <div className="pointer-events-none absolute top-4 left-4 w-[240px] card-surface p-4 shadow-card border border-hairline">
-                  <p className="text-[10.5px] uppercase tracking-wider text-mist">
-                    {hoverId ? "Hover" : "Selected"}
-                  </p>
-                  <p className="font-serif text-[18px] text-ink mt-0.5">{display.name}</p>
-                  <div className="mt-2 flex items-end gap-2">
-                    <span className="font-serif text-[28px] leading-none text-ink tabular">
-                      {display.price.toLocaleString()}
-                    </span>
-                    {display.delta !== 0 && (
-                      <span
-                        className={`pb-1 text-[12px] tabular ${display.delta >= 0 ? "text-green" : "text-rose"}`}
-                      >
-                        {display.delta >= 0 ? "▲" : "▼"} {Math.abs(display.delta)}%
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[10.5px] text-steel mt-0.5 uppercase tracking-wider">
-                    KSh / 90kg
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Comparison table */}
-          {source && (
-            <div className="card-surface p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="eyebrow">Market comparison</p>
-                  <h3 className="font-serif text-[20px] text-ink mt-1">
-                    {source.name} <span className="text-mist">→</span>{" "}
-                    <span className="text-teal">{best?.name}</span>
-                  </h3>
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-steel">
-                  <span>Origin:</span>
-                  <select
-                    value={sourceId}
-                    onChange={(e) => setSourceId(e.target.value)}
-                    className="border border-hairline rounded-md px-2 py-1 bg-paper text-ink text-[11.5px]"
-                  >
-                    {markets.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <table className="w-full text-[12.5px]">
-                <thead>
-                  <tr className="text-left text-[10.5px] uppercase tracking-wider text-mist border-b border-hairline">
-                    <th className="py-2 font-medium">Market</th>
-                    <th className="py-2 font-medium text-right">Price</th>
-                    <th className="py-2 font-medium text-right">Dist.</th>
-                    <th className="py-2 font-medium text-right">Net / bag</th>
-                    <th className="py-2 font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {markets.map((m) => {
-                    const d = distanceKm(source, m);
-                    const net = m.price - source.price - Math.round(d * 6.2);
-                    const isActive = m.id === activeId;
-                    const isBest = m.id === best?.id;
-                    return (
-                      <tr
-                        key={m.id}
-                        onClick={() => setActiveId(m.id)}
-                        onMouseEnter={() => setHoverId(m.id)}
-                        onMouseLeave={() => setHoverId(null)}
-                        className={`cursor-pointer border-b border-hairline last:border-0 transition ${
-                          isActive ? "bg-canvas" : "hover:bg-canvas/60"
-                        }`}
-                      >
-                        <td className="py-2.5 text-ink">
-                          <span className="inline-flex items-center gap-2">
-                            <span
-                              className="h-1.5 w-1.5 rounded-full"
-                              style={{
-                                background:
-                                  m.signal === "sell"
-                                    ? "#2E7D32"
-                                    : m.signal === "buy"
-                                    ? "#0D9280"
-                                    : "#516880",
-                              }}
-                            />
-                            {m.name}
-                            {isBest && (
-                              <span className="text-[9.5px] uppercase tracking-wider text-teal border border-teal/30 rounded px-1 py-px">
-                                Best
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                        <td className="py-2.5 text-right tabular text-ink">
-                          {m.price.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 text-right tabular text-steel">{d} km</td>
-                        <td
-                          className={`py-2.5 text-right tabular font-medium ${
-                            net > 0 ? "text-green" : net < 0 ? "text-rose" : "text-steel"
-                          }`}
-                        >
-                          {net > 0 ? "+" : ""}
-                          {net.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 text-right">
-                          <SignalDot signal={m.signal} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+      {!isStale && error && !markets.length && (
+        <div className="mt-6 border border-rose/30 bg-rose/5 px-5 py-8 text-center">
+          <p className="font-serif text-[20px] text-ink">Could not load market prices</p>
+          <p className="mt-2 text-[13px] text-steel">{error}</p>
+          <button
+            type="button"
+            onClick={retry}
+            className="mt-4 border border-ink bg-ink px-4 py-2 text-[12px] text-paper"
+          >
+            Retry
+          </button>
         </div>
+      )}
 
-        {/* Sidebar */}
-        <aside className="space-y-5 lg:sticky lg:top-24 self-start">
-          {best && source && (
-            <div className="card-surface p-6 bg-ink text-paper border-ink">
-              <p className="text-[10.5px] uppercase tracking-wider text-mist">Best market today</p>
-              <h3 className="font-serif text-[34px] mt-1 leading-none">{best.name}</h3>
-              <p className="text-[12px] text-mist mt-1">
-                {crop} · {COUNTY_MAP[best.name] ?? best.name} County
-              </p>
-              <div className="mt-5 grid grid-cols-2 gap-px bg-ink-soft border border-ink-soft rounded-lg overflow-hidden">
-                <DarkStat label="Expected profit" value={`KSh ${profitPerBag.toLocaleString()}`} sub="per 90kg bag" />
-                <DarkStat label="Distance" value={`${distance} km`} sub={`from ${source.name}`} />
-                <DarkStat
-                  label="Gross spread"
-                  value={`KSh ${grossPerBag.toLocaleString()}`}
-                  sub="vs your origin"
-                  accent={grossPerBag >= 0 ? "text-teal-glow" : "text-rose"}
-                />
-                <DarkStat
-                  label="Transport"
-                  value={`KSh ${transportCostPerBag.toLocaleString()}`}
-                  sub="est. logistics"
-                />
-              </div>
-              <div className="mt-5">
-                <div className="flex items-center justify-between text-[11px] text-mist">
-                  <span className="uppercase tracking-wider">Confidence</span>
-                  <span className="tabular text-paper">{confidence.toFixed(2)}</span>
+      {(!error || markets.length > 0) && (
+        <>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            {selectedCounty && (
+              <button
+                type="button"
+                onClick={handleResetCounties}
+                className="text-[12px] font-medium text-teal border border-hairline px-3 py-1.5 hover:border-teal/40"
+              >
+                ← All counties
+              </button>
+            )}
+            <Legend />
+          </div>
+
+          <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_320px]">
+            {/* Map column */}
+            <div className="space-y-5 min-w-0">
+              <div className="market-flat-card overflow-hidden">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline px-4 py-4 sm:px-5">
+                  <div>
+                    <p className="eyebrow">
+                      Kenya · {crop.label.toLowerCase()} · wholesale markets
+                    </p>
+                    <h2 className="font-serif text-[22px] sm:text-[24px] text-ink mt-1">
+                      {loading && !markets.length ? (
+                        <span className="inline-block h-7 w-48 skeleton" />
+                      ) : (
+                        <>
+                          {markets.length} markets · spread{" "}
+                          <span className="text-teal tabular">
+                            KSh {spread.toLocaleString()}
+                          </span>{" "}
+                          <span className="text-steel text-[14px]">/ 90kg</span>
+                        </>
+                      )}
+                    </h2>
+                  </div>
                 </div>
-                <div className="mt-2 h-1.5 rounded-full bg-ink-soft overflow-hidden">
-                  <div
-                    className="h-full bg-teal-glow"
-                    style={{ width: `${Math.round(confidence * 100)}%` }}
+
+                <div className="relative h-[55vh] md:h-[460px]">
+                  {!error || markets.length > 0 ? (
+                    <Suspense
+                      fallback={
+                        <div className="grid h-full place-items-center text-steel text-[12px]">
+                          Loading map…
+                        </div>
+                      }
+                    >
+                      <LeafletMarketMap
+                        markets={markets}
+                        loading={loading}
+                        selectedCounty={selectedCounty}
+                        selectedSubcounty={
+                          selectedSubcounty
+                            ? {
+                                name: selectedSubcounty.name,
+                                lat: selectedSubcounty.lat,
+                                lng: selectedSubcounty.lng,
+                              }
+                            : null
+                        }
+                        onCountySelect={handleCountySelect}
+                        originMarketId={originMarketId}
+                        activeMarketId={activeMarketId}
+                        bestMarketId={best?.id ?? ""}
+                        onMarketSelect={setActiveMarketId}
+                        onMarketHover={setHoverMarketId}
+                      />
+                    </Suspense>
+                  ) : null}
+
+                  {display && markets.length > 0 && !loading && (
+                    <div className="pointer-events-none absolute top-2 left-2 sm:top-3 sm:left-3 max-w-[min(11rem,48vw)] sm:max-w-[220px] market-flat-card p-2 sm:p-3">
+                      <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-mist">
+                        {hoverMarketId ? "Hover" : "Selected"} market
+                      </p>
+                      <p className="font-serif text-[14px] sm:text-[17px] text-ink mt-0.5 truncate">{display.name}</p>
+                      <p className="font-serif text-[20px] sm:text-[26px] leading-none text-ink tabular mt-1">
+                        {display.price.toLocaleString()}
+                      </p>
+                      <p className="text-[9px] sm:text-[10px] text-steel mt-0.5 uppercase tracking-wider">
+                        KSh / 90kg · wholesale
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {!selectedCounty && (
+                  <p className="border-t border-hairline px-4 py-3 text-[12px] text-steel">
+                    Click a county to zoom in and choose your subcounty.
+                  </p>
+                )}
+              </div>
+
+              {/* Mobile subcounty bottom sheet */}
+              {selectedCounty && (
+                <div className="market-bottom-sheet lg:hidden flex flex-col min-h-0">
+                  <MarketSubcountyPanel
+                    county={selectedCounty}
+                    selectedSubcounty={selectedSubcounty?.name ?? null}
+                    nearestMarketLabel={
+                      originResolution
+                        ? `${originResolution.marketName} — ${originResolution.distanceKm} km`
+                        : null
+                    }
+                    onSelectSubcounty={handleSelectSubcounty}
+                    onClose={handleResetCounties}
+                    className="min-h-0 flex-1"
                   />
                 </div>
-                <p className="mt-3 text-[11.5px] text-mist leading-relaxed">
-                  Signal weighted by price rank and market spread across {markets.length} active markets.
+              )}
+
+              {/* Comparison table */}
+              {showArbitrage && origin && (
+                <div className="market-flat-card p-4 sm:p-5">
+                  <div className="mb-4">
+                    <p className="eyebrow">Market comparison</p>
+                    <h3 className="font-serif text-[20px] text-ink mt-1">
+                      {selectedCounty} · {selectedSubcounty?.name}
+                    </h3>
+                    <p className="text-[12.5px] text-steel mt-1 leading-snug">
+                      Nearest wholesale market:{" "}
+                      <span className="text-ink font-medium">{origin.name}</span>
+                      {originResolution ? ` (${originResolution.distanceKm} km)` : ""}{" "}
+                      <span className="text-mist">→</span>{" "}
+                      <span className="text-teal font-medium">{best?.name}</span>
+                      <span className="text-steel"> (best price today)</span>
+                    </p>
+                  </div>
+
+                  {loading ? (
+                    <TableSkeleton rows={markets.length || 7} />
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[480px] text-[12.5px]">
+                        <thead>
+                          <tr className="text-left text-[10.5px] uppercase tracking-wider text-mist border-b border-hairline">
+                            <th className="py-2 font-medium">Market</th>
+                            <th className="py-2 font-medium text-right">Price</th>
+                            <th className="py-2 font-medium text-right">Dist.</th>
+                            <th className="py-2 font-medium text-right">Net / bag</th>
+                            <th className="py-2 font-medium" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {markets.map((m) => {
+                            const d = haversineKm(origin.lat, origin.lng, m.lat, m.lng);
+                            const net =
+                              m.price - origin.price - Math.round(d * TRANSPORT_KSH_PER_KM_BAG);
+                            const isActive = m.id === activeMarketId;
+                            const isBest = m.id === best?.id;
+                            return (
+                              <tr
+                                key={m.id}
+                                onClick={() => setActiveMarketId(m.id)}
+                                onMouseEnter={() => setHoverMarketId(m.id)}
+                                onMouseLeave={() => setHoverMarketId(null)}
+                                className={`cursor-pointer border-b border-hairline last:border-0 transition ${
+                                  isActive ? "bg-canvas" : "hover:bg-canvas/60"
+                                }`}
+                              >
+                                <td className="py-2.5 text-ink">
+                                  <span className="inline-flex items-center gap-2">
+                                    <SignalSwatch signal={m.signal} />
+                                    {m.name}
+                                    {isBest && (
+                                      <span className="text-[9.5px] uppercase tracking-wider text-teal border border-teal/30 px-1 py-px">
+                                        Best
+                                      </span>
+                                    )}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 text-right tabular text-ink">
+                                  {m.price.toLocaleString()}
+                                </td>
+                                <td className="py-2.5 text-right tabular text-steel">{d} km</td>
+                                <td
+                                  className={`py-2.5 text-right tabular font-medium ${
+                                    net > 0 ? "text-green" : net < 0 ? "text-rose" : "text-steel"
+                                  }`}
+                                >
+                                  {net > 0 ? "+" : ""}
+                                  {net.toLocaleString()}
+                                </td>
+                                <td className="py-2.5 text-right">
+                                  <SignalDot signal={m.signal} />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedCounty && !selectedSubcounty && (
+                <p className="text-[12.5px] text-steel text-center py-2">
+                  Select a subcounty to see nearest-market pricing and arbitrage.
                 </p>
+              )}
+            </div>
+
+            {/* Desktop subcounty side panel */}
+            {selectedCounty && (
+              <div className="hidden lg:block">
+                <MarketSubcountyPanel
+                  county={selectedCounty}
+                  selectedSubcounty={selectedSubcounty?.name ?? null}
+                  nearestMarketLabel={
+                    originResolution
+                      ? `${originResolution.marketName} — ${originResolution.distanceKm} km`
+                      : null
+                  }
+                  onSelectSubcounty={handleSelectSubcounty}
+                  onClose={handleResetCounties}
+                  className="market-panel--side sticky top-24 max-h-[calc(100vh-7rem)]"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Recommendation + stats row */}
+          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr]">
+            {showArbitrage && origin && best && recommendation && (
+              <>
+                <div className="market-flat-card p-4 sm:p-5 bg-ink text-paper border-ink">
+                  <p className="text-[10.5px] uppercase tracking-wider text-mist">Best market today</p>
+                  <h3 className="font-serif text-[26px] sm:text-[32px] mt-1 leading-none">{best.name}</h3>
+                  <p className="text-[12px] text-mist mt-1">
+                    {crop.label} · {COUNTY_MAP[best.name] ?? best.name} County
+                  </p>
+                  <div className="mt-5 grid grid-cols-2 gap-px bg-ink-soft border border-ink-soft overflow-hidden">
+                    <DarkStat
+                      label="Est. net margin"
+                      value={`KSh ${profitPerBag.toLocaleString()}`}
+                      sub="per 90kg bag"
+                    />
+                    <DarkStat
+                      label="Distance"
+                      value={`${distanceToBest} km`}
+                      sub={`from ${origin.name}`}
+                    />
+                    <DarkStat
+                      label="Gross spread"
+                      value={`KSh ${grossPerBag.toLocaleString()}`}
+                      sub="vs nearest market"
+                      accent={grossPerBag >= 0 ? "text-teal-glow" : "text-rose"}
+                    />
+                    <DarkStat
+                      label="Est. freight"
+                      value={`KSh ${transportCostPerBag.toLocaleString()}`}
+                      sub="per bag"
+                    />
+                  </div>
+                </div>
+
+                <div className="market-flat-card p-5 bg-green-surface border-green-surface">
+                  <p className="eyebrow text-green-deep">SokoSense recommendation</p>
+                  <h3 className="font-serif text-[20px] text-green-deep mt-2 leading-snug">
+                    {recommendationHeadline(
+                      recommendation,
+                      crop.label,
+                      origin.name,
+                      best.name,
+                      profitPerBag,
+                    )}
+                  </h3>
+                  <p className="mt-3 text-[12.5px] text-green-deep/80 leading-relaxed">
+                    Est. net margin{" "}
+                    <span className="font-medium">KSh {profitPerBag.toLocaleString()} / bag</span>{" "}
+                    after {distanceToBest} km road freight (KSh {TRANSPORT_KSH_PER_KM_BAG}/km/bag).{" "}
+                    {best.name} is trading{" "}
+                    <span className="font-medium">
+                      {origin.price > 0
+                        ? `${((best.price / origin.price - 1) * 100).toFixed(1)}%`
+                        : "—"}
+                    </span>{" "}
+                    above your nearest market.
+                  </p>
+                </div>
+              </>
+            )}
+
+            <div className="market-flat-card p-4 sm:p-5 sm:col-span-2 lg:col-span-2 xl:col-span-1">
+              <p className="eyebrow">Network snapshot</p>
+              <div className="mt-3 space-y-3 text-[12.5px]">
+                <KV k="Markets online" v={`${markets.length} / 7`} />
+                <KV k="Spread" v={loading ? "…" : `KSh ${spread.toLocaleString()}`} />
+                <KV k="Last update" v={updatedLabel} />
+                <KV k="Source" v="KAMIS · kamis.kilimo.go.ke" />
+                <KV
+                  k="24h change"
+                  v={<span className="text-mist text-[11px]">Coming soon</span>}
+                />
+                <KV
+                  k="Volume"
+                  v={<span className="text-mist text-[11px]">Coming soon</span>}
+                />
               </div>
             </div>
-          )}
-
-          {best && source && (
-            <div className="card-surface p-6 bg-green-surface border-green-surface">
-              <p className="eyebrow text-green-deep">SokoSense recommendation</p>
-              <h3 className="font-serif text-[20px] text-green-deep mt-2 leading-snug">
-                {profitPerBag > 0
-                  ? `Move ${crop.toLowerCase()} from ${source.name} to ${best.name} this week.`
-                  : `Hold ${crop.toLowerCase()} — transport cost erases the spread.`}
-              </h3>
-              <p className="mt-3 text-[12.5px] text-green-deep/80 leading-relaxed">
-                Net margin{" "}
-                <span className="font-medium">KSh {profitPerBag.toLocaleString()} / bag</span>{" "}
-                after {distance} km of road freight. {best.name} is trading{" "}
-                <span className="font-medium">
-                  {((best.price / source.price - 1) * 100).toFixed(1)}%
-                </span>{" "}
-                above your origin.
-              </p>
-            </div>
-          )}
-
-          <div className="card-surface p-6">
-            <p className="eyebrow">Network snapshot</p>
-            <div className="mt-3 space-y-3 text-[12.5px]">
-              <KV k="Markets online" v={`${markets.length} / 7`} />
-              <KV k="Spread" v={`KSh ${spread.toLocaleString()}`} />
-              <KV k="Last update" v={lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"} />
-              <KV k="Source" v="KAMIS · kamis.kilimo.go.ke" />
-            </div>
           </div>
-        </aside>
-      </div>
+        </>
+      )}
     </div>
   );
 }
-
-// ─── shared header (re-exported for other pages) ─────────────────────────────
 
 export function PageHeader({
   eyebrow,
@@ -463,34 +539,40 @@ export function PageHeader({
   );
 }
 
-// ─── sub-components ───────────────────────────────────────────────────────────
-
 function Legend() {
   return (
-    <div className="flex items-center gap-3 text-[10.5px] text-steel">
+    <div className="flex flex-wrap items-center gap-3 text-[10.5px] text-steel">
       <span className="flex items-center gap-1.5">
         <span className="h-2 w-2 rounded-full bg-green" /> Sell
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-full bg-teal" /> Buy
+        <span className="h-2 w-2 rounded-full bg-amber" /> Hold
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-full bg-steel" /> Hold
+        <span className="h-2 w-2 rounded-full bg-steel" /> Buy
       </span>
     </div>
+  );
+}
+
+function SignalSwatch({ signal }: { signal: LMarket["signal"] }) {
+  const color =
+    signal === "sell" ? "#2E7D32" : signal === "hold" ? "#C58A1E" : "#516880";
+  return (
+    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: color }} />
   );
 }
 
 function SignalDot({ signal }: { signal: LMarket["signal"] }) {
   const map = {
     sell: { bg: "bg-green-surface", fg: "text-green-deep", label: "Sell" },
-    buy:  { bg: "bg-teal/10",       fg: "text-teal",       label: "Buy"  },
-    hold: { bg: "bg-canvas",        fg: "text-steel",      label: "Hold" },
+    hold: { bg: "bg-amber/10", fg: "text-amber", label: "Hold" },
+    buy: { bg: "bg-canvas", fg: "text-steel", label: "Buy" },
   } as const;
   const s = map[signal];
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${s.bg} ${s.fg}`}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium ${s.bg} ${s.fg}`}
     >
       <span className="h-1 w-1 rounded-full bg-current" />
       {s.label}
@@ -518,11 +600,21 @@ function DarkStat({
   );
 }
 
-function KV({ k, v }: { k: string; v: string }) {
+function KV({ k, v }: { k: string; v: ReactNode }) {
   return (
-    <div className="flex justify-between border-b border-dashed border-hairline pb-2 last:border-0">
-      <span className="text-steel">{k}</span>
-      <span className="text-ink tabular">{v}</span>
+    <div className="flex justify-between border-b border-dashed border-hairline pb-2 last:border-0 gap-4">
+      <span className="text-steel shrink-0">{k}</span>
+      <span className="text-ink tabular text-right">{v}</span>
+    </div>
+  );
+}
+
+function TableSkeleton({ rows }: { rows: number }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-9 w-full skeleton" />
+      ))}
     </div>
   );
 }

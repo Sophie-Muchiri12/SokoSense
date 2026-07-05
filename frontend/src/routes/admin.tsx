@@ -150,7 +150,7 @@ function AdminPage() {
       : "bg-rose-500";
 
   return (
-    <div className="mx-auto max-w-[1320px] px-5 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20">
+    <div className="mx-auto max-w-[1320px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <PageHeader
           eyebrow="Operations · internal"
@@ -158,7 +158,7 @@ function AdminPage() {
           italic="end to end."
           sub={`Realtime telemetry for the SokoSense intelligence platform — engines, latency, request volumes and recent activity.${healthService ? ` Service: ${healthService}.` : ""}`}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] ${healthCls}`}
           >
@@ -233,7 +233,7 @@ function AdminPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search logs…"
-              className="rounded-full border border-hairline bg-paper px-3.5 py-1.5 text-[12px] text-ink placeholder:text-mist focus:outline-none focus:border-teal/50 w-56"
+              className="rounded-full border border-hairline bg-paper px-3.5 py-1.5 text-[12px] text-ink placeholder:text-mist focus:outline-none focus:border-teal/50 w-full sm:w-56"
             />
             <button
               onClick={() => { fetchHealth(); fetchLogs(); }}

@@ -1,0 +1,2064 @@
+{
+  "version": "1.0",
+  "note": "Centroids from IEBC constituency centers (gaithoben/kenya) where name-matched; small offsets from OSM county centroid otherwise. Prices are market-level only.",
+  "subcounties": [
+    {
+      "county": "Baringo",
+      "name": "Baringo central",
+      "lat": 0.72444025,
+      "lng": 36.100141937892474,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Baringo",
+      "name": "Baringo north",
+      "lat": 0.7937222823027551,
+      "lng": 36.060141937892475,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Baringo",
+      "name": "Baringo south",
+      "lat": 0.7937222823027551,
+      "lng": 35.980141937892476,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Baringo",
+      "name": "Eldama ravine",
+      "lat": 0.72444025,
+      "lng": 35.94014193789248,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Baringo",
+      "name": "Mogotio",
+      "lat": 0.6551582176972449,
+      "lng": 35.980141937892476,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Baringo",
+      "name": "Tiaty",
+      "lat": 0.6551582176972449,
+      "lng": 36.060141937892475,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bomet",
+      "name": "Bomet central",
+      "lat": -0.7196054000000001,
+      "lng": 35.31963843035895,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bomet",
+      "name": "Bomet east",
+      "lat": -0.6435208786963877,
+      "lng": 35.264359789908944,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bomet",
+      "name": "Chepalungu",
+      "lat": -0.6725825798166022,
+      "lng": 35.17491707080895,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bomet",
+      "name": "Konoin",
+      "lat": -0.7666282201833979,
+      "lng": 35.17491707080895,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bomet",
+      "name": "Sotik",
+      "lat": -0.7956899213036124,
+      "lng": 35.264359789908944,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bungoma",
+      "name": "Bumula",
+      "lat": 0.78292445,
+      "lng": 34.79916810731902,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bungoma",
+      "name": "Kabuchai",
+      "lat": 0.8343474587749231,
+      "lng": 34.78045166276854,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bungoma",
+      "name": "Kanduyi",
+      "lat": 0.8617090702409766,
+      "lng": 34.733059961532376,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bungoma",
+      "name": "Kimilil",
+      "lat": 0.8522064823027551,
+      "lng": 34.67916810731902,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bungoma",
+      "name": "Mt Elgon",
+      "lat": 0.8102860614660535,
+      "lng": 34.643992697656145,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bungoma",
+      "name": "Sirisia",
+      "lat": 0.7555628385339465,
+      "lng": 34.643992697656145,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bungoma",
+      "name": "Tongaren",
+      "lat": 0.7136424176972449,
+      "lng": 34.67916810731902,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bungoma",
+      "name": "Webuye east",
+      "lat": 0.7041398297590233,
+      "lng": 34.733059961532376,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Bungoma",
+      "name": "Webuye west",
+      "lat": 0.7315014412250769,
+      "lng": 34.78045166276854,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Busia",
+      "name": "Budalangi",
+      "lat": 0.3712048,
+      "lng": 34.34479520608315,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Busia",
+      "name": "Butula",
+      "lat": 0.4404868323027551,
+      "lng": 34.30479520608315,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Busia",
+      "name": "Funyula",
+      "lat": 0.4404868323027551,
+      "lng": 34.22479520608315,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Busia",
+      "name": "Nambele",
+      "lat": 0.3712048,
+      "lng": 34.18479520608315,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Busia",
+      "name": "Teso North",
+      "lat": 0.3019227676972449,
+      "lng": 34.22479520608315,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Busia",
+      "name": "Teso South",
+      "lat": 0.3019227676972449,
+      "lng": 34.30479520608315,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Elgeyo-Marakwet",
+      "name": "Keiyo north",
+      "lat": 0.7422191499999999,
+      "lng": 35.641808313539315,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Elgeyo-Marakwet",
+      "name": "Keiyo south",
+      "lat": 0.8222191499999999,
+      "lng": 35.561808313539316,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Elgeyo-Marakwet",
+      "name": "Marakwet east",
+      "lat": 0.7422191499999999,
+      "lng": 35.48180831353932,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Elgeyo-Marakwet",
+      "name": "Marakwet west",
+      "lat": 0.66221915,
+      "lng": 35.561808313539316,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Embu",
+      "name": "Manyatta",
+      "lat": -0.5359479,
+      "lng": 37.7452884382665,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Embu",
+      "name": "Mbeere north",
+      "lat": -0.4559479,
+      "lng": 37.6652884382665,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Embu",
+      "name": "Mbeere south",
+      "lat": -0.5359479,
+      "lng": 37.5852884382665,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Embu",
+      "name": "Runyenjes",
+      "lat": -0.6159479,
+      "lng": 37.6652884382665,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Garissa",
+      "name": "Daadab",
+      "lat": -0.52360305,
+      "lng": 40.4363869057871,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Garissa",
+      "name": "Fafi",
+      "lat": -0.45432101769724487,
+      "lng": 40.396386905787104,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Garissa",
+      "name": "Garissa",
+      "lat": -0.45432101769724487,
+      "lng": 40.316386905787105,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Garissa",
+      "name": "Hulugho",
+      "lat": -0.52360305,
+      "lng": 40.276386905787106,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Garissa",
+      "name": "Ijara",
+      "lat": -0.592885082302755,
+      "lng": 40.316386905787105,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Garissa",
+      "name": "Lagdera balambala",
+      "lat": -0.592885082302755,
+      "lng": 40.396386905787104,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Isiolo",
+      "name": "Central",
+      "lat": 1.0060600499999999,
+      "lng": 38.827895385406336,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Isiolo",
+      "name": "Garba tula",
+      "lat": 1.0753420823027549,
+      "lng": 38.78789538540634,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Isiolo",
+      "name": "Kina",
+      "lat": 1.0753420823027549,
+      "lng": 38.70789538540634,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Isiolo",
+      "name": "Merit",
+      "lat": 1.0060600499999999,
+      "lng": 38.66789538540634,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Isiolo",
+      "name": "Oldonyiro",
+      "lat": 0.9367780176972448,
+      "lng": 38.70789538540634,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Isiolo",
+      "name": "Sericho",
+      "lat": 0.9367780176972448,
+      "lng": 38.78789538540634,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kajiado",
+      "name": "Isinya",
+      "lat": -2.12171705,
+      "lng": 36.86625503675998,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kajiado",
+      "name": "Kajiado Central",
+      "lat": -2.045632528696388,
+      "lng": 36.810976396309975,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kajiado",
+      "name": "Kajiado North",
+      "lat": -2.0746942298166022,
+      "lng": 36.72153367720998,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kajiado",
+      "name": "Loitokitok",
+      "lat": -2.1687398701833978,
+      "lng": 36.72153367720998,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kajiado",
+      "name": "Mashuuru",
+      "lat": -2.197801571303612,
+      "lng": 36.810976396309975,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Butere",
+      "lat": 0.4957104,
+      "lng": 34.88154886163461,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Kakamega central",
+      "lat": 0.5328882537635015,
+      "lng": 34.87238534368687,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Kakamega east",
+      "lat": 0.5615491092714925,
+      "lng": 34.84699404137311,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Kakamega north",
+      "lat": 0.5751271099278443,
+      "lng": 34.81119179605504,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Kakamega south",
+      "lat": 0.5705116994148332,
+      "lng": 34.773180470671214,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Khwisero",
+      "lat": 0.5487602126592637,
+      "lng": 34.74166800178093,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Lugari",
+      "lat": 0.5148556531430046,
+      "lng": 34.72387351624053,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Lukuyani",
+      "lat": 0.4765651468569954,
+      "lng": 34.72387351624053,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Lurambi",
+      "lat": 0.4426605873407364,
+      "lng": 34.74166800178093,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Matete",
+      "lat": 0.42090910058516684,
+      "lng": 34.773180470671214,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Mumias",
+      "lat": 0.41629369007215566,
+      "lng": 34.81119179605504,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Mutungu",
+      "lat": 0.42987169072850745,
+      "lng": 34.84699404137311,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kakamega",
+      "name": "Navakholo",
+      "lat": 0.45853254623649853,
+      "lng": 34.87238534368687,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kericho",
+      "name": "Ainamoi",
+      "lat": -0.32099679999999997,
+      "lng": 35.30612759775384,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kericho",
+      "name": "Belgut",
+      "lat": -0.2517147676972449,
+      "lng": 35.266127597753844,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kericho",
+      "name": "Bureti",
+      "lat": -0.2517147676972449,
+      "lng": 35.186127597753845,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kericho",
+      "name": "Kipkelion east",
+      "lat": -0.32099679999999997,
+      "lng": 35.146127597753846,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kericho",
+      "name": "Kipkelion west",
+      "lat": -0.39027883230275506,
+      "lng": 35.186127597753845,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kericho",
+      "name": "Soin sigowet",
+      "lat": -0.39027883230275506,
+      "lng": 35.266127597753844,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Gatundu north",
+      "lat": -1.03207695,
+      "lng": 36.89568670212906,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Gatundu south",
+      "lat": -0.99207695,
+      "lng": 36.884968734431816,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Githunguri",
+      "lat": -0.9627949176972449,
+      "lng": 36.85568670212906,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Juja",
+      "lat": -0.95207695,
+      "lng": 36.815686702129064,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Kabete",
+      "lat": -0.9627949176972449,
+      "lng": 36.775686702129065,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Kiambaa",
+      "lat": -0.99207695,
+      "lng": 36.74640466982631,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Kiambu",
+      "lat": -1.03207695,
+      "lng": 36.735686702129065,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Kikuyu",
+      "lat": -1.07207695,
+      "lng": 36.74640466982631,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Limuru",
+      "lat": -1.101358982302755,
+      "lng": 36.775686702129065,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Ruiru",
+      "lat": -1.11207695,
+      "lng": 36.815686702129064,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "Thika town",
+      "lat": -1.101358982302755,
+      "lng": 36.85568670212906,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kiambu",
+      "name": "lari",
+      "lat": -1.07207695,
+      "lng": 36.884968734431816,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kilifi",
+      "name": "Genzw",
+      "lat": -3.15073925,
+      "lng": 39.75507159193717,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kilifi",
+      "name": "Kaloleni",
+      "lat": -3.0881927314025575,
+      "lng": 39.72495077608587,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kilifi",
+      "name": "Kilifi north",
+      "lat": -3.072745017025454,
+      "lng": 39.65726991722067,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kilifi",
+      "name": "Kilifi south",
+      "lat": -3.1160285508705954,
+      "lng": 39.60299408250498,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kilifi",
+      "name": "Magarini",
+      "lat": -3.1854499491294046,
+      "lng": 39.60299408250498,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kilifi",
+      "name": "Malindi",
+      "lat": -3.2287334829745458,
+      "lng": 39.65726991722067,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kilifi",
+      "name": "Rabai",
+      "lat": -3.2132857685974425,
+      "lng": 39.72495077608587,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kirinyaga",
+      "name": "Kirinyaga central",
+      "lat": -0.46887805,
+      "lng": 37.382768103932406,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kirinyaga",
+      "name": "Kirinyaga east",
+      "lat": -0.39279352869638773,
+      "lng": 37.3274894634824,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kirinyaga",
+      "name": "Kirinyaga west",
+      "lat": -0.4218552298166021,
+      "lng": 37.23804674438241,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kirinyaga",
+      "name": "Mwea east",
+      "lat": -0.5159008701833978,
+      "lng": 37.23804674438241,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kirinyaga",
+      "name": "Mwea west",
+      "lat": -0.5449625713036123,
+      "lng": 37.3274894634824,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kisii",
+      "name": "Kisii",
+      "lat": -0.73894255,
+      "lng": 34.75398551201732,
+      "source": "county-centroid"
+    },
+    {
+      "county": "Kisumu",
+      "name": "Kisumu central",
+      "lat": -0.197126,
+      "lng": 34.8578573178751,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kisumu",
+      "name": "Kisumu east",
+      "lat": -0.1345794814025576,
+      "lng": 34.827736502023804,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kisumu",
+      "name": "Kisumu west",
+      "lat": -0.11913176702545411,
+      "lng": 34.7600556431586,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kisumu",
+      "name": "Mohoroni",
+      "lat": -0.16241530087059533,
+      "lng": 34.70577980844291,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kisumu",
+      "name": "Nyakach",
+      "lat": -0.23183669912940463,
+      "lng": 34.70577980844291,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kisumu",
+      "name": "Nyando",
+      "lat": -0.2751202329745459,
+      "lng": 34.7600556431586,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kisumu",
+      "name": "Seme",
+      "lat": -0.2596725185974424,
+      "lng": 34.827736502023804,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Ikutha",
+      "lat": -1.5642219499999999,
+      "lng": 38.45281165436877,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Katulani",
+      "lat": -1.5316830185539358,
+      "lng": 38.44589529098018,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Kisasi",
+      "lat": -1.5047703639618084,
+      "lng": 38.426342102877484,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Kitui central",
+      "lat": -1.4881374286963875,
+      "lng": 38.39753301391877,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Kitui west",
+      "lat": -1.484660198370538,
+      "lng": 38.36444937730736,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Lower yatta",
+      "lat": -1.4949399176972449,
+      "lng": 38.332811654368776,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Matiyani",
+      "lat": -1.517199129816602,
+      "lng": 38.308090294818776,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Migwani",
+      "lat": -1.5475890147345792,
+      "lng": 38.29455984631007,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Mutitu",
+      "lat": -1.5808548852654205,
+      "lng": 38.29455984631007,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Mutomo",
+      "lat": -1.6112447701833976,
+      "lng": 38.308090294818776,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Muumonikyusu",
+      "lat": -1.6335039823027548,
+      "lng": 38.332811654368776,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Mwingi central",
+      "lat": -1.6437837016294616,
+      "lng": 38.36444937730736,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Mwingi east",
+      "lat": -1.6403064713036122,
+      "lng": 38.39753301391877,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Nzambani",
+      "lat": -1.6236735360381913,
+      "lng": 38.426342102877484,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kitui",
+      "name": "Tseikuru",
+      "lat": -1.5967608814460639,
+      "lng": 38.44589529098018,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kwale",
+      "name": "Kinango",
+      "lat": -4.1836067,
+      "lng": 39.18509497523299,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kwale",
+      "name": "Lungalunga",
+      "lat": -4.1036067,
+      "lng": 39.105094975232994,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kwale",
+      "name": "Msambweni",
+      "lat": -4.1836067,
+      "lng": 39.025094975232996,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Kwale",
+      "name": "Mutuga",
+      "lat": -4.2636067,
+      "lng": 39.105094975232994,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Laikipia",
+      "name": "Laikipia central",
+      "lat": 0.2858452,
+      "lng": 36.90577107682906,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Laikipia",
+      "name": "Laikipia east",
+      "lat": 0.36192972130361234,
+      "lng": 36.85049243637906,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Laikipia",
+      "name": "Laikipia north",
+      "lat": 0.3328680201833979,
+      "lng": 36.761049717279064,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Laikipia",
+      "name": "Laikipia west",
+      "lat": 0.23882237981660218,
+      "lng": 36.761049717279064,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Laikipia",
+      "name": "Nyahururu",
+      "lat": 0.20976067869638773,
+      "lng": 36.85049243637906,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Lamu",
+      "name": "Lamu East",
+      "lat": -2.0645208999999998,
+      "lng": 40.80809915263692,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Lamu",
+      "name": "Lamu West",
+      "lat": -2.0645208999999998,
+      "lng": 40.648099152636924,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Machakos",
+      "name": "Kathiani",
+      "lat": -1.27900465,
+      "lng": 37.47526976452546,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Machakos",
+      "name": "Machakos town",
+      "lat": -1.2164581314025578,
+      "lng": 37.44514894867416,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Machakos",
+      "name": "Masinga",
+      "lat": -1.2010104170254543,
+      "lng": 37.37746808980896,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Machakos",
+      "name": "Matungulu",
+      "lat": -1.2442939508705955,
+      "lng": 37.32319225509327,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Machakos",
+      "name": "Mavoko",
+      "lat": -1.3137153491294047,
+      "lng": 37.32319225509327,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Machakos",
+      "name": "Mwala",
+      "lat": -1.3569988829745459,
+      "lng": 37.37746808980896,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Machakos",
+      "name": "Yatta",
+      "lat": -1.3415511685974424,
+      "lng": 37.44514894867416,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Makueni",
+      "name": "Kaiti",
+      "lat": -2.25709305,
+      "lng": 37.95717148162716,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Makueni",
+      "name": "Kibwei west",
+      "lat": -2.187811017697245,
+      "lng": 37.91717148162716,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Makueni",
+      "name": "Kibwezi east",
+      "lat": -2.187811017697245,
+      "lng": 37.83717148162716,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Makueni",
+      "name": "Kilome",
+      "lat": -2.25709305,
+      "lng": 37.79717148162716,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Makueni",
+      "name": "Makueni",
+      "lat": -2.326375082302755,
+      "lng": 37.83717148162716,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Makueni",
+      "name": "Mbooni",
+      "lat": -2.326375082302755,
+      "lng": 37.91717148162716,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mandera",
+      "name": "Banissa",
+      "lat": 3.2285332,
+      "lng": 40.78561647260599,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mandera",
+      "name": "Lafey",
+      "lat": 3.297815232302755,
+      "lng": 40.74561647260599,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mandera",
+      "name": "Mandera East",
+      "lat": 3.297815232302755,
+      "lng": 40.66561647260599,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mandera",
+      "name": "Mandera North",
+      "lat": 3.2285332,
+      "lng": 40.62561647260599,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mandera",
+      "name": "Mandera South",
+      "lat": 3.1592511676972452,
+      "lng": 40.66561647260599,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mandera",
+      "name": "Mandera West",
+      "lat": 3.1592511676972452,
+      "lng": 40.74561647260599,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Marsabit",
+      "name": "Laisamis",
+      "lat": 2.85795825,
+      "lng": 37.795489185900394,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Marsabit",
+      "name": "Moyale",
+      "lat": 2.93795825,
+      "lng": 37.715489185900395,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Marsabit",
+      "name": "North hor",
+      "lat": 2.85795825,
+      "lng": 37.6354891859004,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Marsabit",
+      "name": "Saku",
+      "lat": 2.7779582499999997,
+      "lng": 37.715489185900395,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Meru",
+      "name": "Buuri",
+      "lat": 0.2254509,
+      "lng": 37.857262371636935,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Meru",
+      "name": "Igembe central",
+      "lat": 0.2768739087749231,
+      "lng": 37.83854592708646,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Meru",
+      "name": "Igembe north",
+      "lat": 0.30423552024097666,
+      "lng": 37.79115422585029,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Meru",
+      "name": "Igembe south",
+      "lat": 0.2947329323027551,
+      "lng": 37.73726237163694,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Meru",
+      "name": "Imenti central",
+      "lat": 0.25281251146605355,
+      "lng": 37.70208696197406,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Meru",
+      "name": "Imenti north",
+      "lat": 0.19808928853394653,
+      "lng": 37.70208696197406,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Meru",
+      "name": "Imenti south",
+      "lat": 0.15616886769724492,
+      "lng": 37.73726237163694,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Meru",
+      "name": "Tigania east",
+      "lat": 0.14666627975902335,
+      "lng": 37.79115422585029,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Meru",
+      "name": "Tigania west",
+      "lat": 0.17402789122507684,
+      "lng": 37.83854592708646,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Migori",
+      "name": "Awendo",
+      "lat": -1.0211616000000001,
+      "lng": 34.38964322421073,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Migori",
+      "name": "Kuria east",
+      "lat": -0.969738591225077,
+      "lng": 34.37092677966025,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Migori",
+      "name": "Kuria west",
+      "lat": -0.9423769797590235,
+      "lng": 34.32353507842409,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Migori",
+      "name": "Mabera",
+      "lat": -0.951879567697245,
+      "lng": 34.26964322421073,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Migori",
+      "name": "Ntimaru",
+      "lat": -0.9937999885339466,
+      "lng": 34.234467814547855,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Migori",
+      "name": "Rongo",
+      "lat": -1.0485232114660537,
+      "lng": 34.234467814547855,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Migori",
+      "name": "Suna east",
+      "lat": -1.090443632302755,
+      "lng": 34.26964322421073,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Migori",
+      "name": "Suna west",
+      "lat": -1.0999462202409767,
+      "lng": 34.32353507842409,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Migori",
+      "name": "Uriri",
+      "lat": -1.0725846087749233,
+      "lng": 34.37092677966025,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mombasa",
+      "name": "Changamwe",
+      "lat": -4.0390146,
+      "lng": 39.72842393685704,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mombasa",
+      "name": "Jomvu",
+      "lat": -3.969732567697245,
+      "lng": 39.68842393685704,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mombasa",
+      "name": "Kisauni",
+      "lat": -3.969732567697245,
+      "lng": 39.608423936857044,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mombasa",
+      "name": "Likoni",
+      "lat": -4.0390146,
+      "lng": 39.568423936857045,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mombasa",
+      "name": "Mvita",
+      "lat": -4.108296632302755,
+      "lng": 39.608423936857044,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Mombasa",
+      "name": "Nyali",
+      "lat": -4.108296632302755,
+      "lng": 39.68842393685704,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Murang'a",
+      "name": "Gatanga",
+      "lat": -0.83091505,
+      "lng": 37.08486124961814,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Murang'a",
+      "name": "Kahuro",
+      "lat": -0.7743465075050762,
+      "lng": 37.06142979211307,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Murang'a",
+      "name": "Kandara",
+      "lat": -0.75091505,
+      "lng": 37.004861249618145,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Murang'a",
+      "name": "Kangema",
+      "lat": -0.7743465075050762,
+      "lng": 36.94829270712322,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Murang'a",
+      "name": "Kigumo",
+      "lat": -0.83091505,
+      "lng": 36.92486124961815,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Murang'a",
+      "name": "Kiharu",
+      "lat": -0.8874835924949238,
+      "lng": 36.94829270712322,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Murang'a",
+      "name": "Mathioya",
+      "lat": -0.91091505,
+      "lng": 37.004861249618145,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Murang'a",
+      "name": "Murang\u2019a south",
+      "lat": -0.8874835924949238,
+      "lng": 37.06142979211307,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Dagoretti North Sub County",
+      "lat": -1.3031689499999999,
+      "lng": 36.906067805294896,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Dagoretti South Sub County",
+      "lat": -1.2742696167050276,
+      "lng": 36.900665583647246,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Embakasi Central Sub Count",
+      "lat": -1.2492732985082753,
+      "lng": 36.88518851867255,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Embakasi East Sub County",
+      "lat": -1.231555886691595,
+      "lng": 36.86172687375702,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Embakasi North Sub County",
+      "lat": -1.223510215896397,
+      "lng": 36.833449274051965,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Embakasi South Sub County",
+      "lat": -1.2262228985461743,
+      "lng": 36.80417476608913,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Embakasi West Sub County",
+      "lat": -1.2393275718175807,
+      "lng": 36.77785703438456,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Kamukunji Sub County",
+      "lat": -1.2610543769698115,
+      "lng": 36.75805043443653,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Kasarani Sub County",
+      "lat": -1.2884689885746743,
+      "lng": 36.747429957320186,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Kibra Sub County",
+      "lat": -1.3178689114253255,
+      "lng": 36.747429957320186,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Lang'ata Sub County",
+      "lat": -1.3452835230301883,
+      "lng": 36.75805043443653,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Makadara Sub County",
+      "lat": -1.367010328182419,
+      "lng": 36.77785703438456,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Mathare Sub County",
+      "lat": -1.3801150014538255,
+      "lng": 36.80417476608913,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Roysambu Sub County",
+      "lat": -1.3828276841036027,
+      "lng": 36.833449274051965,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Ruaraka Sub County",
+      "lat": -1.3747820133084048,
+      "lng": 36.86172687375702,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Starehe Sub County",
+      "lat": -1.3570646014917245,
+      "lng": 36.88518851867255,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nairobi",
+      "name": "Westlands Sub County",
+      "lat": -1.3320682832949722,
+      "lng": 36.900665583647246,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Bahati",
+      "lat": -0.4598213,
+      "lng": 36.18080381595827,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Gilgil",
+      "lat": -0.4165700346035522,
+      "lng": 36.16810409858477,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Kuresoi north",
+      "lat": -0.3870507403716385,
+      "lng": 36.13403701699843,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Kuresoi south",
+      "lat": -0.38063558464952535,
+      "lng": 36.08941862889641,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Molo",
+      "lat": -0.3993613340516593,
+      "lng": 36.04841495724265,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Naivasha",
+      "lat": -0.4372826954526856,
+      "lng": 36.024044378069114,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Nakuru town east",
+      "lat": -0.48235990454731437,
+      "lng": 36.024044378069114,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Nakuru town west",
+      "lat": -0.5202812659483407,
+      "lng": 36.04841495724265,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Njoro",
+      "lat": -0.5390070153504746,
+      "lng": 36.08941862889641,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Rongai",
+      "lat": -0.5325918596283614,
+      "lng": 36.13403701699843,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nakuru",
+      "name": "Subukia",
+      "lat": -0.5030725653964477,
+      "lng": 36.16810409858477,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nandi",
+      "name": "Aldai",
+      "lat": 0.22539325,
+      "lng": 35.20449292185472,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nandi",
+      "name": "Chesumei",
+      "lat": 0.2946752823027551,
+      "lng": 35.16449292185472,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nandi",
+      "name": "Emgwen",
+      "lat": 0.2946752823027551,
+      "lng": 35.084492921854725,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nandi",
+      "name": "Mosop",
+      "lat": 0.22539325,
+      "lng": 35.044492921854726,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nandi",
+      "name": "Namdi hills",
+      "lat": 0.1561112176972449,
+      "lng": 35.084492921854725,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nandi",
+      "name": "Tindiret",
+      "lat": 0.1561112176972449,
+      "lng": 35.16449292185472,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Narok",
+      "name": "Narok east",
+      "lat": -1.2779365500000002,
+      "lng": 35.55742284932569,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Narok",
+      "name": "Narok north",
+      "lat": -1.2086545176972452,
+      "lng": 35.51742284932569,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Narok",
+      "name": "Narok south",
+      "lat": -1.2086545176972452,
+      "lng": 35.43742284932569,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Narok",
+      "name": "Narok west",
+      "lat": -1.2779365500000002,
+      "lng": 35.39742284932569,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Narok",
+      "name": "Transmara east",
+      "lat": -1.3472185823027552,
+      "lng": 35.43742284932569,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Narok",
+      "name": "Transmara west",
+      "lat": -1.3472185823027552,
+      "lng": 35.51742284932569,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyamira",
+      "name": "Borabu",
+      "lat": -0.65225405,
+      "lng": 35.014130799923294,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyamira",
+      "name": "Manga",
+      "lat": -0.5761695286963877,
+      "lng": 34.95885215947329,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyamira",
+      "name": "Masaba north",
+      "lat": -0.6052312298166022,
+      "lng": 34.869409440373296,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyamira",
+      "name": "Nyamira north",
+      "lat": -0.6992768701833979,
+      "lng": 34.869409440373296,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyamira",
+      "name": "Nyamira south",
+      "lat": -0.7283385713036123,
+      "lng": 34.95885215947329,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyandarua",
+      "name": "Kinangop",
+      "lat": -0.39155344999999997,
+      "lng": 36.57776838093413,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyandarua",
+      "name": "Kipipiri",
+      "lat": -0.31546892869638765,
+      "lng": 36.522489740484126,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyandarua",
+      "name": "Ndaragwa",
+      "lat": -0.3445306298166021,
+      "lng": 36.433047021384134,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyandarua",
+      "name": "Ol Kalou",
+      "lat": -0.43857627018339784,
+      "lng": 36.433047021384134,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyandarua",
+      "name": "Ol joro orok",
+      "lat": -0.4676379713036123,
+      "lng": 36.522489740484126,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyeri",
+      "name": "Kieni east",
+      "lat": -0.32121045000000004,
+      "lng": 37.00956152367317,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyeri",
+      "name": "Kieni west",
+      "lat": -0.2646419075050762,
+      "lng": 36.986130066168094,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyeri",
+      "name": "Mathira east",
+      "lat": -0.24121045000000002,
+      "lng": 36.92956152367317,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyeri",
+      "name": "Mathira west",
+      "lat": -0.2646419075050762,
+      "lng": 36.87299298117825,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyeri",
+      "name": "Mkurweni",
+      "lat": -0.32121045000000004,
+      "lng": 36.849561523673174,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyeri",
+      "name": "Nyeri town",
+      "lat": -0.37777899249492386,
+      "lng": 36.87299298117825,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyeri",
+      "name": "Othaya",
+      "lat": -0.40121045000000005,
+      "lng": 36.92956152367317,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Nyeri",
+      "name": "Tetu",
+      "lat": -0.37777899249492386,
+      "lng": 36.986130066168094,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Samburu",
+      "name": "Samburu east",
+      "lat": 1.5394463,
+      "lng": 37.02216599162042,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Samburu",
+      "name": "Samburu north",
+      "lat": 1.6087283323027552,
+      "lng": 36.90216599162042,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Samburu",
+      "name": "Samburu west",
+      "lat": 1.470164267697245,
+      "lng": 36.90216599162042,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Siaya",
+      "name": "Alego usonga",
+      "lat": -0.06040135,
+      "lng": 34.28013500999629,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Siaya",
+      "name": "Bondo",
+      "lat": 0.008880682302755093,
+      "lng": 34.240135009996294,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Siaya",
+      "name": "Gem",
+      "lat": 0.008880682302755093,
+      "lng": 34.160135009996296,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Siaya",
+      "name": "Rarieda",
+      "lat": -0.06040134999999999,
+      "lng": 34.1201350099963,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Siaya",
+      "name": "Ugenya",
+      "lat": -0.12968338230275508,
+      "lng": 34.160135009996296,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Siaya",
+      "name": "Unguja",
+      "lat": -0.12968338230275508,
+      "lng": 34.240135009996294,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Taita-Taveta",
+      "name": "Mwatate",
+      "lat": -3.4178355,
+      "lng": 38.447067628089655,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Taita-Taveta",
+      "name": "Taveta",
+      "lat": -3.3378354999999997,
+      "lng": 38.36706762808966,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Taita-Taveta",
+      "name": "Voi",
+      "lat": -3.4178355,
+      "lng": 38.28706762808966,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Taita-Taveta",
+      "name": "Wundanyi",
+      "lat": -3.4978355,
+      "lng": 38.36706762808966,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Tana River",
+      "name": "Bura",
+      "lat": -1.53651195,
+      "lng": 39.63083745466502,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Tana River",
+      "name": "Galole",
+      "lat": -1.467229917697245,
+      "lng": 39.51083745466502,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Tana River",
+      "name": "Garsen",
+      "lat": -1.605793982302755,
+      "lng": 39.51083745466502,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Tharaka-Nithi",
+      "name": "Chuka",
+      "lat": -0.19370805000000002,
+      "lng": 38.04140495608314,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Tharaka-Nithi",
+      "name": "Igambangobe",
+      "lat": -0.12442601769724493,
+      "lng": 38.00140495608314,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Tharaka-Nithi",
+      "name": "Maara",
+      "lat": -0.12442601769724493,
+      "lng": 37.921404956083144,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Tharaka-Nithi",
+      "name": "Muthambi",
+      "lat": -0.19370805000000002,
+      "lng": 37.881404956083145,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Tharaka-Nithi",
+      "name": "Tharak north",
+      "lat": -0.2629900823027551,
+      "lng": 37.921404956083144,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Tharaka-Nithi",
+      "name": "Tharaka south",
+      "lat": -0.2629900823027551,
+      "lng": 38.00140495608314,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Trans-Nzoia",
+      "name": "Cherangany",
+      "lat": 1.0454582499999998,
+      "lng": 35.05904397271594,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Trans-Nzoia",
+      "name": "Endebess",
+      "lat": 1.1215427713036121,
+      "lng": 35.003765332265935,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Trans-Nzoia",
+      "name": "Kiminini",
+      "lat": 1.0924810701833976,
+      "lng": 34.91432261316594,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Trans-Nzoia",
+      "name": "Kwanza",
+      "lat": 0.9984354298166019,
+      "lng": 34.91432261316594,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Trans-Nzoia",
+      "name": "Saboti",
+      "lat": 0.9693737286963875,
+      "lng": 35.003765332265935,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Turkana",
+      "name": "Loima",
+      "lat": 2.76556575,
+      "lng": 35.67772282185919,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Turkana",
+      "name": "Turkana central",
+      "lat": 2.841650271303612,
+      "lng": 35.622444181409186,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Turkana",
+      "name": "Turkana east",
+      "lat": 2.8125885701833977,
+      "lng": 35.533001462309194,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Turkana",
+      "name": "Turkana north",
+      "lat": 2.718542929816602,
+      "lng": 35.533001462309194,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Turkana",
+      "name": "Turkana south",
+      "lat": 2.689481228696388,
+      "lng": 35.622444181409186,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Uasin Gishu",
+      "name": "Ainabkoi",
+      "lat": 0.4771938,
+      "lng": 35.385059736992275,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Uasin Gishu",
+      "name": "Kapseret",
+      "lat": 0.5464758323027551,
+      "lng": 35.345059736992276,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Uasin Gishu",
+      "name": "Kesses",
+      "lat": 0.5464758323027551,
+      "lng": 35.26505973699228,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Uasin Gishu",
+      "name": "Moiben",
+      "lat": 0.4771938,
+      "lng": 35.22505973699228,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Uasin Gishu",
+      "name": "Soy",
+      "lat": 0.4079117676972449,
+      "lng": 35.26505973699228,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Uasin Gishu",
+      "name": "Turbo",
+      "lat": 0.4079117676972449,
+      "lng": 35.345059736992276,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Vihiga",
+      "name": "Emuhaya",
+      "lat": 0.0831199,
+      "lng": 34.788033906814825,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Vihiga",
+      "name": "Hamisi",
+      "lat": 0.1592044213036123,
+      "lng": 34.73275526636482,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Vihiga",
+      "name": "Luanda",
+      "lat": 0.13014272018339784,
+      "lng": 34.64331254726483,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Vihiga",
+      "name": "Sabatia",
+      "lat": 0.03609707981660215,
+      "lng": 34.64331254726483,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Vihiga",
+      "name": "vihiga",
+      "lat": 0.007035378696387706,
+      "lng": 34.73275526636482,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Wajir",
+      "name": "Eldas",
+      "lat": 1.9394402,
+      "lng": 40.104493932000565,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Wajir",
+      "name": "Tarbaj",
+      "lat": 2.008722232302755,
+      "lng": 40.064493932000566,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Wajir",
+      "name": "Wajir East",
+      "lat": 2.008722232302755,
+      "lng": 39.98449393200057,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Wajir",
+      "name": "Wajir North",
+      "lat": 1.9394402,
+      "lng": 39.94449393200057,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Wajir",
+      "name": "Wajir South",
+      "lat": 1.870158167697245,
+      "lng": 39.98449393200057,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "Wajir",
+      "name": "Wajir West",
+      "lat": 1.870158167697245,
+      "lng": 40.064493932000566,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "West Pokot",
+      "name": "Central Pokot",
+      "lat": 1.8798607999999999,
+      "lng": 35.290613006849966,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "West Pokot",
+      "name": "North Pokot",
+      "lat": 1.9598608,
+      "lng": 35.21061300684997,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "West Pokot",
+      "name": "Pokot South",
+      "lat": 1.8798607999999999,
+      "lng": 35.13061300684997,
+      "source": "county-centroid-offset"
+    },
+    {
+      "county": "West Pokot",
+      "name": "West Pokot",
+      "lat": 1.7998607999999998,
+      "lng": 35.21061300684997,
+      "source": "county-centroid-offset"
+    }
+  ]
+}

@@ -140,7 +140,7 @@ function LoanRiskAnalyzer() {
   }, [calc.risk]);
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20">
+    <div className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20">
       <header>
         <p className="eyebrow">Credit intelligence</p>
         <h1 className="display mt-4 text-[40px] sm:text-[52px] text-ink max-w-3xl">
@@ -153,7 +153,7 @@ function LoanRiskAnalyzer() {
 
       <div className="mt-12 grid lg:grid-cols-[1fr_1.1fr] gap-5">
         {/* Inputs */}
-        <div className="card-surface p-7">
+        <div className="card-surface p-5 sm:p-7">
           <p className="eyebrow">Loan terms</p>
           <h2 className="font-serif text-[26px] text-ink mt-1">Enter the offer</h2>
 
@@ -215,7 +215,7 @@ function LoanRiskAnalyzer() {
         <div className="space-y-5">
           {/* Engine verdict from POST /api/loan */}
           {(engineResult || engineLoading || engineError) && (
-            <div className="card-surface p-7 border-teal/20">
+            <div className="card-surface p-5 sm:p-7 border-teal/20">
               <p className="eyebrow text-teal">SokoSense engine</p>
               {engineLoading && !engineResult && (
                 <p className="mt-3 text-[13px] text-steel">Checking loan engine…</p>
@@ -239,13 +239,13 @@ function LoanRiskAnalyzer() {
           )}
 
           {agentReply && (
-            <div className="card-surface p-7 bg-canvas">
+            <div className="card-surface p-5 sm:p-7 bg-canvas">
               <p className="eyebrow">Agent audit</p>
               <p className="mt-3 text-[13.5px] text-ink leading-relaxed whitespace-pre-wrap">{agentReply}</p>
             </div>
           )}
           {/* Risk classification */}
-          <div className={`card-surface p-7 ${riskColor.border}`}>
+          <div className={`card-surface p-5 sm:p-7 ${riskColor.border}`}>
             <div className="flex items-center justify-between">
               <p className={`eyebrow ${riskColor.text}`}>Risk classification</p>
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium ${riskColor.badge}`}>
@@ -265,7 +265,7 @@ function LoanRiskAnalyzer() {
           </div>
 
           {/* Comparison bars */}
-          <div className="card-surface p-7">
+          <div className="card-surface p-5 sm:p-7">
             <p className="eyebrow">Benchmark comparison</p>
             <h3 className="font-serif text-[20px] text-ink mt-2">How this loan stacks up</h3>
             <div className="mt-6 space-y-5">
@@ -276,7 +276,7 @@ function LoanRiskAnalyzer() {
           </div>
 
           {/* Pricing summary */}
-          <div className="card-surface p-7">
+          <div className="card-surface p-5 sm:p-7">
             <p className="eyebrow">True cost</p>
             <div className="mt-3 grid grid-cols-2 gap-px bg-hairline rounded-xl overflow-hidden border border-hairline">
               <Stat label="Effective APR" value={`${calc.effectiveAPR.toFixed(2)}%`} hero />
@@ -299,7 +299,7 @@ function LoanRiskAnalyzer() {
       {/* Bottom analysis cards */}
       <div className="mt-6 grid md:grid-cols-3 gap-5">
         {/* Why risky */}
-        <div className="card-surface p-7">
+        <div className="card-surface p-5 sm:p-7">
           <p className="eyebrow">Risk analysis</p>
           <h3 className="font-serif text-[22px] text-ink mt-2">Why this loan is risky</h3>
           <ul className="mt-5 space-y-3">
@@ -313,7 +313,7 @@ function LoanRiskAnalyzer() {
         </div>
 
         {/* Hidden costs */}
-        <div className="card-surface p-7">
+        <div className="card-surface p-5 sm:p-7">
           <p className="eyebrow">Transparency</p>
           <h3 className="font-serif text-[22px] text-ink mt-2">Potential hidden costs</h3>
           <ul className="mt-5 space-y-3 text-[13px] text-steel">
@@ -331,7 +331,7 @@ function LoanRiskAnalyzer() {
         </div>
 
         {/* Recommendation: friendly recommendation */}
-        <div className={`card-surface p-7 ${riskColor.bg} ${riskColor.border}`}>
+        <div className={`card-surface p-5 sm:p-7 ${riskColor.bg} ${riskColor.border}`}>
           <p className={`eyebrow ${riskColor.text}`}>Recommendation</p>
           <h3 className={`font-serif text-[22px] mt-2 ${riskColor.text}`}>What to do next</h3>
           <p className={`mt-5 text-[14px] leading-relaxed ${riskColor.text} opacity-90`}>
@@ -467,7 +467,7 @@ function LiveVerdictCard({
   isError: boolean;
 }) {
   return (
-    <div className="card-surface p-7 bg-ink text-paper border-ink">
+    <div className="card-surface p-5 sm:p-7 bg-ink text-paper border-ink">
       <div className="flex items-center justify-between">
         <div>
           <p className="eyebrow text-teal-glow">SokoSense engine · live</p>

@@ -1,149 +1,327 @@
 import { useEffect, useRef } from "react";
+import type { GeoJSON as GeoJSONType, Map as LeafletMap, LayerGroup, Path } from "leaflet";
+import { canonicalCountyName, countiesMatch, KENYA_BOUNDS } from "@/lib/geo";
 
 export type LMarket = {
   id: string;
   name: string;
-  county: string;
   lat: number;
   lng: number;
   price: number;
-  delta: number;
-  volume: number;
   signal: "buy" | "sell" | "hold";
 };
 
 const SIGNAL_COLOR: Record<LMarket["signal"], string> = {
   sell: "#2E7D32",
-  buy: "#0D9280",
-  hold: "#516880",
+  hold: "#C58A1E",
+  buy: "#516880",
 };
+
+const FLY_OPTS = { duration: 1.2, easeLinearity: 0.25 };
+const REDUCED_FLY_OPTS = { duration: 0.01, easeLinearity: 0.25 };
+
+type SubcountyPin = { name: string; lat: number; lng: number } | null;
 
 type Props = {
   markets: LMarket[];
-  activeId: string;
-  bestId: string;
-  sourceId: string;
-  onSelect: (id: string) => void;
-  onHover?: (id: string | null) => void;
+  loading: boolean;
+  selectedCounty: string | null;
+  selectedSubcounty: SubcountyPin;
+  onCountySelect: (countyName: string) => void;
+  originMarketId: string;
+  activeMarketId: string;
+  bestMarketId: string;
+  onMarketSelect: (id: string) => void;
+  onMarketHover?: (id: string | null) => void;
 };
 
-export default function LeafletMarketMap({ markets, activeId, bestId, sourceId, onSelect, onHover }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<any>(null);
-  const layerRef = useRef<any>(null);
-  const LRef = useRef<any>(null);
+function prefersReducedMotion(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
-  // init once
+function countyNameFromFeature(feature: GeoJSON.Feature): string {
+  const props = feature.properties ?? {};
+  return (props.COUNTY_NAM as string) || (props.name as string) || "";
+}
+
+export default function LeafletMarketMap({
+  markets,
+  loading,
+  selectedCounty,
+  selectedSubcounty,
+  onCountySelect,
+  originMarketId,
+  activeMarketId,
+  bestMarketId,
+  onMarketSelect,
+  onMarketHover,
+}: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const leafletRef = useRef<typeof import("leaflet") | null>(null);
+  const countiesLayerRef = useRef<GeoJSONType | null>(null);
+  const marketsLayerRef = useRef<LayerGroup | null>(null);
+  const subcountyLayerRef = useRef<LayerGroup | null>(null);
+  const countyBoundsRef = useRef<Map<string, import("leaflet").LatLngBounds>>(new Map());
+  const selectedCountyRef = useRef<string | null>(selectedCounty);
+  const onCountySelectRef = useRef(onCountySelect);
+
+  selectedCountyRef.current = selectedCounty;
+  onCountySelectRef.current = onCountySelect;
+
+  function applyCountyHighlight(county: string | null) {
+    const layer = countiesLayerRef.current;
+    if (!layer) return;
+    layer.eachLayer((l) => {
+      const feature = (l as GeoJSONType & { feature?: GeoJSON.Feature }).feature;
+      if (!feature) return;
+      const name = countyNameFromFeature(feature);
+      const path = l as Path;
+      if (!county) {
+        path.setStyle({
+          color: "#9AA89A",
+          weight: 1,
+          fillColor: "#DDE8DA",
+          fillOpacity: 0.45,
+          opacity: 1,
+        });
+        return;
+      }
+      if (countiesMatch(name, county)) {
+        path.setStyle({
+          color: "#2E7D32",
+          weight: 2,
+          fillColor: "#2E7D32",
+          fillOpacity: 0.22,
+          opacity: 1,
+        });
+        path.bringToFront();
+      } else {
+        path.setStyle({
+          color: "#C5CEC5",
+          weight: 1,
+          fillColor: "#E8EDE7",
+          fillOpacity: 0.12,
+          opacity: 0.3,
+        });
+      }
+    });
+  }
+
+  // Init map once
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const L = (await import("leaflet")).default;
       if (cancelled || !containerRef.current || mapRef.current) return;
-      LRef.current = L;
+      leafletRef.current = L;
+
       const map = L.map(containerRef.current, {
         center: [0.2, 37.2],
         zoom: 6,
         zoomControl: false,
         attributionControl: false,
-        scrollWheelZoom: false,
-        zoomSnap: 0.25,
+        scrollWheelZoom: true,
       });
       mapRef.current = map;
 
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-        {
-          subdomains: "abcd",
-          maxZoom: 18,
-        }
-      ).addTo(map);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+        subdomains: "abcd",
+        maxZoom: 18,
+      }).addTo(map);
 
-      // subtle label overlay
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-        { subdomains: "abcd", maxZoom: 18, opacity: 0.55 }
-      ).addTo(map);
+      L.control
+        .attribution({ position: "bottomleft", prefix: false })
+        .addAttribution("© OSM · CARTO")
+        .addTo(map);
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      layerRef.current = L.layerGroup().addTo(map);
+
+      marketsLayerRef.current = L.layerGroup().addTo(map);
+      subcountyLayerRef.current = L.layerGroup().addTo(map);
+
+      const flyOpts = prefersReducedMotion() ? REDUCED_FLY_OPTS : FLY_OPTS;
+      map.fitBounds(KENYA_BOUNDS, { padding: [24, 24], ...flyOpts });
+
+      try {
+        const res = await fetch("/geo/kenya-counties.geojson");
+        const geojson = (await res.json()) as GeoJSON.FeatureCollection;
+
+        const counties = L.geoJSON(geojson, {
+          style: {
+            color: "#9AA89A",
+            weight: 1,
+            fillColor: "#DDE8DA",
+            fillOpacity: 0.45,
+          },
+          onEachFeature: (feature, layer) => {
+            const name = countyNameFromFeature(feature);
+            if (!name) return;
+
+            const bounds = (layer as Path).getBounds?.();
+            if (bounds?.isValid()) countyBoundsRef.current.set(name, bounds);
+
+            layer.on({
+              mouseover: (e) => {
+                const active = selectedCountyRef.current;
+                if (active && !countiesMatch(name, active)) return;
+                (e.target as Path).setStyle({ fillOpacity: 0.62, fillColor: "#C8DCC4" });
+              },
+              mouseout: (e) => {
+                countiesLayerRef.current?.resetStyle(e.target as Path);
+                applyCountyHighlight(selectedCountyRef.current);
+              },
+              click: (e) => {
+                L.DomEvent.stopPropagation(e);
+                onCountySelectRef.current(canonicalCountyName(name));
+              },
+            });
+          },
+        }).addTo(map);
+
+        countiesLayerRef.current = counties;
+      } catch {
+        // County boundaries unavailable
+      }
     })();
+
     return () => {
       cancelled = true;
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
+      mapRef.current?.remove();
+      mapRef.current = null;
+      countiesLayerRef.current = null;
+      marketsLayerRef.current = null;
+      subcountyLayerRef.current = null;
     };
   }, []);
 
-  // re-render markers + route on state changes
+  // County zoom + highlight
   useEffect(() => {
-    const L = LRef.current;
     const map = mapRef.current;
-    const layer = layerRef.current;
-    if (!L || !map || !layer) return;
+    if (!map) return;
+    applyCountyHighlight(selectedCounty);
+
+    const flyOpts = prefersReducedMotion() ? REDUCED_FLY_OPTS : FLY_OPTS;
+    if (selectedCounty) {
+      const bounds = [...countyBoundsRef.current.entries()].find(([n]) =>
+        countiesMatch(n, selectedCounty),
+      )?.[1];
+      if (bounds?.isValid()) {
+        map.flyToBounds(bounds, { padding: [32, 32], maxZoom: 10, ...flyOpts });
+      }
+    } else {
+      map.flyToBounds(KENYA_BOUNDS, { padding: [24, 24], ...flyOpts });
+    }
+  }, [selectedCounty]);
+
+  // Market markers + route
+  useEffect(() => {
+    const L = leafletRef.current;
+    const layer = marketsLayerRef.current;
+    if (!L || !layer) return;
     layer.clearLayers();
 
-    const source = markets.find((m) => m.id === sourceId);
-    const best = markets.find((m) => m.id === bestId);
+    const origin = markets.find((m) => m.id === originMarketId);
+    const best = markets.find((m) => m.id === bestMarketId);
 
-    if (source && best && source.id !== best.id) {
+    if (origin && best && origin.id !== best.id) {
       L.polyline(
         [
-          [source.lat, source.lng],
+          [origin.lat, origin.lng],
           [best.lat, best.lng],
         ],
-        {
-          color: "#0D9280",
-          weight: 1.2,
-          opacity: 0.85,
-          dashArray: "4 4",
-        }
+        { color: "#0D9280", weight: 1.2, opacity: 0.75, dashArray: "5 4" },
       ).addTo(layer);
     }
 
+    if (loading) {
+      const skeletonPositions =
+        markets.length > 0
+          ? markets
+          : [
+              { lat: -1.2864, lng: 36.8172 },
+              { lat: -0.3031, lng: 36.08 },
+              { lat: 0.5143, lng: 35.2698 },
+            ];
+      skeletonPositions.forEach((pos) => {
+        L.circleMarker([pos.lat, pos.lng], {
+          radius: 10,
+          color: "#DCE2DA",
+          weight: 1,
+          fillColor: "#EEF2EC",
+          fillOpacity: 0.9,
+          className: "soko-marker-skeleton",
+        }).addTo(layer);
+      });
+      return;
+    }
+
     markets.forEach((m) => {
-      const isActive = m.id === activeId;
-      const isBest = m.id === bestId;
+      const isActive = m.id === activeMarketId;
       const color = SIGNAL_COLOR[m.signal];
-      const radius = 6 + Math.min(14, m.volume / 200);
+      const icon = L.divIcon({
+        className: "soko-market-marker-wrap",
+        html: `<div class="soko-market-marker${isActive ? " soko-market-marker--active" : ""}" style="--signal:${color}">
+          <span class="soko-market-marker__dot"></span>
+          <span class="soko-market-marker__price">KSh ${m.price.toLocaleString()}</span>
+        </div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      });
 
-      // outer halo
-      L.circleMarker([m.lat, m.lng], {
-        radius: radius + (isBest ? 8 : 4),
-        color,
-        weight: isBest ? 1.5 : 0.5,
-        opacity: isBest ? 0.7 : 0.25,
-        fillOpacity: 0.06,
-        fillColor: color,
-        interactive: false,
-      }).addTo(layer);
-
-      const dot = L.circleMarker([m.lat, m.lng], {
-        radius: isActive ? radius + 2 : radius,
-        color: isActive ? "#1B2128" : color,
-        weight: isActive ? 2 : 1,
-        fillColor: color,
-        fillOpacity: 0.92,
-      })
+      L.marker([m.lat, m.lng], { icon, zIndexOffset: isActive ? 500 : 100 })
         .addTo(layer)
-        .on("click", () => onSelect(m.id))
-        .on("mouseover", () => onHover?.(m.id))
-        .on("mouseout", () => onHover?.(null));
-
-      const html = `<div style="font-family:Inter,sans-serif;font-size:11px;background:#1B2128;color:#fff;padding:6px 9px;border-radius:6px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.25)">
-        <div style="font-weight:600;letter-spacing:.01em">${m.name}</div>
-        <div style="opacity:.7;margin-top:2px;font-variant-numeric:tabular-nums">KSh ${m.price.toLocaleString()} · ${m.delta >= 0 ? "+" : ""}${m.delta}%</div>
-      </div>`;
-      dot.bindTooltip(html, { direction: "top", offset: [0, -4], opacity: 1, className: "soko-tt" });
+        .on("click", () => onMarketSelect(m.id))
+        .on("mouseover", () => onMarketHover?.(m.id))
+        .on("mouseout", () => onMarketHover?.(null))
+        .bindTooltip(
+          `<strong>${m.name}</strong><br/>KSh ${m.price.toLocaleString()} / 90kg`,
+          { direction: "top", offset: [0, -6], opacity: 1, className: "soko-map-tt" },
+        );
     });
-  }, [markets, activeId, bestId, sourceId, onSelect, onHover]);
+  }, [
+    markets,
+    loading,
+    originMarketId,
+    bestMarketId,
+    activeMarketId,
+    onMarketSelect,
+    onMarketHover,
+  ]);
+
+  // Subcounty centroid pin
+  useEffect(() => {
+    const L = leafletRef.current;
+    const layer = subcountyLayerRef.current;
+    if (!L || !layer) return;
+    layer.clearLayers();
+    if (!selectedSubcounty) return;
+
+    const icon = L.divIcon({
+      className: "soko-subcounty-pin-wrap",
+      html: `<div class="soko-subcounty-pin" title="${selectedSubcounty.name}"></div>`,
+      iconSize: [12, 12],
+      iconAnchor: [6, 6],
+    });
+
+    L.marker([selectedSubcounty.lat, selectedSubcounty.lng], {
+      icon,
+      zIndexOffset: 800,
+      interactive: false,
+    })
+      .addTo(layer)
+      .bindTooltip(selectedSubcounty.name, {
+        direction: "top",
+        offset: [0, -4],
+        opacity: 1,
+        className: "soko-map-tt",
+      });
+  }, [selectedSubcounty]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-xl border border-hairline bg-[#EEF2EC]">
+    <div className="market-map-shell relative h-full min-h-[55vh] w-full overflow-hidden border border-hairline bg-[#EEF2EC] md:min-h-0">
       <div ref={containerRef} className="absolute inset-0" />
-      {/* scanline / terminal overlay */}
-      <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-hairline rounded-xl" />
     </div>
   );
 }
