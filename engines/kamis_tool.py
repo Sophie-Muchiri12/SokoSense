@@ -1,5 +1,6 @@
 import os
 import io
+import logging
 import urllib3
 import requests
 import pandas as pd
@@ -7,9 +8,19 @@ from typing import Optional
 from langchain_core.tools import tool
 from tavily import TavilyClient
 from engines.rate_limiter import kamis_http_limiter
+from engines.price_fallbacks import run_price_fallback_chain
+
+logger = logging.getLogger(__name__)
 
 # Suppress SSL certificate warning from urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Max number of KAMIS product IDs to fetch for a single query. Broad crop names
+# (e.g. "beans") resolve to ~10 IDs; fetching all of them — each a deep
+# per_page=1500 request — blows past the 5-calls/60s rate limiter and makes the
+# query hang for ~85s. 4 keeps us under the limit while still covering the
+# common varieties of a crop.
+_MAX_PRODUCT_FETCHES = 4
 
 # Full crop name to product ID mapping as extracted from the select2 dropdown options of the website
 CROP_MAPPING = {
@@ -287,6 +298,41 @@ def _build_tavily_query(
     return " ".join(parts).strip() or "latest market prices"
 
 
+def _fallback_chain_kwargs() -> dict:
+    """Shared Tavily helpers for the structured fallback chain."""
+    return {
+        "build_tavily_query": _build_tavily_query,
+        "search_kamis_via_tavily": _search_kamis_via_tavily,
+        "open_web_fallback": _open_web_fallback,
+    }
+
+
+def _open_web_fallback(
+    crop_name: Optional[str],
+    market_name: Optional[str],
+    county_name: Optional[str],
+) -> Optional[str]:
+    """Last-resort open-web price search via Tavily (no KAMIS-site restriction).
+
+    Only call this once KAMIS, WFP, and the KAMIS-site Tavily search have all
+    come up empty. Returns flagged, caveated text on success, or None on miss.
+    Open-web prices are the least reliable source (possibly stale, different
+    units, or national averages), so the disclaimer is baked into the result.
+    """
+    query = _build_tavily_query(crop_name, market_name, county_name)
+    text = _search_kamis_via_tavily(query, restrict_to_kamis=False)
+    if text and not text.startswith(("Error:", "An error occurred")):
+        return (
+            "No official KAMIS or WFP market data was found for this query. The "
+            "estimate below comes from a general web search and may be outdated, "
+            "use a different unit (e.g. per bag vs per kg), or reflect a national "
+            "average rather than this specific market — treat it as a rough guide, "
+            "not an official price.\n\n"
+            + text
+        )
+    return None
+
+
 @tool
 def scrape_kamis_prices(
     crop_name: Optional[str] = None,
@@ -311,12 +357,26 @@ def scrape_kamis_prices(
     clean_market_name = market_name.strip() if market_name else None
     clean_county_name = county_name.strip() if county_name else None
 
-    # If a location filter is set, fetch more rows from the server so the local
-    # filter has enough data to find matches. Without a filter, 10 is enough.
+    # If a location filter is set, fetch a deep history from the server so the
+    # local filter can find markets that report infrequently. KAMIS has no
+    # server-side market/county filter — it only returns the most recent N rows
+    # across all markets — so a small window misses markets that haven't
+    # reported lately (e.g. Nakuru maize, last seen mid-2025). Without a filter,
+    # 10 recent rows is enough.
     has_location = bool(clean_market_name or clean_county_name)
-    server_per_page = 100 if has_location else 10
+    server_per_page = 1500 if has_location else 10
+    fetch_timeout = 40 if has_location else 20
 
     product_ids = resolve_crop_ids(clean_crop_name)
+    # A broad crop term ("beans") substring-matches ~10 KAMIS product IDs, and
+    # with a location set each ID is a separate deep (per_page=1500) HTTP request.
+    # The 5-calls/60s rate limiter then forces a ~60s sleep mid-query, so a single
+    # "price of beans in Nairobi" lookup took ~85s. Cap the fan-out to the first
+    # few (most common) varieties: it keeps the query under the rate limit while
+    # still returning enough variety rows for a useful summary.
+    if len(product_ids) > _MAX_PRODUCT_FETCHES:
+        product_ids = product_ids[:_MAX_PRODUCT_FETCHES]
+
     dfs = []
     had_fetch_error = False
 
@@ -328,7 +388,7 @@ def scrape_kamis_prices(
             }
             try:
                 kamis_http_limiter.acquire()  # ← rate-limit each outgoing HTTP call
-                response = requests.get(url, params=params, verify=False, timeout=15)
+                response = requests.get(url, params=params, verify=False, timeout=fetch_timeout)
                 if response.status_code == 200:
                     sub_dfs = pd.read_html(io.StringIO(response.text))
                     if sub_dfs:
@@ -339,7 +399,7 @@ def scrape_kamis_prices(
         params = {"per_page": server_per_page}
         try:
             kamis_http_limiter.acquire()  # ← rate-limit the fallback HTTP call
-            response = requests.get(url, params=params, verify=False, timeout=20)
+            response = requests.get(url, params=params, verify=False, timeout=fetch_timeout)
             if response.status_code == 200:
                 sub_dfs = pd.read_html(io.StringIO(response.text))
                 if sub_dfs:
@@ -348,19 +408,19 @@ def scrape_kamis_prices(
             had_fetch_error = True
 
     if not dfs:
-        # Direct KAMIS access is sometimes blocked (e.g. the host firewalls the
-        # hosting provider's IPs, surfacing as connection timeouts). When the
-        # direct fetch yields nothing — especially after a network error — fall
-        # back to Tavily, which retrieves KAMIS content from its own infra.
-        if had_fetch_error:
-            fallback_query = _build_tavily_query(clean_crop_name, clean_market_name, clean_county_name)
-            tavily_text = _search_kamis_via_tavily(fallback_query)
-            if tavily_text and not tavily_text.startswith(("Error:", "An error occurred")):
-                return (
-                    "Direct KAMIS access was unavailable; results below come from a "
-                    "Tavily web search of the KAMIS site and may be less precise.\n\n"
-                    + tavily_text
-                )
+        # Direct KAMIS HTML scrape failed — try Excel export (same official source),
+        # then WFP, Tavily (KAMIS site), and finally open-web search.
+        fallback = run_price_fallback_chain(
+            clean_crop_name,
+            clean_market_name,
+            clean_county_name,
+            limit,
+            try_kamis_excel=True,
+            had_fetch_error=had_fetch_error,
+            **_fallback_chain_kwargs(),
+        )
+        if fallback:
+            return fallback
         return "No price data could be retrieved from the KAMIS website."
 
     # Combine and clean
@@ -372,26 +432,82 @@ def scrape_kamis_prices(
     if clean_crop_name:
         df = df[df['Commodity'].str.contains(clean_crop_name, case=False, na=False)]
 
-    if clean_market_name and clean_county_name:
-        # Match either market OR county
-        df = df[
-            df['Market'].str.contains(clean_market_name, case=False, na=False) |
-            df['County'].str.contains(clean_county_name, case=False, na=False)
-        ]
-    else:
-        if clean_market_name:
-            # LLMs and SMS parsers often pass a town/county as market_name
-            # ("Nairobi") even when KAMIS stores the exact market separately
-            # ("Kawangware"). Treat market_name as a broad location hint.
-            df = df[
-                df['Market'].str.contains(clean_market_name, case=False, na=False) |
-                df['County'].str.contains(clean_market_name, case=False, na=False)
-            ]
-        if clean_county_name:
-            df = df[df['County'].str.contains(clean_county_name, case=False, na=False)]
+    # Location filtering — market-first.
+    #
+    # The farmer usually names a *specific* market (e.g. "Mutindwa"). KAMIS only
+    # returns the most recent N rows across all markets, and many markets report
+    # infrequently, so the requested one is often absent from the fetched
+    # window. The old logic matched "market OR county" together, which meant a
+    # missing market silently returned some *other* market in the same county
+    # (e.g. Kawangware) with no indication of the swap.
+    #
+    # Instead: try the exact market first; if it has no rows, search the other
+    # sources (WFP backup, then Tavily) for that market; only then fall back to
+    # county-level KAMIS rows, clearly flagged as a substitution.
+    substitution_note = ""
+
+    if clean_market_name:
+        market_mask = df['Market'].str.contains(clean_market_name, case=False, na=False)
+        if market_mask.any():
+            # Best case: the named market reported recently in KAMIS.
+            df = df[market_mask]
+        elif (
+            not clean_county_name
+            and df['County'].str.contains(clean_market_name, case=False, na=False).any()
+        ):
+            # The "market" is really a town/county the LLM put in the market slot
+            # ("Nairobi"); KAMIS stores it as a County. Use fresh county rows —
+            # this is what the farmer meant, so no substitution note is needed.
+            df = df[df['County'].str.contains(clean_market_name, case=False, na=False)]
+        else:
+            # The named market truly isn't in the KAMIS window. Search backup
+            # sources for it specifically before widening to the whole county.
+            fallback = run_price_fallback_chain(
+                clean_crop_name,
+                clean_market_name,
+                clean_county_name,
+                limit,
+                tavily_kamis_prefix=(
+                    f"No recent KAMIS price entries were found for '{clean_market_name}' "
+                    "market specifically, so the results below come from a Tavily web "
+                    "search of the KAMIS site and may reference nearby markets or older "
+                    "reports.\n\n"
+                ),
+                **_fallback_chain_kwargs(),
+            )
+            if fallback:
+                return fallback
+
+            # Last resort: widen to county-level KAMIS rows, flagged transparently.
+            county_hint = clean_county_name or clean_market_name
+            df = df[df['County'].str.contains(county_hint, case=False, na=False)]
+            if not df.empty:
+                substitution_note = (
+                    f"Note: '{clean_market_name}' has no recent KAMIS price reports, "
+                    f"so the prices below are from other markets in "
+                    f"{county_hint.title()} county.\n\n"
+                )
+    elif clean_county_name:
+        df = df[df['County'].str.contains(clean_county_name, case=False, na=False)]
 
     total_rows = len(df)
     if total_rows == 0:
+        # KAMIS returned data, but nothing matched the requested location.
+        fallback = run_price_fallback_chain(
+            clean_crop_name,
+            clean_market_name,
+            clean_county_name,
+            limit,
+            tavily_kamis_prefix=(
+                "No recent KAMIS price entries matched that market directly, so the "
+                "results below come from a Tavily web search of the KAMIS site and "
+                "may reference nearby markets or older reports.\n\n"
+            ),
+            **_fallback_chain_kwargs(),
+        )
+        if fallback:
+            return fallback
+
         msg = "No price data found matching your query."
         if crop_name:
             msg += f" Crop: '{crop_name}' (Resolved IDs: {product_ids})."
@@ -411,12 +527,17 @@ def scrape_kamis_prices(
     df = df[cols_to_keep]
 
     df_limited = df.head(limit)
-    return df_limited.to_json(orient="records", indent=2)
+    return substitution_note + df_limited.to_json(orient="records", indent=2)
 
-def _search_kamis_via_tavily(query: str) -> str:
+def _search_kamis_via_tavily(query: str, restrict_to_kamis: bool = True) -> str:
     """
-    Plain (non-tool) implementation of the Tavily KAMIS search so it can be reused
-    as a fallback by other code paths (e.g. when direct KAMIS scraping is blocked).
+    Plain (non-tool) implementation of the Tavily search so it can be reused as a
+    fallback by other code paths (e.g. when direct KAMIS scraping is blocked).
+
+    When ``restrict_to_kamis`` is True (default) the search is scoped to the
+    KAMIS website, which is more trustworthy. When False it searches the open
+    web — used only as the very last resort, when KAMIS and WFP have no data and
+    the KAMIS-site search also came up empty.
     """
     tavily_key = os.getenv("TAVILY_API_KEY")
     if not tavily_key:
@@ -424,8 +545,9 @@ def _search_kamis_via_tavily(query: str) -> str:
 
     client = TavilyClient(api_key=tavily_key)
 
-    # Force search to focus on the KAMIS website
-    modified_query = f"{query} site:kamis.kilimo.go.ke"
+    # Scope to the KAMIS site for trustworthy results; drop the filter for the
+    # open-web last-resort tier.
+    modified_query = f"{query} site:kamis.kilimo.go.ke" if restrict_to_kamis else query
 
     try:
         # Perform advanced search

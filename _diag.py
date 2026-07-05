@@ -1,20 +1,16 @@
 import os, time
 from dotenv import load_dotenv
 load_dotenv("/home/sophie/SokoSense/SokoSense/.env")
-from langchain_openai import ChatOpenAI
+from engines.llm import DEFAULT_GROQ_MODEL, get_groq_llm
 
-key = os.getenv("FEATHERLSS_API_KEY")
-model = os.getenv("LLM_MODEL_FEATHERLESS", "deepseek-ai/DeepSeek-V4-Flash")
-print("model:", model, "| key set:", bool(key))
+key = os.getenv("GROQ_API_KEY")
+print("model:", DEFAULT_GROQ_MODEL, "| key set:", bool(key))
 
-llm = ChatOpenAI(
-    model=model,
-    temperature=0,
-    openai_api_key=key,
-    openai_api_base="https://api.featherless.ai/v1",
-    timeout=30,
-    max_retries=0,
-)
+llm = get_groq_llm(temperature=0)
+if llm is None:
+    print("GROQ_API_KEY not set")
+    raise SystemExit(1)
+
 t = time.time()
 try:
     r = llm.invoke("Say OK")

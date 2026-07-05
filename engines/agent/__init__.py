@@ -9,6 +9,6 @@ Usage:
     result = agent_graph.invoke({"messages": [HumanMessage(content="...")]})
 """
 
-from engines.agent.graph import agent_graph
+from engines.agent.graph import agent_graph, get_summarizer_llm
 
-__all__ = ["agent_graph"]
+__all__ = ["agent_graph", "get_summarizer_llm"]
