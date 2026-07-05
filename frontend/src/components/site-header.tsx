@@ -1,6 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
+import { SokoSenseLogo } from "./sokosense-logo";
+
 const nav = [
   { to: "/", label: "Overview" },
   { to: "/simulator", label: "SMS Simulator" },
@@ -34,15 +36,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/85 backdrop-blur supports-[backdrop-filter]:bg-canvas/70">
       <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between gap-4 px-5 sm:px-6">
         <Link to="/" className="flex shrink-0 items-center gap-2.5 group" aria-label="SokoSense home">
-          <span className="relative inline-flex h-7 w-7 items-center justify-center rounded-md bg-ink text-paper">
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-              <path d="M4 18c4-10 12-10 16 0" />
-              <path d="M12 4v14" />
-            </svg>
-          </span>
-          <span className="font-serif text-[22px] leading-none text-ink">
-            Soko<span className="text-teal">Sense</span>
-          </span>
+          <SokoSenseLogo />
         </Link>
 
         <nav aria-label="Primary" className="hidden lg:flex items-center gap-1">
