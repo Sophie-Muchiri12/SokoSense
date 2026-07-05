@@ -1,0 +1,19 @@
+# SokoSense Web — TanStack Start (Nitro node-server)
+#
+# Railway service setup:
+#   Root Directory: frontend
+#   Config path:    /frontend/railway.toml
+#
+# Required Variables (set in Railway dashboard before/at build):
+#   NITRO_PRESET=node-server
+#   VITE_API_URL=https://${{SokoSense.RAILWAY_PUBLIC_DOMAIN}}
+#     ↑ rename "SokoSense" to match your API service name exactly
+#
+# After deploy: Settings → Networking → Generate Domain
+
+[build]
+buildCommand = "npm install && npm run build"
+
+[deploy]
+startCommand = "node .output/server/index.mjs"
+restartPolicyType = "on_failure"

@@ -1,0 +1,17 @@
+# SokoSense API — FastAPI backend
+#
+# Railway service setup:
+#   Root Directory: /  (repo root — default)
+#   Config path:    /railway.toml  (default when root is /)
+#
+# After deploy: Settings → Networking → Generate Domain
+# Health check: GET /health
+
+[build]
+buildCommand = "pip install -r requirements.txt"
+
+[deploy]
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"

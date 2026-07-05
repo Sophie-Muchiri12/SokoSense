@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { postAdvisory, postAgent, type AdvisoryResponse } from "@/lib/sokosense-api";
+import { postAdvisory, postAgent, formatAdvisoryAnswer, type AdvisoryResponse } from "@/lib/sokosense-api";
 import { PageHeader } from "./market";
 
 export const Route = createFileRoute("/advisory")({
@@ -44,7 +44,7 @@ function AdvisoryPage() {
         const agent = await postAgent(q);
         setResult({
           query: q,
-          answer: agent.response,
+          answer: formatAdvisoryAnswer(agent.response),
           location: null,
           weather: null,
           sources: agent.raw?.messages
@@ -53,7 +53,7 @@ function AdvisoryPage() {
         });
       } else {
         const res = await postAdvisory(q);
-        setResult(res);
+        setResult({ ...res, answer: formatAdvisoryAnswer(res.answer) });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Advisory request failed");
