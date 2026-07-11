@@ -2,7 +2,7 @@ from typing import Any
 
 from langchain_core.tools import tool
 
-from models.common import truncate_sms
+from models.common import truncate_sms, USSD_MAX_CHARS
 from models.loan import LoanRequest, LoanResponse, RiskVerdict
 
 # Standard Central Bank of Kenya (CBK) benchmark interest rate as of June 2026
@@ -330,10 +330,28 @@ def _get_best_alternative(is_woman: bool = False) -> str:
     return "Try AFC: 10% per YEAR. Dial *234# or call 0800 723 573 FREE."
 
 
+LENDER_SHORT_NAMES = {
+    "afc": "AFC",
+    "digifarm": "DigiFarm",
+    "hustler_fund": "Hustler Fund",
+    "kcb_mkulima": "KCB Mkulima",
+    "mshwari": "M-Shwari",
+    "juhudi_kilimo": "Juhudi Kilimo",
+    "kwft": "KWFT",
+    "pezesha": "Pezesha",
+}
+
+
 def _get_alternatives_list() -> str:
     """
-    Return top 3 lender alternatives as a compact SMS string.
-    Used for the MORE/ZAIDI second message.
+    Return top 3 lender alternatives as a compact, USSD-safe string:
+    name + APR% (if known) + ussd/phone contact (if known). Each piece
+    is only included when the underlying lender data actually has it,
+    so lenders with incomplete data (no APR, no ussd) still show whatever
+    is available instead of being dropped or printing blank fields.
+    Guarantees all matched lenders stay visible within the 182-char
+    USSD limit, unlike full sms_blurb text which could push out lenders
+    2 and 3 entirely.
     """
     try:
         from engines.loan_engine import match_lenders
@@ -346,16 +364,18 @@ def _get_alternatives_list() -> str:
         if lenders:
             parts = []
             for i, l in enumerate(lenders, 1):
-                apr_str = f"{l['apr']}% p.a." if l["apr"] else "ask lender"
-                parts.append(f"{i}. {l['name']} {apr_str}: {l['sms_blurb']}")
-            return " | ".join(parts)[:320]
+                name = LENDER_SHORT_NAMES.get(l["id"], l["name"])
+                piece = f"{i}.{name}"
+                if l.get("apr") is not None:
+                    piece += f" {l['apr']}%"
+                contact = l.get("ussd") or l.get("phone")
+                if contact:
+                    piece += f" {contact}"
+                parts.append(piece)
+            return " ".join(parts)
     except Exception:
         pass
-    return (
-        "1. AFC: 10% p.a. Dial *234# FREE. "
-        "2. Hustler Fund: 8% p.a. via M-Pesa. "
-        "3. DigiFarm: inputs only, no collateral. Dial *944#."
-    )
+    return "1.AFC 10% *234# 2.Hustler Fund 8% M-Pesa menu 3.DigiFarm *944#"
 
 
 def _build_short_reply(monthly: float, apr: float, mapped: RiskVerdict) -> str:
@@ -413,19 +433,19 @@ def _build_short_reply_multi(
         msg = (
             f"{payment_line}"
             f"DO NOT TAKE THIS LOAN. {apr}% APR. {ratio}x the CBK rate. "
-            f"BETTER OPTIONS: {alternatives}"
+            f"TRY: {alternatives}"
         )
     elif mapped == RiskVerdict.HIGH_RISK:
         msg = (
             f"{payment_line}"
             f"HIGH RISK. {apr}% APR. {ratio}x CBK rate. "
-            f"BETTER OPTIONS: {alternatives}"
+            f"TRY: {alternatives}"
         )
     elif mapped == RiskVerdict.CAUTION:
         msg = (
             f"{payment_line}"
             f"CAUTION. {apr}% APR. Above CBK benchmark. "
-            f"BETTER OPTIONS: {alternatives}"
+            f"TRY: {alternatives}"
         )
     else:
         msg = (
@@ -434,7 +454,7 @@ def _build_short_reply_multi(
             f"BEST: {alternatives}"
         )
 
-    return _truncate_at_word(msg, 320)
+    return _truncate_at_word(msg, USSD_MAX_CHARS)
 
 
 def _truncate_at_word(text: str, max_len: int) -> str:
