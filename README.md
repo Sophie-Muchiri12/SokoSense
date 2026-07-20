@@ -29,7 +29,7 @@ SokoSense turns raw market data into **one clear instruction** for Kenyan smallh
    ```bash
    pip install -r requirements.txt
    ```
-   *(Ensure you have `pandas`, `beautifulsoup4`, `lxml`, `requests`, `langchain`, `langgraph`, `langchain-openai`, `tavily-python`, and `python-dotenv` installed).*
+   *(Ensure you have `pandas`, `beautifulsoup4`, `lxml`, `requests`, `langchain`, `langgraph`, `langchain-openai`, and `python-dotenv` installed).*
 
 4. **Configure Environment Variables**:
    Create a `.env` file in the root directory based on `.env.example`:
@@ -39,8 +39,7 @@ SokoSense turns raw market data into **one clear instruction** for Kenyan smallh
    ```env
    FEATHERLSS_API_KEY=your_featherless_api_key_here
    LLM_MODEL_FEATHERLESS=MiniMaxAI/MiniMax-M3
-   TAVILY_API_KEY=your_tavily_api_key_here
-   ```
+      ```
 
 ---
 
@@ -86,7 +85,7 @@ VITE_API_URL=http://localhost:8000
 Start the backend first so the UI can reach it. Pages wired to the live API:
 - **Simulator** (`/simulator`) → `POST /api/agent` (full LangGraph agent)
 - **Loan Analyzer** (`/loans`) → `POST /api/loan` (live APR + risk verdict)
-- **Market Map** (`/market`) → `GET /api/market-prices` (live price feed)
+- **Market Map** (`/market`) → `GET /api/market-prices` (cached SQLite market feed)
 - **Operations** (`/admin`) → `GET /health` (live API status badge)
 
 ### Available API endpoints

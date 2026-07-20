@@ -53,13 +53,6 @@ class RateLimiter:
 
 # ── Pre-built shared limiters ────────────────────────────────────────────────
 
-# Applied to every outgoing HTTP request to the KAMIS website
-kamis_http_limiter = RateLimiter(
-    max_calls=5,
-    period_seconds=60,
-    name="KAMIS HTTP"
-)
-
 # Applied to every user query processed by the agent
 agent_query_limiter = RateLimiter(
     max_calls=5,

@@ -28,7 +28,7 @@ def decide_timing(request: TimingRequest) -> TimingResponse:
             "pct_change": None,
             "wait_days": 0,
             "national_avg_kes": None,
-            "data_source": "KAMIS (kamis.kilimo.go.ke)",
+            "data_source": "KAMIS cache (SQLite)",
         }
 
     price = signal.get("price_kes")
@@ -42,10 +42,7 @@ def decide_timing(request: TimingRequest) -> TimingResponse:
 
     if price is None:
         recommendation = "WAIT"
-        reason = (
-            f"No live KAMIS wholesale data for {crop} in {display_market}. "
-            "Check kamis.kilimo.go.ke or try another market."
-        )
+        reason = "There is no market found in that area."
         short_reply = reason
         return TimingResponse(
             crop=crop,
@@ -113,5 +110,5 @@ def decide_timing(request: TimingRequest) -> TimingResponse:
         price_kes=price,
         trend=trend,
         kamis_date=kamis_date,
-        data_source=signal.get("data_source", "KAMIS (kamis.kilimo.go.ke)"),
+        data_source=signal.get("data_source", "KAMIS cache (SQLite)"),
     )

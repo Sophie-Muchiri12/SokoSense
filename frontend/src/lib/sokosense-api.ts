@@ -149,7 +149,7 @@ export async function postAgent(message: string): Promise<AgentResponse> {
   });
 }
 
-/** Fetch live wholesale prices for a given crop (KAMIS-backed). */
+/** Fetch cached wholesale prices for a given crop (SQLite-backed). */
 export async function getMarketPrices(
   crop: string,
 ): Promise<MarketMapResponse> {

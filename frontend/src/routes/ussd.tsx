@@ -109,7 +109,7 @@ const NODES: Record<string, Node> = {
     ],
     explanation:
       "Defaults to the farmer's registered village. Other markets are sorted by transport feasibility — Kitale → Eldoret is 70km, well within a single-day truck round-trip.",
-    latency: "160ms",
+    latency: "190ms",
     children: ["recommend"],
   },
   recommend: {
@@ -130,7 +130,7 @@ const NODES: Record<string, Node> = {
       "0. Main menu",
     ],
     explanation:
-      "Engine combines live market feed, transport cost model and a 14-day price forecast (LSTM). The final SMS is sent free-of-charge with the full breakdown and 3 trusted buyer contacts.",
+      "Engine combines cached market data from the local SQLite store with transport cost logic. The final SMS returns a clear action for the farmer and can be followed by a full report.",
     latency: "620ms",
   },
 };

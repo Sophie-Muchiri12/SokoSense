@@ -2,8 +2,8 @@
 SokoSense — Live Price Pipeline
 Lucy Kamau · Data Layer Owner
 
-Wraps Job's KAMIS scraper to aggregate live prices by county.
-Called by engines/market.py and engines/timing.py via get_live_prices().
+Reads KAMIS prices from the local SQLite cache populated by
+`data/refresh_market_db.py` (GitHub Actions every 3 hours).
 
 Usage:
     from data.price_pipeline import get_live_prices, get_best_market
@@ -11,18 +11,11 @@ Usage:
     # {"nakuru": 3600, "nairobi": 3200, ...}
 """
 
-import io
-import json
 import logging
-import urllib3
 from datetime import datetime, timedelta
 from time import time
 
-import pandas as pd
-import requests
-
 logger = logging.getLogger(__name__)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ---------------------------------------------------------------------------
 # MARKET → COUNTY MAPPING
@@ -40,8 +33,6 @@ MARKET_TO_COUNTY = {
 }
 
 COUNTY_TO_MARKET = {v: k for k, v in MARKET_TO_COUNTY.items()}
-
-KAMIS_URL = "https://kamis.kilimo.go.ke/site/market"
 
 # ---------------------------------------------------------------------------
 # PRICE CACHE (12-hour TTL)
@@ -103,14 +94,30 @@ def _median(values: list[float]) -> float | None:
     return (ordered[mid - 1] + ordered[mid]) / 2
 
 
+def _resolve_tracked_county(market: str, county: str) -> str | None:
+    """Map a KAMIS market/county label to one of our tracked counties."""
+    haystack = f"{market} {county}".lower()
+    for market_key, county_name in MARKET_TO_COUNTY.items():
+        if market_key in haystack or county_name.lower() in haystack:
+            return county_name
+    return None
+
+
+def _row_price(row: dict) -> float | None:
+    return _parse_price(row.get("Wholesale")) or _parse_price(row.get("Retail"))
+
+
 def _latest_wholesale_by_county(rows: list[dict]) -> dict[str, dict]:
-    """Latest KAMIS wholesale price per tracked county (median across markets)."""
+    """Latest KAMIS price per tracked county (median across markets)."""
     by_county: dict[str, list[dict]] = {}
     for row in rows:
-        county = str(row.get("County", "")).strip()
-        if county not in COUNTY_TO_MARKET:
+        county = _resolve_tracked_county(
+            str(row.get("Market", "")),
+            str(row.get("County", "")),
+        )
+        if not county:
             continue
-        price = _parse_price(row.get("Wholesale"))
+        price = _row_price(row)
         dt = _parse_kamis_date(row.get("Date"))
         if price is None or dt is None:
             continue
@@ -140,12 +147,15 @@ def _county_wholesale_on_date(
     prices: list[float] = []
     target_day = target.date()
     for row in rows:
-        if str(row.get("County", "")).strip() != county:
+        if str(row.get("County", "")).strip() != county and _resolve_tracked_county(
+            str(row.get("Market", "")),
+            str(row.get("County", "")),
+        ) != county:
             continue
         dt = _parse_kamis_date(row.get("Date"))
         if dt is None or dt.date() != target_day:
             continue
-        price = _parse_price(row.get("Wholesale"))
+        price = _row_price(row)
         if price is not None:
             prices.append(price)
     median = _median(prices)
@@ -159,12 +169,15 @@ def _historical_price_for_county(
     target = latest_dt - timedelta(days=lookback_days)
     candidates: dict[datetime, list[float]] = {}
     for row in rows:
-        if str(row.get("County", "")).strip() != county:
+        if _resolve_tracked_county(
+            str(row.get("Market", "")),
+            str(row.get("County", "")),
+        ) != county:
             continue
         dt = _parse_kamis_date(row.get("Date"))
         if dt is None or dt > latest_dt:
             continue
-        price = _parse_price(row.get("Wholesale"))
+        price = _row_price(row)
         if price is None:
             continue
         candidates.setdefault(dt, []).append(price)
@@ -184,65 +197,19 @@ def _historical_price_for_county(
 
 
 # ---------------------------------------------------------------------------
-# DIRECT KAMIS FETCH (bypasses tool's 10-row cap)
+# LOCAL SQLITE FETCH
 # ---------------------------------------------------------------------------
 
 def _fetch_kamis(crop: str) -> list[dict]:
-    """
-    Fetch all available KAMIS rows for a crop directly.
-    Requests per_page=500 to capture all counties.
-    Returns list of raw row dicts.
-    """
+    """Read stored KAMIS rows for a crop from SQLite."""
     try:
-        from engines.kamis_tool import resolve_crop_ids
-        product_ids = resolve_crop_ids(crop.strip().lower())
+        from data.market_db import init_db, query_crop_history
+
+        init_db()
+        return query_crop_history(crop.strip().lower())
     except Exception as e:
-        logger.error("Could not resolve crop IDs for %s: %s", crop, e)
+        logger.error("Could not read market DB for %s: %s", crop, e)
         return []
-
-    dfs = []
-    if product_ids:
-        for pid in product_ids:
-            try:
-                resp = requests.get(
-                    KAMIS_URL,
-                    params={"product": pid, "per_page": 500},
-                    verify=False,
-                    timeout=20,
-                )
-                if resp.status_code == 200:
-                    tables = pd.read_html(io.StringIO(resp.text))
-                    if tables:
-                        dfs.append(tables[0])
-            except Exception as e:
-                logger.warning("KAMIS fetch failed for product_id=%s: %s", pid, e)
-    else:
-        # No ID resolved — try generic fetch
-        try:
-            resp = requests.get(
-                KAMIS_URL,
-                params={"per_page": 500},
-                verify=False,
-                timeout=20,
-            )
-            if resp.status_code == 200:
-                tables = pd.read_html(io.StringIO(resp.text))
-                if tables:
-                    dfs.append(tables[0])
-        except Exception as e:
-            logger.error("KAMIS generic fetch failed: %s", e)
-
-    if not dfs:
-        return []
-
-    df = pd.concat(dfs, ignore_index=True)
-    df.columns = [c.strip() for c in df.columns]
-    df = df.drop_duplicates()
-
-    # Filter to this crop
-    df = df[df["Commodity"].str.contains(crop, case=False, na=False)]
-
-    return df.to_dict(orient="records")
 
 
 # ---------------------------------------------------------------------------
@@ -251,7 +218,7 @@ def _fetch_kamis(crop: str) -> list[dict]:
 
 def get_live_prices(crop: str) -> dict[str, float]:
     """
-    Fetch live prices for a crop from KAMIS, aggregated by our market names.
+    Fetch prices for a crop from the local SQLite cache, aggregated by market.
 
     Returns:
         dict mapping market name (lowercase) → price in KSh per 90kg bag
@@ -279,7 +246,7 @@ def get_live_prices(crop: str) -> dict[str, float]:
 
     if result:
         _cache_set(cache_key, result)
-        logger.info("Live KAMIS prices for %s: %s", crop, result)
+        logger.info("Live DB prices for %s: %s", crop, result)
     else:
         logger.warning("No matching counties in KAMIS data for %s", crop)
 
@@ -359,7 +326,7 @@ def get_trend(crop: str, market: str) -> dict:
         "pct_change": None,
         "wait_days": 0,
         "national_avg_kes": None,
-        "data_source": "KAMIS (kamis.kilimo.go.ke)",
+        "data_source": "KAMIS cache (SQLite)",
     }
 
     if not county:
@@ -407,5 +374,5 @@ def get_trend(crop: str, market: str) -> dict:
         "pct_change": pct_change,
         "wait_days": wait_days,
         "national_avg_kes": national_avg,
-        "data_source": "KAMIS (kamis.kilimo.go.ke)",
+        "data_source": "KAMIS cache (SQLite)",
     }

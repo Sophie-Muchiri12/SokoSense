@@ -28,8 +28,8 @@ type Stage = { id: string; label: string; detail: string };
 const STAGES: Stage[] = [
   { id: "sms-in", label: "SMS received", detail: "Telco gateway · Safaricom 21455" },
   { id: "agent", label: "Agent invoked", detail: "LangGraph · tool-calling loop" },
-  { id: "market", label: "Market engine called", detail: "KAMIS price feed · arbitrage graph" },
-  { id: "compose", label: "Response generated", detail: "Featherless LLM · 160-char shaping" },
+  { id: "market", label: "Market engine called", detail: "SQLite market cache · decision engine" },
+  { id: "compose", label: "Response generated", detail: "Groq LLM · SMS shaping" },
   { id: "sms-out", label: "SMS delivered", detail: "DLR confirmed · session closed" },
 ];
 
@@ -53,7 +53,7 @@ const COPY = {
     title: "Inspect every message",
     titleItalic: "the engine touches.",
     subtitle:
-      "Type a farmer message in the format the shortcode expects. We parse intent, run the market and credit engines, then return a 160-character reply.",
+      "Type a farmer message in the format the shortcode expects. We parse intent, run the market and credit engines, then return an SMS-ready reply.",
     inputCardTitle: "Inbound SMS",
     inputCardSub: "Farmer message · shortcode 21455",
     placeholder: "PRICE MAIZE NAKURU",
@@ -61,7 +61,7 @@ const COPY = {
     sending: "Running…",
     langLabel: "Language",
     chars: "characters",
-    limit: "160 char limit",
+    limit: "320 char limit",
     aiTitle: "AI recommendation",
     aiSub: "Decision payload returned to the farmer",
     responseType: "Response type",
@@ -79,7 +79,7 @@ const COPY = {
     title: "Chunguza kila ujumbe",
     titleItalic: "unaopita kwenye injini.",
     subtitle:
-      "Andika ujumbe wa mkulima kwa muundo unaotarajiwa. Tunafafanua nia, tunaita injini ya soko na mkopo, kisha tunarudisha jibu la herufi 160.",
+      "Andika ujumbe wa mkulima kwa muundo unaotarajiwa. Tunafafanua nia, tunaita injini ya soko na mkopo, kisha tunarudisha jibu tayari kwa SMS.",
     inputCardTitle: "SMS ya kuingia",
     inputCardSub: "Ujumbe wa mkulima · namba fupi 21455",
     placeholder: "BEI MAHINDI NAKURU",
@@ -87,7 +87,7 @@ const COPY = {
     sending: "Inafanya kazi…",
     langLabel: "Lugha",
     chars: "herufi",
-    limit: "kikomo herufi 160",
+    limit: "kikomo herufi 320",
     aiTitle: "Pendekezo la AI",
     aiSub: "Jibu linalorudi kwa mkulima",
     responseType: "Aina ya jibu",
@@ -212,7 +212,7 @@ function SimulatorPage() {
   };
 
   const charCount = message.length;
-  const overLimit = charCount > 160;
+  const overLimit = charCount > 320;
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void run();
@@ -261,7 +261,7 @@ function SimulatorPage() {
           <div className="mt-2 flex items-center justify-between text-[11.5px]">
             <span className="text-mist">{t.hint}</span>
             <span className={`tabular ${overLimit ? "text-red-600" : "text-steel"}`}>
-              {charCount}/160 · {overLimit ? t.limit : t.chars}
+              {charCount}/320 · {overLimit ? t.limit : t.chars}
             </span>
           </div>
 

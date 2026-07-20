@@ -502,7 +502,7 @@ function LiveVerdictCard({
             </div>
           </div>
           <div className="mt-4 rounded-lg bg-paper/5 border border-paper/10 p-4">
-            <p className="text-[10px] uppercase tracking-wider text-mist">160-char SMS reply</p>
+            <p className="text-[10px] uppercase tracking-wider text-mist">320-char SMS reply</p>
             <p className="mt-1.5 text-[13.5px] leading-relaxed text-paper">{data.short_reply}</p>
           </div>
           <p className="mt-3 text-[11.5px] text-mist">

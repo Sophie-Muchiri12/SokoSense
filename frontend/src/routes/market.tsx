@@ -12,12 +12,12 @@ export const Route = createFileRoute("/market")({
       {
         name: "description",
         content:
-          "Live wholesale crop pricing, demand heatmaps and arbitrage intelligence across Kenya's seven primary markets.",
+          "Cached market pricing and arbitrage intelligence across Kenyan markets, refreshed by background sync.",
       },
       { property: "og:title", content: "Market Intelligence Map — SokoSense" },
       {
         property: "og:description",
-        content: "Live crop prices and arbitrage intelligence across Kenyan markets.",
+        content: "Cached crop prices and arbitrage intelligence across Kenyan markets.",
       },
     ],
   }),
@@ -147,9 +147,9 @@ function MarketMapPage() {
     <div className="mx-auto max-w-[1320px] px-6 pt-14 pb-12">
       <PageHeader
         eyebrow="Market intelligence"
-        title="Where prices live."
+        title="Where prices are synced."
         italic="Where to move next."
-        sub="Live wholesale pricing across Kenya's primary markets. SokoSense reconciles transport, volume and demand to surface the highest-margin destination for your harvest."
+        sub="Background-synced wholesale pricing from our local market cache. SokoSense reconciles transport, volume and demand to surface the highest-margin destination for your harvest."
       />
 
       {/* Filters */}
@@ -428,7 +428,7 @@ function MarketMapPage() {
               <KV k="Markets online" v={`${markets.length} / 7`} />
               <KV k="Spread" v={`KSh ${spread.toLocaleString()}`} />
               <KV k="Last update" v={lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"} />
-              <KV k="Source" v="KAMIS · kamis.kilimo.go.ke" />
+              <KV k="Source" v="KAMIS cache (SQLite)" />
             </div>
           </div>
         </aside>

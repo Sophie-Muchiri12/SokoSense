@@ -314,7 +314,7 @@ function ProductGrid() {
     {
       to: "/market",
       title: "Market Intelligence Map",
-      desc: "Live crop prices, arbitrage routes and demand heat across every county we serve.",
+      desc: "Cached crop prices, arbitrage routes and demand heat across every county we serve.",
       tag: "Spatial",
     },
     {
@@ -338,7 +338,7 @@ function ProductGrid() {
     {
       to: "/timing",
       title: "Sell Timing Engine",
-      desc: "SELL_TODAY or WAIT — KAMIS price trends tell farmers when to move their harvest.",
+      desc: "SELL_TODAY or WAIT — cached market price trends tell farmers when to move their harvest.",
       tag: "Timing",
     },
     {
@@ -417,13 +417,13 @@ function NetworkSection() {
         <div className="p-10">
           <p className="eyebrow">Network intelligence</p>
           <h2 className="display mt-4 text-[40px] text-ink">
-            A live map of
+            A synced map of
             <br />
             <span className="italic text-teal">where food moves.</span>
           </h2>
           <p className="mt-5 text-[14px] leading-relaxed text-steel max-w-md">
-            We ingest pricing from wholesale markets every hour, blend it with weather, transport corridors and
-            cooperative reporting — and route advice back to the farmer who needs it most.
+            We sync pricing from wholesale markets into a local database on schedule, blend it with weather,
+            transport corridors and cooperative reporting — and route advice back to the farmer who needs it most.
           </p>
           <ul className="mt-8 space-y-3 text-[13px] text-ink">
             <Bullet>Bottom-up data from cooperative reporters in every county</Bullet>
