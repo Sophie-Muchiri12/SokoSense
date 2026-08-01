@@ -251,6 +251,15 @@ async def ussd_handler(
         if depth == 3:
             result = loaning.decide_loan_by_amount_band(parts[2])
             reply = loan_reply_sw(result) if is_sw else result.short_reply
+
+            if sms_client:
+                try:
+                    sms_text = loaning.build_loan_sms_followup(parts[2])
+                    sms_client.send(sms_text, [phoneNumber])
+                    print(f"[AT] USSD loan follow-up SMS sent to {phoneNumber}")
+                except Exception as e:
+                    print(f"[AT] Failed to send USSD loan follow-up SMS to {phoneNumber}: {e}")
+
             return f"END {truncate_ussd(reply)}"
 
     if is_sw:

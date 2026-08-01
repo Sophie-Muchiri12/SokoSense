@@ -307,10 +307,33 @@ def _map_risk_verdict(verdict: str, risk_level: str) -> RiskVerdict:
     return RiskVerdict.SAFE
 
 
-def _get_best_alternative(is_woman: bool = False) -> str:
+def _build_alternative_reason(farmer_apr: float, lender: dict) -> str:
     """
-    Return the single best no-collateral lender blurb for SMS.
-    Falls back to AFC hardcoded if loan_engine unavailable.
+    Build a short, factually-true reason this specific lender is being
+    recommended over the loan the farmer asked about. Each piece is only
+    included when the underlying data actually supports it — e.g. AFC
+    requires collateral, so it never gets a "no collateral" claim even
+    though other lenders in the same list might.
+    """
+    parts = []
+    lender_apr = lender.get("apr")
+    if lender_apr and farmer_apr:
+        ratio = round(farmer_apr / lender_apr, 1)
+        if ratio >= 1.5:
+            parts.append(f"{ratio}x cheaper")
+    if lender.get("collateral_required") is False:
+        parts.append("no collateral needed")
+    return ", ".join(parts)
+
+
+def _get_best_alternative_with_reason(farmer_apr: float, is_woman: bool = False) -> str:
+    """
+    Return the top 3 lenders for SMS, each with a short factual reason
+    it's being recommended over the farmer's current loan. Showing
+    multiple options (not just one) matters here beyond completeness --
+    a single repeated recommendation can look like an undisclosed
+    partnership even when it's genuinely just the lowest-APR match.
+    Falls back to a hardcoded 3-lender line if loan_engine is unavailable.
     """
     try:
         from engines.loan_engine import match_lenders
@@ -321,13 +344,26 @@ def _get_best_alternative(is_woman: bool = False) -> str:
             tags=tags,
             has_collateral=False,
             is_woman=is_woman,
-            max_results=1,
+            max_results=3,
         )
         if lenders:
-            return lenders[0]["sms_blurb"]
+            parts = []
+            for i, l in enumerate(lenders, 1):
+                name = LENDER_SHORT_NAMES.get(l["id"], l["name"])
+                reason = _build_alternative_reason(farmer_apr, l)
+                piece = f"{i}.{name}"
+                if l.get("apr") is not None:
+                    piece += f" {l['apr']}%"
+                if reason:
+                    piece += f" ({reason})"
+                contact = l.get("ussd") or l.get("phone")
+                if contact:
+                    piece += f" {contact}"
+                parts.append(piece)
+            return " ".join(parts)
     except Exception:
         pass
-    return "Try AFC: 10% per YEAR. Dial *234# or call 0800 723 573 FREE."
+    return "1.Hustler Fund 8% (no collateral) M-Pesa menu 2.AFC 10% *234# 3.Pezesha (no collateral) SMS/USSD"
 
 
 LENDER_SHORT_NAMES = {
@@ -380,22 +416,22 @@ def _get_alternatives_list() -> str:
 
 def _build_short_reply(monthly: float, apr: float, mapped: RiskVerdict) -> str:
     ratio = round(apr / CBK_CBR_RATE, 1) if CBK_CBR_RATE else 0
-    alternative = _get_best_alternative()
+    alternative = _get_best_alternative_with_reason(apr)
 
     if mapped == RiskVerdict.AVOID:
         return truncate_sms(
             f"DO NOT TAKE THIS LOAN. {apr}% APR. {ratio}x the CBK rate. "
-            f"BETTER: {alternative}"
+            f"BETTER OPTIONS: {alternative}"
         )
     if mapped == RiskVerdict.HIGH_RISK:
         return truncate_sms(
             f"HIGH RISK. {apr}% APR. {ratio}x CBK rate. "
-            f"BETTER: {alternative}"
+            f"BETTER OPTIONS: {alternative}"
         )
     if mapped == RiskVerdict.CAUTION:
         return truncate_sms(
             f"CAUTION. {apr}% APR. Above CBK benchmark. "
-            f"BETTER: {alternative}"
+            f"BETTER OPTIONS: {alternative}"
         )
     return truncate_sms(
         f"SAFE. {apr}% APR. Near CBK benchmark. Still read all loan terms."
@@ -466,6 +502,23 @@ def _truncate_at_word(text: str, max_len: int) -> str:
     if last_space > 0:
         cut = cut[:last_space]
     return cut.rstrip(" .,|") + "..."
+
+
+def build_loan_sms_followup(band_key: str) -> str:
+    """
+    Build a reasoning-enhanced SMS follow-up message for a USSD Loan Check
+    session. Reuses the same band evaluation as decide_loan_by_amount_band,
+    but formats through _build_short_reply (the 3-lender, reasoning-enhanced
+    SMS version) instead of the terse USSD one, since SMS has far more
+    character budget to actually explain the alternatives.
+    """
+    result = evaluate_loan_amount_band(band_key)
+    if "error" in result:
+        return truncate_sms(f"Invalid loan input: {result['error']}")
+    monthly = result["interest_rate"]
+    apr = result["real_apr"]
+    mapped = _map_risk_verdict(result["verdict"], result["risk_level"])
+    return _build_short_reply(monthly, apr, mapped)
 
 
 def decide_loan_by_amount_band(band_key: str) -> LoanResponse:
