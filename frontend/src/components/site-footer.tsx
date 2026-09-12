@@ -2,8 +2,8 @@ import { Link } from "@tanstack/react-router";
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-hairline bg-paper mt-24">
-      <div className="mx-auto max-w-[1240px] px-5 sm:px-6 py-16 grid gap-12 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+    <footer className="border-t border-hairline bg-paper mt-16 sm:mt-24">
+      <div className="mx-auto max-w-[1240px] px-5 sm:px-6 py-12 sm:py-16 grid gap-10 sm:gap-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-ink text-paper">

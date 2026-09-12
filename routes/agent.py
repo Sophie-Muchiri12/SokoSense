@@ -12,7 +12,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from engines.agent import agent_graph, get_summarizer_llm
-from models.common import truncate_sms
+from models.common import truncate_sms, unwrap_llm_json_answer
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +142,7 @@ def _parse_agent_response(response: str) -> tuple[str, str] | None:
         return None
     if resp_type not in {"advisory", "market", "weather", "loan", "general"}:
         resp_type = "general"
-    return reply, resp_type
+    return unwrap_llm_json_answer(reply), resp_type
 
 
 def _format_kamis_tool_reply(result: dict[str, Any], user_message: str = "") -> str | None:

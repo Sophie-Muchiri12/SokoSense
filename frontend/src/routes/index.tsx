@@ -47,7 +47,7 @@ function LandingPage() {
 function Hero() {
   return (
     <section className="relative">
-      <div className="mx-auto max-w-[1240px] px-5 sm:px-6 pt-20 pb-10 lg:pt-28 lg:pb-16 text-center">
+      <div className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 pt-16 sm:pt-20 pb-10 lg:pt-28 lg:pb-16 text-center">
         <p className="eyebrow">Agricultural intelligence · East Africa</p>
         <h1 className="display mt-6 text-[44px] sm:text-[64px] lg:text-[84px] text-ink">
           Markets, credit and advice
@@ -142,11 +142,11 @@ function SmsSimulator() {
   };
 
   return (
-    <section className="mx-auto max-w-[1240px] px-5 sm:px-6">
+    <section className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6">
       <div className="card-surface overflow-hidden">
         <div className="grid lg:grid-cols-[1.05fr_1.35fr_0.95fr]">
           {/* Left: prompt picker */}
-          <div className="bg-[radial-gradient(120%_120%_at_0%_0%,#0F7E70_0%,#0D9280_40%,#0a6a5e_100%)] p-10 text-paper relative">
+          <div className="bg-[radial-gradient(120%_120%_at_0%_0%,#0F7E70_0%,#0D9280_40%,#0a6a5e_100%)] p-6 sm:p-8 lg:p-10 text-paper relative">
             <p className="eyebrow text-paper/70">Live SMS simulator</p>
             <h2 className="font-serif text-[36px] leading-[1.05] mt-3 text-paper">
               A farmer texts.
@@ -175,7 +175,7 @@ function SmsSimulator() {
           </div>
 
           {/* Middle: conversation */}
-          <div className="border-x border-hairline bg-canvas p-8">
+          <div className="border-x border-hairline bg-canvas p-5 sm:p-8">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.14em] text-steel">SMS thread</p>
@@ -232,7 +232,7 @@ function SmsSimulator() {
           </div>
 
           {/* Right: engine trace */}
-          <div className="bg-paper p-8">
+          <div className="bg-paper p-5 sm:p-8">
             <p className="eyebrow">Engine trace</p>
             <h3 className="font-serif text-[22px] text-ink mt-2">How we decided</h3>
             {turns.length > 1 ? (
@@ -296,10 +296,10 @@ function Stats() {
     { v: "Neo4j RAG", l: "Knowledge graph powering advisory" },
   ];
   return (
-    <section className="mx-auto max-w-[1240px] px-5 sm:px-6 mt-20">
+    <section className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 mt-16 sm:mt-20">
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-hairline rounded-2xl overflow-hidden border border-hairline">
         {data.map((d) => (
-          <div key={d.l} className="bg-paper p-7">
+          <div key={d.l} className="bg-paper p-5 sm:p-7">
             <p className="font-serif text-[44px] leading-none text-ink tabular">{d.v}</p>
             <p className="mt-3 text-[12.5px] text-steel">{d.l}</p>
           </div>
@@ -361,7 +361,7 @@ function ProductGrid() {
     },
   ];
   return (
-    <section className="mx-auto max-w-[1240px] px-5 sm:px-6 mt-24">
+    <section className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 mt-16 sm:mt-24">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
         <div>
           <p className="eyebrow">The platform</p>
@@ -412,9 +412,9 @@ function NetworkSection() {
   );
 
   return (
-    <section className="mx-auto max-w-[1240px] px-5 sm:px-6 mt-24">
+    <section className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 mt-16 sm:mt-24">
       <div className="card-surface overflow-hidden grid lg:grid-cols-[1fr_1.15fr]">
-        <div className="p-10">
+        <div className="p-6 sm:p-10">
           <p className="eyebrow">Network intelligence</p>
           <h2 className="display mt-4 text-[40px] text-ink">
             A live map of
@@ -525,7 +525,7 @@ function PartnersStrip() {
     "One Acre Fund",
   ];
   return (
-    <section className="mx-auto max-w-[1240px] px-5 sm:px-6 mt-24">
+    <section className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 mt-16 sm:mt-24">
       <p className="text-center eyebrow">Built with operators on the ground</p>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-4">
         {partners.map((p) => (
@@ -540,8 +540,8 @@ function PartnersStrip() {
 
 function CTA() {
   return (
-    <section className="mx-auto max-w-[1240px] px-5 sm:px-6 mt-24">
-      <div className="card-surface bg-ink text-paper p-12 lg:p-16 flex flex-col lg:flex-row gap-10 lg:items-center justify-between">
+    <section className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 mt-16 sm:mt-24">
+      <div className="card-surface bg-ink text-paper p-8 sm:p-12 lg:p-16 flex flex-col lg:flex-row gap-8 lg:gap-10 lg:items-center justify-between">
         <div className="max-w-xl">
           <p className="eyebrow text-teal-glow">Deploy with us</p>
           <h2 className="font-serif text-[36px] lg:text-[44px] mt-4 leading-[1.05]">

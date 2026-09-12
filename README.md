@@ -107,6 +107,8 @@ Start the backend first so the UI can reach it. Pages wired to the live API:
 > Neo4j for advisory, Africa's Talking for SMS/USSD). Copy `.env.example` to `.env`
 > and fill in credentials. The rule-based engines (`/api/loan`, `/api/timing`,
 > `/api/market`) work without any keys.
+>
+> **Deploy:** See [docs/RAILWAY.md](docs/RAILWAY.md) for Railway (two services) or use `render.yaml` for Render.
 
 ---
 

@@ -120,6 +120,25 @@ export interface AdvisoryResponse {
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+/** Strip LLM JSON wrappers so the UI shows plain text, not raw objects. */
+export function formatAdvisoryAnswer(raw: string): string {
+  const trimmed = raw.trim();
+  let text = trimmed;
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  }
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (parsed && typeof parsed === "object" && "response" in parsed) {
+      const reply = (parsed as { response?: unknown }).response;
+      if (typeof reply === "string" && reply.trim()) return reply.trim();
+    }
+  } catch {
+    // not JSON — return as-is
+  }
+  return trimmed;
+}
+
 async function apiFetch<T>(
   path: string,
   init?: RequestInit,
