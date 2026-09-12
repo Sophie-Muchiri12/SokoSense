@@ -67,7 +67,7 @@ const RECOS = [
 
 function SaccoPage() {
   return (
-    <div className="mx-auto max-w-[1280px] px-5 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20">
+    <div className="mx-auto max-w-[1280px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <PageHeader
           eyebrow="Partner console · Tumaini SACCO + Mercy Corps"
@@ -75,7 +75,7 @@ function SaccoPage() {
           italic="every farmer."
           sub="A live operations view of SMS queries, market signals, loan risk and recommendations across 9 counties in Western and Rift Valley Kenya."
         />
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-green-surface px-3 py-1.5 text-[11.5px] text-green-deep">
             <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" />
             Live · 12 nodes
@@ -135,7 +135,7 @@ function Kpi({ label, value, delta, positive }: { label: string; value: string; 
 function RegionalMap() {
   const total = HOTSPOTS.reduce((s, h) => s + parseInt(h.q.replace(/,/g, "")), 0);
   return (
-    <div className="card-surface p-7">
+    <div className="card-surface p-5 sm:p-7">
       <div className="flex items-start justify-between">
         <div>
           <p className="eyebrow">Regional activity</p>
@@ -189,7 +189,7 @@ function RegionalMap() {
         ))}
       </div>
 
-      <div className="mt-5 grid grid-cols-3 gap-px bg-hairline rounded-lg overflow-hidden border border-hairline">
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-px bg-hairline rounded-lg overflow-hidden border border-hairline">
         <Stat label="Counties active" value="9" />
         <Stat label="Queries last hour" value="612" />
         <Stat label="Total today" value={total.toLocaleString()} />
@@ -254,13 +254,13 @@ function SignalDot({ tag }: { tag: string }) {
 
 function MarketTrends() {
   return (
-    <div className="card-surface p-7">
-      <div className="flex items-start justify-between">
+    <div className="card-surface p-5 sm:p-7">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <p className="eyebrow">Market trends · 12 weeks</p>
           <h3 className="font-serif text-[22px] text-ink mt-1">Reference prices, KSh</h3>
         </div>
-        <div className="flex items-center gap-3 text-[11px]">
+        <div className="flex flex-wrap items-center gap-3 text-[11px]">
           <span className="inline-flex items-center gap-1.5 text-teal">
             <span className="h-2 w-2 rounded-full bg-teal" /> Maize / 90kg
           </span>
@@ -280,7 +280,7 @@ function MarketTrends() {
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-4 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
+      <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
         <Stat label="Maize spot" value="4,820" />
         <Stat label="12w Δ" value="+26.2%" />
         <Stat label="Beans spot" value="9,080" />
@@ -330,11 +330,11 @@ function Engagement() {
     { name: "WhatsApp", pct: 2, n: "169" },
   ];
   return (
-    <div className="card-surface p-7">
+    <div className="card-surface p-5 sm:p-7">
       <p className="eyebrow">Farmer engagement</p>
       <h3 className="font-serif text-[22px] text-ink mt-1">Channels & retention</h3>
 
-      <div className="mt-5 grid grid-cols-3 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
         <Stat label="DAU" value="3,140" />
         <Stat label="WAU" value="11.2k" />
         <Stat label="Retention 30d" value="68%" />
@@ -371,16 +371,17 @@ function Engagement() {
 function Recommendations() {
   return (
     <div className="card-surface overflow-hidden">
-      <div className="px-6 py-4 border-b border-hairline flex items-center justify-between">
+      <div className="px-4 sm:px-6 py-4 border-b border-hairline flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <p className="eyebrow">Recent recommendations</p>
           <h3 className="font-serif text-[22px] text-ink mt-0.5">Issued in the last hour</h3>
         </div>
-        <div className="text-[11.5px] text-steel">
+        <div className="text-[11.5px] text-steel shrink-0">
           <span className="text-ink font-medium tabular">704</span> issued · <span className="text-green tabular">92%</span> followed
         </div>
       </div>
-      <table className="w-full text-[13px]">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] text-[13px]">
         <thead>
           <tr className="text-left text-[10.5px] uppercase tracking-wider text-mist bg-canvas">
             <th className="px-6 py-3 font-medium">Crop</th>
@@ -417,6 +418,7 @@ function Recommendations() {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

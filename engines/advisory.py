@@ -29,6 +29,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from engines.llm import get_groq_llm
 from engines.neo4j_client import Neo4jClient
 from engines.weather import get_farmer_weather, _geocode_location, _fetch_weather, _weatheradvice
+from models.common import unwrap_llm_json_answer
 
 load_dotenv()
 
@@ -369,7 +370,7 @@ def answer_farmer_question(
 
     try:
         response = llm.invoke([system_prompt, user_message])
-        answer = _extract_answer_text(response.content.strip())
+        answer = unwrap_llm_json_answer(response.content.strip())
     except Exception as exc:
         logger.warning("Groq LLM call failed in advisory: %s", exc)
         answer = (

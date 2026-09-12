@@ -1,0 +1,15 @@
+{
+  "name": "SokoSense",
+  "short_name": "SokoSense",
+  "description": "Agricultural intelligence for East Africa",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#0D9280",
+  "background_color": "#F5F7F4",
+  "display": "standalone"
+}
