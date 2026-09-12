@@ -4,8 +4,10 @@ Pipeline:
   1. Parse farmer's question → extract crop, disease, location keywords
   2. Query Neo4j knowledge graph for relevant (crop, disease, remedy, practice)
   3. Fetch weather for location (if present)
-  4. Build a prompt with retrieved context + weather context
-  5. Call Featherless LLM → generate final answer
+  4. Fetch live KAMIS market prices for the crop (prices live in the KAMIS
+     pipeline, not Neo4j) → best market + price trend
+  5. Build a prompt with retrieved context + weather + market context
+  6. Call Groq LLM → generate final answer
 
 Usage:
     from engines.advisory import answer_farmer_question
@@ -15,17 +17,6 @@ Terminal:
     python engines/advisory.py "What causes maize rust in Nakuru?"
 """
 
-import sys
-from pathlib import Path
-
-_ROOT = Path(__file__).resolve().parents[1]
-_ENGINES = Path(__file__).resolve().parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-if str(_ENGINES) not in sys.path:
-    sys.path.insert(0, str(_ENGINES))
-
-import os
 import re
 import json
 import logging
@@ -33,15 +24,11 @@ import argparse
 from typing import Any
 
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 
-if __package__ in (None, ""):
-    from neo4j_client import Neo4jClient
-    from weather import _geocode_location, _fetch_weather, _weatheradvice
-else:
-    from engines.neo4j_client import Neo4jClient
-    from engines.weather import _geocode_location, _fetch_weather, _weatheradvice
+from engines.llm import get_groq_llm
+from engines.neo4j_client import Neo4jClient
+from engines.weather import get_farmer_weather, _geocode_location, _fetch_weather, _weatheradvice
 
 load_dotenv()
 
@@ -189,6 +176,55 @@ def _format_vector_context(chunks: list[dict[str, Any]]) -> str:
     return "\n\n".join(parts)
 
 
+def _fetch_market_context(
+    crop: str, location: str | None
+) -> tuple[dict[str, Any] | None, str]:
+    """Fetch live KAMIS market context for a crop to enrich the advisory answer.
+
+    Prices live in the KAMIS pipeline (not Neo4j). Returns (market_dict, context_block).
+    Degrades to (None, "") when prices are unavailable so the RAG answer is unaffected.
+    """
+    try:
+        from data.price_pipeline import get_best_market, get_trend
+    except Exception as exc:  # import guard — pipeline optional
+        logger.warning("Price pipeline unavailable: %s", exc)
+        return None, ""
+
+    reference_market = location or "nairobi"
+    try:
+        info = get_best_market(crop, reference_market)
+    except Exception as exc:
+        logger.warning("Market context fetch failed: %s", exc)
+        return None, ""
+
+    if not info or info.get("best_price") is None:
+        return None, ""
+
+    trend = None
+    try:
+        trend = get_trend(crop, reference_market)
+    except Exception as exc:
+        logger.warning("Trend fetch failed: %s", exc)
+
+    lines = [f"--- Live Market Prices for {crop.title()} (KAMIS, KSh per 90kg bag) ---"]
+    current_price = info.get("current_price")
+    current_market = (info.get("current_market") or reference_market).title()
+    if current_price:
+        lines.append(f"{current_market}: KSh {current_price:,.0f}")
+    best_market = (info.get("best_market") or "").title()
+    best_price = info.get("best_price")
+    if best_market and best_price:
+        lines.append(f"Best market: {best_market} at KSh {best_price:,.0f}")
+    diff = info.get("price_diff_kes", 0) or 0
+    if diff > 0:
+        lines.append(f"Selling in {best_market} earns ~KSh {diff:,.0f} more per bag.")
+    if trend and trend.get("price_kes") is not None:
+        lines.append(f"Trend at {current_market}: {trend.get('trend', 'flat')}")
+
+    info["crop"] = crop
+    return info, "\n".join(lines)
+
+
 def answer_farmer_question(
     query: str,
     include_weather: bool = True,
@@ -251,7 +287,13 @@ def answer_farmer_question(
             logger.warning("Weather fetch failed: %s", exc)
             weather_context = ""
 
-    # 4. Build sources list
+    # 4. Fetch live market context (prices live in KAMIS pipeline, not Neo4j)
+    market_data: dict | None = None
+    market_context = ""
+    if crop:
+        market_data, market_context = _fetch_market_context(crop, location)
+
+    # 5. Build sources list
     sources = []
     if graph_rows:
         for r in graph_rows[:3]:
@@ -263,30 +305,26 @@ def answer_farmer_question(
             sources.append(f"PDF reference: {pdf} (page {c.get('page_num', '?')})")
     if weather_data:
         sources.append(f"Weather data (Open-Meteo) for {location.title()}")
+    if market_data:
+        sources.append(f"Live market prices (KAMIS) for {crop.title()}")
 
-    # 5. Call LLM
+    # 6. Call LLM
     system_prompt = SystemMessage(
         content=(
-            "You are SokoSense, a friendly farming helper for Kenyan smallholder farmers. "
-            "Write like you are explaining to a neighbour — simple and clear.\n\n"
-            "LANGUAGE RULES:\n"
-            "- Match the farmer's language. If they ask in Swahili, reply fully in Swahili "
-            "(simple Kiswahili sanifu, not heavy English mix unless naming a product or place).\n"
-            "- If they ask in English, reply in English.\n"
-            "- If they mix Swahili and English, reply in the language they use most.\n"
-            "- Use short sentences and common words in whichever language you choose.\n"
-            "- If you use a technical or scientific name, immediately explain it in plain language "
-            "in the same language as your answer "
-            "(e.g. English: 'Maize rust — orange spots on the leaves caused by a fungus'; "
-            "Swahili: 'Kutu ya mahindi — madoa ya rangi ya chungwa kwenye majani, husababishwa na kuvu').\n"
-            "- Avoid long lists of chemicals; give 1–2 practical options with simple instructions.\n"
-            "- DO NOT use emojis.\n\n"
-            "STRUCTURE (keep the whole answer easy to scan):\n"
-            "1. One sentence: what is happening and why.\n"
-            "2. Two or three numbered steps the farmer can do today or this week.\n"
-            "3. One short tip linked to local weather if weather data is provided.\n\n"
-            "Use the context below. If it is incomplete, still give safe, practical general advice. "
-            "Be helpful and reassuring, not academic."
+            "You are SokoSense, an expert agricultural AI assistant for Kenyan smallholder farmers. "
+            "You provide practical, actionable advice in clear, simple language (Swahili or English). "
+            "Your responses must be under 320 characters when possible (SMS-ready).\n"
+            "DO NOT use any emojis in your response under any circumstances.\n\n"
+            "Use the context below to answer the farmer's question. If the context doesn't contain "
+            "enough information, still try to give helpful general advice based on your training.\n\n"
+            "Always structure your answer with:\n"
+            "1. Direct answer to the question\n"
+            "2. Practical steps the farmer can take today\n"
+            "3. If weather data is provided, relate your advice to current conditions\n"
+            "4. If live market prices are provided, mention the best market to sell and the "
+            "price difference when it is relevant to the farmer's question\n\n"
+            "Be concise, specific, and actionable. Mention specific crop varieties, chemical names, "
+            "and local practices where relevant."
         )
     )
 
@@ -301,6 +339,9 @@ def answer_farmer_question(
     if weather_context:
         context_parts.append("")
         context_parts.append(weather_context)
+    if market_context:
+        context_parts.append("")
+        context_parts.append(market_context)
 
     context_block = "\n".join(context_parts)
 
@@ -315,31 +356,22 @@ def answer_farmer_question(
         )
     )
 
-    # Initialize the LLM (Featherless API)
-    featherless_api_key = os.getenv("FEATHERLSS_API_KEY")
-    featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "MiniMaxAI/MiniMax-M3")
-
-    if not featherless_api_key:
+    llm = get_groq_llm(temperature=0.3)
+    if llm is None:
         return {
             "query": query,
-            "answer": "FEATHERLSS_API_KEY is not set in .env.",
+            "answer": "GROQ_API_KEY is not set in .env.",
             "location": location,
             "weather": weather_data,
+            "market": market_data,
             "sources": sources,
         }
-
-    llm = ChatOpenAI(
-        model=featherless_model,
-        temperature=0.3,
-        openai_api_key=featherless_api_key,
-        openai_api_base="https://api.featherless.ai/v1",
-    )
 
     try:
         response = llm.invoke([system_prompt, user_message])
         answer = _extract_answer_text(response.content.strip())
     except Exception as exc:
-        logger.warning("Featherless LLM call failed in advisory: %s", exc)
+        logger.warning("Groq LLM call failed in advisory: %s", exc)
         answer = (
             f"I'm sorry, I couldn't generate a complete answer right now. "
             f"Based on my records: {graph_context[:300]}"
@@ -350,6 +382,7 @@ def answer_farmer_question(
         "answer": answer,
         "location": location,
         "weather": weather_data,
+        "market": market_data,
         "sources": sources,
     }
 

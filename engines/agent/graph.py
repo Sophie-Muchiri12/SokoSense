@@ -4,17 +4,17 @@ Defines the state graph, LLM binding, system prompt, and compilation.
 All responses are wrapped in JSON format for USSD/SMS integration.
 """
 
-import os
 import logging
+import uuid
 
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 
 from engines.agent.state import AgentState
-from engines.agent.tools import EXECUTABLE_TOOLS, TOOLS
+from engines.agent.tools import TOOLS
+from engines.llm import DEFAULT_GROQ_MODEL, get_groq_llm
 
 load_dotenv()
 
@@ -22,35 +22,32 @@ logger = logging.getLogger(__name__)
 
 # ── LLM initialisation ─────────────────────────────────────────────────────
 
-groq_api_key = os.getenv("GROQ_API_KEY")
-groq_model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-
-featherless_api_key = os.getenv("FEATHERLSS_API_KEY")
-featherless_model = os.getenv("LLM_MODEL_FEATHERLESS", "deepseek-ai/DeepSeek-V4-Flash")
-
-# Prefer Groq (as requested), fallback to Featherless if Groq key is missing.
-if groq_api_key:
-    llm = ChatOpenAI(
-        model=groq_model,
-        temperature=0.0,
-        openai_api_key=groq_api_key,
-        openai_api_base="https://api.groq.com/openai/v1",
-    )
-    logger.info("Using Groq LLM: %s", groq_model)
-elif featherless_api_key:
-    llm = ChatOpenAI(
-        model=featherless_model,
-        temperature=0.0,
-        openai_api_key=featherless_api_key,
-        openai_api_base="https://api.featherless.ai/v1",
-    )
-    logger.info("Using Featherless LLM: %s", featherless_model)
+_groq_llm = get_groq_llm(temperature=0.0)
+if _groq_llm is not None:
+    logger.info("Using Groq LLM: %s", DEFAULT_GROQ_MODEL)
+    llm_with_tools = _groq_llm.bind_tools(TOOLS)
 else:
-    raise ValueError(
-        "No LLM API key configured. Set GROQ_API_KEY (preferred) or FEATHERLSS_API_KEY in .env."
-    )
+    raise ValueError("No LLM provider configured. Set GROQ_API_KEY in .env")
 
-llm_with_tools = llm.bind_tools(TOOLS)
+# Plain, tool-free LLM used to summarize tool output (e.g. scraped KAMIS rows)
+# into a useful SMS reply. Built lazily and memoized so importing this module
+# stays cheap and a missing summarizer never breaks the agent.
+_summarizer_llm = None
+_summarizer_built = False
+
+
+def get_summarizer_llm():
+    """Return a tool-free LLM for grounded post-tool summarization, or ``None``.
+
+    Memoized; returns ``None`` if GROQ_API_KEY is not set so callers can fall
+    back to deterministic formatting.
+    """
+    global _summarizer_llm, _summarizer_built
+    if _summarizer_built:
+        return _summarizer_llm
+    _summarizer_built = True
+    _summarizer_llm = get_groq_llm(temperature=0.0)
+    return _summarizer_llm
 
 # ── System prompt ──────────────────────────────────────────────────────────
 
@@ -86,6 +83,23 @@ SYSTEM_PROMPT = SystemMessage(
 # ── Graph nodes ────────────────────────────────────────────────────────────
 
 
+def _ensure_tool_call_ids(message):
+    """Guarantee every tool call has a non-empty string id.
+
+    Some models intermittently emit tool calls with a missing/``None`` id.
+    LangGraph's ToolNode builds a ``ToolMessage(tool_call_id=call["id"])`` for
+    these calls and a ``None`` id raises a pydantic ValidationError. Backfilling
+    a valid id keeps the agent loop alive so the model can recover.
+    """
+    for tc in (getattr(message, "tool_calls", None) or []):
+        if not tc.get("id"):
+            tc["id"] = f"call_{uuid.uuid4().hex}"
+    for tc in (getattr(message, "invalid_tool_calls", None) or []):
+        if not tc.get("id"):
+            tc["id"] = f"call_{uuid.uuid4().hex}"
+    return message
+
+
 def call_model(state: AgentState):
     """Call the LLM with the current message history."""
     messages = state["messages"]
@@ -97,7 +111,7 @@ def call_model(state: AgentState):
         messages_to_send = list(messages)
 
     response = llm_with_tools.invoke(messages_to_send)
-    return {"messages": [response]}
+    return {"messages": [_ensure_tool_call_ids(response)]}
 
 
 def should_continue(state: AgentState) -> str:

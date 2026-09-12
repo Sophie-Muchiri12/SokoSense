@@ -8,7 +8,7 @@ Usage:
 Pipeline:
   1. Extract text from PDF using pypdf
   2. Chunk text into overlapping segments
-  3. Generate vector embeddings for each chunk via Featherless API
+  3. Generate vector embeddings for each chunk (hash-based dev fallback)
   4. Store chunks in Neo4j as DocumentChunk nodes with vector index
 
 If Neo4j is not configured, prints the chunk metadata that would be stored.

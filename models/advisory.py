@@ -19,4 +19,5 @@ class AdvisoryResponse(BaseModel):
     answer: str
     location: str | None = None
     weather: dict | None = None
+    market: dict | None = None
     sources: list[str] = []

@@ -28,8 +28,8 @@ type Stage = { id: string; label: string; detail: string };
 const STAGES: Stage[] = [
   { id: "sms-in", label: "SMS received", detail: "Telco gateway · Safaricom 21455" },
   { id: "agent", label: "Agent invoked", detail: "LangGraph · tool-calling loop" },
-  { id: "market", label: "Market engine called", detail: "SQLite market cache · decision engine" },
-  { id: "compose", label: "Response generated", detail: "Groq LLM · SMS shaping" },
+  { id: "market", label: "Market engine called", detail: "KAMIS price feed · arbitrage graph" },
+  { id: "compose", label: "Response generated", detail: "Groq LLM · 160-char shaping" },
   { id: "sms-out", label: "SMS delivered", detail: "DLR confirmed · session closed" },
 ];
 
@@ -121,10 +121,11 @@ function SimulatorPage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const t = COPY[lang];
 
-  const clearTimers = () => {
+  const reset = () => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
     setRec(null);
@@ -165,6 +166,7 @@ function SimulatorPage() {
       }, delay);
       timers.current.push(h);
     };
+
     // Show first 3 stages animating while the real request is in flight
     tick("sms-in", "running",   0);
     tick("sms-in", "completed", 300);
@@ -204,9 +206,7 @@ function SimulatorPage() {
         next[s.id] = next[s.id] === "completed" ? "completed" : "error";
       });
       setStageStates({ ...next });
-      const message = t.error + (err instanceof Error ? ` (${err.message})` : "");
-      setError(message);
-      setRec(null);
+      setError(t.error + (err instanceof Error ? ` (${err.message})` : ""));
       setRunning(false);
     }
   };

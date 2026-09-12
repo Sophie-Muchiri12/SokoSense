@@ -428,7 +428,7 @@ function MarketMapPage() {
               <KV k="Markets online" v={`${markets.length} / 7`} />
               <KV k="Spread" v={`KSh ${spread.toLocaleString()}`} />
               <KV k="Last update" v={lastUpdated ? lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"} />
-              <KV k="Source" v="KAMIS cache (SQLite)" />
+              <KV k="Source" v="KAMIS · kamis.kilimo.go.ke" />
             </div>
           </div>
         </aside>

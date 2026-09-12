@@ -24,6 +24,9 @@ build/
 .coverage
 htmlcov/
 
+# Cached backup datasets (downloaded at runtime, e.g. WFP food prices)
+data/cache/
+
 # Editor / OS
 .vscode/
 .idea/
