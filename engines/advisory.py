@@ -12,10 +12,15 @@ Pipeline:
 Usage:
     from engines.advisory import answer_farmer_question
     result = answer_farmer_question("What causes maize rust in Nakuru?")
+
+Terminal:
+    python engines/advisory.py "What causes maize rust in Nakuru?"
 """
 
 import re
+import json
 import logging
+import argparse
 from typing import Any
 
 from dotenv import load_dotenv
@@ -29,6 +34,39 @@ from models.common import unwrap_llm_json_answer
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_answer_text(raw: str) -> str:
+    """Unwrap JSON LLM output into plain farmer-facing text."""
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.strip("`").strip()
+        if text.lower().startswith("json"):
+            text = text[4:].strip()
+
+    candidates = [text]
+    if not text.startswith("{"):
+        candidates.append("{" + text)
+    if text.startswith('response"'):
+        candidates.insert(0, '{"' + text)
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(parsed, dict) and isinstance(parsed.get("response"), str):
+            return parsed["response"]
+
+    for pattern in (
+        r'"response"\s*:\s*"((?:[^"\\]|\\.)*)"',
+        r'response"\s*:\s*"((?:[^"\\]|\\.)*)"',
+    ):
+        match = re.search(pattern, text)
+        if match:
+            return bytes(match.group(1), "utf-8").decode("unicode_escape")
+
+    return text
 
 # ── keyword extraction (lightweight — no extra model call) ─────────────────
 
@@ -312,8 +350,10 @@ def answer_farmer_question(
         content=(
             f"Farmer's question: {query}\n\n"
             f"{context_block}\n\n"
-            f"Provide a helpful answer for this Kenyan farmer. "
-            f"Respond in JSON format: {{\"response\": \"your answer\", \"type\": \"advisory\"}}"
+            "Write a clear, easy-to-understand answer for this farmer. "
+            "Reply in Swahili if the question is in Swahili; otherwise use English. "
+            "Use simple words and numbered steps where helpful.\n"
+            'Respond in JSON only: {"response": "your plain-language answer here", "type": "advisory"}'
         )
     )
 
@@ -346,3 +386,76 @@ def answer_farmer_question(
         "market": market_data,
         "sources": sources,
     }
+
+
+def run_query(query: str, *, include_weather: bool = True) -> dict[str, Any]:
+    """Run advisory pipeline and print a readable terminal summary."""
+    print("=" * 60)
+    print(f"FARMER QUESTION: {query}")
+    print("=" * 60)
+
+    kw = _extract_keywords(query)
+    print("\nDetected keywords:")
+    print(f"  crop:     {kw['crop'] or '—'}")
+    print(f"  disease:  {kw['disease'] or '—'}")
+    print(f"  location: {kw['location'] or '—'}")
+
+    print("\nRunning advisory pipeline (Neo4j + Featherless LLM)…")
+    result = answer_farmer_question(query, include_weather=include_weather)
+
+    if result.get("sources"):
+        print("\nSources:")
+        for source in result["sources"]:
+            print(f"  • {source}")
+
+    weather = result.get("weather")
+    if weather and "current" in weather:
+        current = weather["current"]
+        print("\nWeather:")
+        print(f"  {current.get('condition', 'N/A')}, {current.get('temperature_c', 'N/A')}°C")
+
+    print("\nAdvisory answer:")
+    print(result.get("answer", "(no answer)"))
+    print("=" * 60 + "\n")
+    return result
+
+
+def main() -> None:
+    load_dotenv()
+
+    parser = argparse.ArgumentParser(
+        description="SokoSense advisory CLI — Neo4j RAG + weather + Featherless LLM",
+    )
+    parser.add_argument(
+        "query",
+        nargs="*",
+        help='Farmer question (e.g. "What causes maize rust in Nakuru?")',
+    )
+    parser.add_argument(
+        "--no-weather",
+        action="store_true",
+        help="Skip weather lookup even if a location is detected",
+    )
+    args = parser.parse_args()
+
+    if args.query:
+        run_query(" ".join(args.query), include_weather=not args.no_weather)
+        return
+
+    print("SokoSense Advisory CLI")
+    print("Ask a crop, pest, or farming question. Type 'exit' or 'quit' to close.\n")
+    while True:
+        try:
+            query = input("Ask SokoSense> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nExiting...")
+            break
+        if not query:
+            continue
+        if query.lower() in {"exit", "quit"}:
+            break
+        run_query(query, include_weather=not args.no_weather)
+
+
+if __name__ == "__main__":
+    main()

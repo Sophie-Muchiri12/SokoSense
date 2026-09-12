@@ -10,7 +10,7 @@ export const Route = createFileRoute("/timing")({
       {
         name: "description",
         content:
-          "Should you sell today or wait? KAMIS price trends power the timing engine.",
+          "Should you sell today or wait? Cached market price trends power the timing engine.",
       },
     ],
   }),
@@ -66,7 +66,7 @@ function TimingPage() {
         eyebrow="Sell timing"
         title="Sell today"
         italic="or wait?"
-        sub="The timing engine reads KAMIS price signals and returns a SELL_TODAY or WAIT verdict — the same logic behind SMS replies like TIMING MAIZE NAKURU."
+        sub="The timing engine reads cached market price signals and returns a SELL_TODAY or WAIT verdict — the same logic behind SMS replies like TIMING MAIZE NAKURU."
       />
 
       <div className="mt-10 grid lg:grid-cols-2 gap-6">
@@ -137,6 +137,32 @@ function TimingPage() {
               </span>
               <p className="mt-5 font-serif text-[22px] text-ink leading-snug">{result.short_reply}</p>
               <p className="mt-4 text-[13px] text-steel leading-relaxed">{result.reason}</p>
+              {(result.price_kes != null || result.kamis_date) && (
+                <div className="mt-4 rounded-xl border border-hairline bg-canvas px-4 py-3 text-[12px] text-steel space-y-1">
+                  {result.price_kes != null && (
+                    <p>
+                      Cached wholesale:{" "}
+                      <span className="text-ink font-medium tabular">
+                        KSh {result.price_kes.toLocaleString()}/90kg bag
+                      </span>
+                    </p>
+                  )}
+                  {result.trend && (
+                    <p>
+                      Trend:{" "}
+                      <span className="text-ink font-medium uppercase">{result.trend}</span>
+                    </p>
+                  )}
+                  {result.kamis_date && (
+                    <p>
+                      Report date: <span className="text-ink">{result.kamis_date}</span>
+                    </p>
+                  )}
+                  {result.data_source && (
+                    <p className="text-mist">Source: {result.data_source}</p>
+                  )}
+                </div>
+              )}
               {result.wait_days != null && result.wait_days > 0 && (
                 <p className="mt-3 text-[12px] text-mist tabular">
                   Suggested wait: {result.wait_days} days

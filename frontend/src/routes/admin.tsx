@@ -37,7 +37,7 @@ const ENGINES = [
   {
     id: "market",
     name: "Market engine",
-    desc: "KAMIS price feed · arbitrage",
+    desc: "SQLite market cache · arbitrage",
     p50: null,
     p95: null,
     rps: null,

@@ -2,8 +2,8 @@
 SokoSense — Live Price Pipeline
 Lucy Kamau · Data Layer Owner
 
-Wraps Job's KAMIS scraper to aggregate live prices by county.
-Called by engines/market.py and engines/timing.py via get_live_prices().
+Reads KAMIS prices from the local SQLite cache populated by
+`data/refresh_market_db.py` (GitHub Actions every 3 hours).
 
 Usage:
     from data.price_pipeline import get_live_prices, get_best_market
@@ -11,18 +11,12 @@ Usage:
     # {"nakuru": 3600, "nairobi": 3200, ...}
 """
 
-import io
-import json
 import logging
 import os
 import urllib3
 from time import time
 
-import pandas as pd
-import requests
-
 logger = logging.getLogger(__name__)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ---------------------------------------------------------------------------
 # MARKET → COUNTY MAPPING
@@ -40,8 +34,6 @@ MARKET_TO_COUNTY = {
 }
 
 COUNTY_TO_MARKET = {v: k for k, v in MARKET_TO_COUNTY.items()}
-
-KAMIS_URL = "https://kamis.kilimo.go.ke/site/market"
 
 # ---------------------------------------------------------------------------
 # PRICE CACHE (12-hour TTL)
@@ -68,7 +60,7 @@ def _cache_set(key: str, val: dict) -> None:
 # ---------------------------------------------------------------------------
 
 def _parse_price(val) -> float | None:
-    """Convert KAMIS price string to KSh per 90kg bag."""
+    """Convert KAMIS wholesale price string to KSh per 90kg bag."""
     if not val or str(val).strip() in ("-", "", "nan"):
         return None
     try:
@@ -84,22 +76,135 @@ def _parse_price(val) -> float | None:
     return None
 
 
+def _parse_kamis_date(val) -> datetime | None:
+    if not val or str(val).strip() in ("-", "", "nan"):
+        return None
+    try:
+        return datetime.strptime(str(val).strip()[:10], "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+def _median(values: list[float]) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def _resolve_tracked_county(market: str, county: str) -> str | None:
+    """Map a KAMIS market/county label to one of our tracked counties."""
+    haystack = f"{market} {county}".lower()
+    for market_key, county_name in MARKET_TO_COUNTY.items():
+        if market_key in haystack or county_name.lower() in haystack:
+            return county_name
+    return None
+
+
+def _row_price(row: dict) -> float | None:
+    return _parse_price(row.get("Wholesale")) or _parse_price(row.get("Retail"))
+
+
+def _latest_wholesale_by_county(rows: list[dict]) -> dict[str, dict]:
+    """Latest KAMIS price per tracked county (median across markets)."""
+    by_county: dict[str, list[dict]] = {}
+    for row in rows:
+        county = _resolve_tracked_county(
+            str(row.get("Market", "")),
+            str(row.get("County", "")),
+        )
+        if not county:
+            continue
+        price = _row_price(row)
+        dt = _parse_kamis_date(row.get("Date"))
+        if price is None or dt is None:
+            continue
+        by_county.setdefault(county, []).append(
+            {"price": price, "date": dt, "market": row.get("Market", "")}
+        )
+
+    result: dict[str, dict] = {}
+    for county, items in by_county.items():
+        latest_dt = max(i["date"] for i in items)
+        latest_prices = [i["price"] for i in items if i["date"] == latest_dt]
+        median_price = _median(latest_prices)
+        if median_price is None:
+            continue
+        result[county] = {
+            "price": round(median_price, 0),
+            "date": latest_dt.strftime("%Y-%m-%d"),
+            "markets": len(latest_prices),
+        }
+    return result
+
+
+def _county_wholesale_on_date(
+    rows: list[dict], county: str, target: datetime
+) -> float | None:
+    """Median wholesale price for a county on a specific KAMIS report date."""
+    prices: list[float] = []
+    target_day = target.date()
+    for row in rows:
+        if str(row.get("County", "")).strip() != county and _resolve_tracked_county(
+            str(row.get("Market", "")),
+            str(row.get("County", "")),
+        ) != county:
+            continue
+        dt = _parse_kamis_date(row.get("Date"))
+        if dt is None or dt.date() != target_day:
+            continue
+        price = _row_price(row)
+        if price is not None:
+            prices.append(price)
+    median = _median(prices)
+    return round(median, 0) if median is not None else None
+
+
+def _historical_price_for_county(
+    rows: list[dict], county: str, latest_dt: datetime, lookback_days: int = 14
+) -> tuple[float | None, str | None]:
+    """Find wholesale price closest to lookback_days before latest_dt."""
+    target = latest_dt - timedelta(days=lookback_days)
+    candidates: dict[datetime, list[float]] = {}
+    for row in rows:
+        if _resolve_tracked_county(
+            str(row.get("Market", "")),
+            str(row.get("County", "")),
+        ) != county:
+            continue
+        dt = _parse_kamis_date(row.get("Date"))
+        if dt is None or dt > latest_dt:
+            continue
+        price = _row_price(row)
+        if price is None:
+            continue
+        candidates.setdefault(dt, []).append(price)
+
+    if not candidates:
+        return None, None
+
+    best_dt = min(candidates, key=lambda d: abs((d - target).days))
+    # Only use if within 10 days of target window
+    if abs((best_dt - target).days) > 10:
+        return None, None
+
+    median = _median(candidates[best_dt])
+    if median is None:
+        return None, None
+    return round(median, 0), best_dt.strftime("%Y-%m-%d")
+
+
 # ---------------------------------------------------------------------------
-# DIRECT KAMIS FETCH (bypasses tool's 10-row cap)
+# LOCAL SQLITE FETCH
 # ---------------------------------------------------------------------------
 
 def _fetch_kamis(crop: str) -> list[dict]:
-    """
-    Fetch all available KAMIS rows for a crop directly.
-    Requests per_page=500 to capture all counties.
-    Returns list of raw row dicts.
-    """
+    """Read stored KAMIS rows for a crop from SQLite."""
     try:
-        from engines.kamis_tool import resolve_crop_ids
-        product_ids = resolve_crop_ids(crop.strip().lower())
-    except Exception as e:
-        logger.error("Could not resolve crop IDs for %s: %s", crop, e)
-        return []
+        from data.market_db import init_db, query_crop_history
 
     dfs = []
     if product_ids:
@@ -141,15 +246,6 @@ def _fetch_kamis(crop: str) -> list[dict]:
         if rows:
             logger.info("KAMIS data recovered via Tavily fallback for %s", crop)
         return rows
-
-    df = pd.concat(dfs, ignore_index=True)
-    df.columns = [c.strip() for c in df.columns]
-    df = df.drop_duplicates()
-
-    # Filter to this crop
-    df = df[df["Commodity"].str.contains(crop, case=False, na=False)]
-
-    return df.to_dict(orient="records")
 
 
 def _fetch_kamis_via_tavily(crop: str) -> list[dict]:
@@ -213,7 +309,7 @@ def _fetch_kamis_via_tavily(crop: str) -> list[dict]:
 
 def get_live_prices(crop: str) -> dict[str, float]:
     """
-    Fetch live prices for a crop from KAMIS, aggregated by our market names.
+    Fetch prices for a crop from the local SQLite cache, aggregated by market.
 
     Returns:
         dict mapping market name (lowercase) → price in KSh per 90kg bag
@@ -221,7 +317,7 @@ def get_live_prices(crop: str) -> dict[str, float]:
 
     Falls back to empty dict on any error — callers use mock fallback.
     """
-    cache_key = f"prices:{crop.lower()}"
+    cache_key = f"prices:v2:{crop.lower()}"
     cached = _cache_get(cache_key)
     if cached is not None:
         logger.info("Cache hit for %s", crop)
@@ -233,24 +329,15 @@ def get_live_prices(crop: str) -> dict[str, float]:
         logger.warning("No KAMIS rows returned for %s", crop)
         return {}
 
-    # Aggregate: average wholesale price per county
-    county_prices: dict[str, list[float]] = {}
-    for row in rows:
-        county = str(row.get("County", "")).strip()
-        if county not in COUNTY_TO_MARKET:
-            continue
-        price = _parse_price(row.get("Wholesale")) or _parse_price(row.get("Retail"))
-        if price:
-            county_prices.setdefault(county, []).append(price)
-
+    latest = _latest_wholesale_by_county(rows)
     result: dict[str, float] = {}
-    for county, prices in county_prices.items():
+    for county, info in latest.items():
         market = COUNTY_TO_MARKET[county]
-        result[market] = round(sum(prices) / len(prices), 0)
+        result[market] = info["price"]
 
     if result:
         _cache_set(cache_key, result)
-        logger.info("Live prices for %s: %s", crop, result)
+        logger.info("Live DB prices for %s: %s", crop, result)
     else:
         logger.warning("No matching counties in KAMIS data for %s", crop)
 
@@ -298,44 +385,85 @@ def get_best_market(crop: str, current_market: str) -> dict:
 
 def get_trend(crop: str, market: str) -> dict:
     """
-    Returns price trend signal for a crop at a market.
-    Derived from cross-market variance as a proxy for trend direction.
+    Returns price trend for a crop at a market from KAMIS historical wholesale data.
+
+    Compares the latest KAMIS wholesale price to the price ~14 days earlier.
 
     Returns:
         {
             "crop": str,
             "market": str,
             "price_kes": float | None,
-            "trend": "up" | "down" | "flat",
+            "kamis_date": str | None,
+            "compare_date": str | None,
+            "compare_price_kes": float | None,
+            "trend": "rising" | "falling" | "stable",
+            "pct_change": float | None,
             "wait_days": int,
+            "national_avg_kes": float | None,
+            "data_source": str,
         }
     """
-    prices = get_live_prices(crop)
     market = market.lower().strip()
-    price  = prices.get(market)
+    county = MARKET_TO_COUNTY.get(market)
+    empty = {
+        "crop": crop,
+        "market": market,
+        "price_kes": None,
+        "kamis_date": None,
+        "compare_date": None,
+        "compare_price_kes": None,
+        "trend": "stable",
+        "pct_change": None,
+        "wait_days": 0,
+        "national_avg_kes": None,
+        "data_source": "KAMIS cache (SQLite)",
+    }
 
-    if not prices or price is None:
-        return {
-            "crop": crop, "market": market,
-            "price_kes": None, "trend": "flat", "wait_days": 0,
-        }
+    if not county:
+        return empty
 
-    avg  = sum(prices.values()) / len(prices)
-    diff = price - avg
+    rows = _fetch_kamis(crop)
+    if not rows:
+        return empty
 
-    # Below average → price likely to rise → worth waiting
-    # Above average → already at peak → sell now
-    if diff < -avg * 0.05:
-        trend, wait = "up", 3
-    elif diff > avg * 0.05:
-        trend, wait = "flat", 0
-    else:
-        trend, wait = "flat", 1
+    latest_by_county = _latest_wholesale_by_county(rows)
+    county_info = latest_by_county.get(county)
+    if not county_info:
+        return empty
+
+    latest_price = county_info["price"]
+    kamis_date = county_info["date"]
+    latest_dt = datetime.strptime(kamis_date, "%Y-%m-%d")
+
+    past_price, compare_date = _historical_price_for_county(rows, county, latest_dt)
+
+    trend = "stable"
+    pct_change = None
+    wait_days = 0
+
+    if past_price and past_price > 0:
+        pct_change = round((latest_price - past_price) / past_price * 100, 1)
+        if pct_change >= 3:
+            trend, wait_days = "rising", 7
+        elif pct_change <= -3:
+            trend, wait_days = "falling", 0
+        else:
+            trend, wait_days = "stable", 3
+
+    all_prices = [info["price"] for info in latest_by_county.values()]
+    national_avg = round(sum(all_prices) / len(all_prices), 0) if all_prices else None
 
     return {
-        "crop":      crop,
-        "market":    market,
-        "price_kes": price,
-        "trend":     trend,
-        "wait_days": wait,
+        "crop": crop,
+        "market": market,
+        "price_kes": latest_price,
+        "kamis_date": kamis_date,
+        "compare_date": compare_date,
+        "compare_price_kes": past_price,
+        "trend": trend,
+        "pct_change": pct_change,
+        "wait_days": wait_days,
+        "national_avg_kes": national_avg,
+        "data_source": "KAMIS cache (SQLite)",
     }

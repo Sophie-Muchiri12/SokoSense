@@ -2,8 +2,6 @@ import os
 import io
 import logging
 import urllib3
-import requests
-import pandas as pd
 from typing import Optional
 from langchain_core.tools import tool
 from tavily import TavilyClient
@@ -341,7 +339,7 @@ def scrape_kamis_prices(
     limit: int = 10
 ) -> str:
     """
-    Directly queries the KAMIS market price website and returns the 10 most recent price entries.
+    Queries the local KAMIS SQLite cache and returns the most recent price entries.
     IMPORTANT: Always use the default limit of 10. Do NOT pass a higher limit value.
     
     Args:
@@ -350,8 +348,7 @@ def scrape_kamis_prices(
         county_name: Optional name of the county to filter by (e.g. 'Meru', 'Kakamega', 'Nairobi'). Case-insensitive.
         limit: Number of records to return. Maximum is 10. Do NOT change this value.
     """
-    url = "https://kamis.kilimo.go.ke/site/market"
-    limit = min(limit, 10)  # Hard cap — never return more than 10 rows
+    limit = min(limit, 10)
 
     clean_crop_name = crop_name.strip() if crop_name else None
     clean_market_name = market_name.strip() if market_name else None
@@ -510,11 +507,7 @@ def scrape_kamis_prices(
 
         msg = "No price data found matching your query."
         if crop_name:
-            msg += f" Crop: '{crop_name}' (Resolved IDs: {product_ids})."
-        if market_name:
-            msg += f" Market: '{market_name}'."
-        if county_name:
-            msg += f" County: '{county_name}'."
+            msg += f" Crop: '{crop_name}'."
         return msg
 
     # Sort newest first
