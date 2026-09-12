@@ -104,6 +104,10 @@ export interface TimingResponse {
   short_reply: string;
   wait_days?: number | null;
   reason: string;
+  price_kes?: number | null;
+  trend?: "rising" | "falling" | "stable" | null;
+  kamis_date?: string | null;
+  data_source?: string;
 }
 
 export interface AdvisoryRequest {
@@ -164,7 +168,7 @@ export async function postAgent(message: string): Promise<AgentResponse> {
   });
 }
 
-/** Fetch live wholesale prices for a given crop (KAMIS-backed). */
+/** Fetch cached wholesale prices for a given crop (SQLite-backed). */
 export async function getMarketPrices(
   crop: string,
 ): Promise<MarketMapResponse> {

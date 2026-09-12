@@ -6,7 +6,9 @@ Parses incoming SMS text, routes to the correct engine, returns SMS-ready reply.
 Matches contract.json: POST /webhook/sms
 """
 
+import os
 import re
+import africastalking
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import PlainTextResponse
 
@@ -14,6 +16,19 @@ from engines import market, timing, loaning
 from models.market import MarketDecisionRequest
 from models.timing import TimingRequest
 from models.loan import LoanRequest
+from models.common import truncate_ussd, truncate_sms
+
+# --- Africa's Talking SMS client (for sending replies to inbound SMS) ---
+AT_USERNAME = os.getenv("AT_USERNAME")
+AT_API_KEY = os.getenv("AT_API_KEY")
+
+sms_client = None
+if AT_USERNAME and AT_API_KEY:
+    try:
+        africastalking.initialize(AT_USERNAME, AT_API_KEY)
+        sms_client = africastalking.SMS
+    except Exception as e:
+        print(f"[AT] Failed to initialize Africa's Talking SDK: {e}")
 from masumi_hook import charge_query
 from routes.ussd_i18n import (
     CROP_SW,
@@ -134,7 +149,17 @@ async def sms_webhook(request: Request):
     text   = form.get("text", "").strip()
     sender = form.get("from", "unknown")
 
-    reply = route_sms(text)
+    reply = truncate_sms(route_sms(text))
+
+    if sms_client and sender != "unknown":
+        try:
+            at_response = sms_client.send(reply, [sender])
+            print(f"[AT] SMS sent to {sender}: {at_response}")
+        except Exception as e:
+            print(f"[AT] Failed to send SMS reply to {sender}: {e}")
+    else:
+        print(f"[AT] SMS client not configured — reply NOT sent to {sender}: {reply}")
+
     return {"short_reply": reply}
 
 
@@ -190,7 +215,7 @@ async def ussd_handler(
             )
             result = market.decide_market(req)
             reply = market_reply_sw(result) if is_sw else result.short_reply
-            return f"END {reply}"
+            return f"END {truncate_ussd(reply)}"
 
     # Option 2: When to Sell / Wakati wa Kuuza
     if service == "2":
@@ -205,7 +230,7 @@ async def ussd_handler(
             )
             result = timing.decide_timing(req)
             reply = timing_reply_sw(result) if is_sw else result.short_reply
-            return f"END {reply}"
+            return f"END {truncate_ussd(reply)}"
 
     # Option 3: Loan Check / Mkopo
     if service == "3":
@@ -226,7 +251,16 @@ async def ussd_handler(
         if depth == 3:
             result = loaning.decide_loan_by_amount_band(parts[2])
             reply = loan_reply_sw(result) if is_sw else result.short_reply
-            return f"END {reply}"
+
+            if sms_client:
+                try:
+                    sms_text = loaning.build_loan_sms_followup(parts[2])
+                    sms_client.send(sms_text, [phoneNumber])
+                    print(f"[AT] USSD loan follow-up SMS sent to {phoneNumber}")
+                except Exception as e:
+                    print(f"[AT] Failed to send USSD loan follow-up SMS to {phoneNumber}: {e}")
+
+            return f"END {truncate_ussd(reply)}"
 
     if is_sw:
         return "END Ingizo batili. Tuma HELP kwa maagizo."

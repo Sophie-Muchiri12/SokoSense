@@ -1,4 +1,5 @@
 SMS_MAX_CHARS = 320
+USSD_MAX_CHARS = 182
 
 
 def truncate_sms(value: str) -> str:

@@ -39,7 +39,7 @@ def scrape_kamis_prices(
     county_name: str | None = None,
     limit: int = 10,
 ) -> str:
-    """Directly queries the KAMIS market price website and returns price data.
+    """Queries the local KAMIS SQLite cache and returns price data.
 
     Use this to find the latest crop prices from Kenyan markets.
 
@@ -71,24 +71,6 @@ def scrape_kamis_prices(
             {"tool": "scrape_kamis_prices", "data": [{"message": raw}], "status": "ok"},
             default=str,
         )
-
-
-@tool
-def search_kamis_via_tavily(query: str) -> str:
-    """Searches the KAMIS website using Tavily Search API.
-
-    Use when direct scraping doesn't find results.
-
-    Args:
-        query: Search query (e.g. 'Tomatoes price in Meru county').
-    """
-    from engines.kamis_tool import search_kamis_via_tavily as _tavily_impl
-
-    raw = _tavily_impl.invoke({"query": query})
-    return json.dumps(
-        {"tool": "search_kamis_via_tavily", "data": [{"message": raw}], "status": "ok"},
-        default=str,
-    )
 
 
 @tool
@@ -233,13 +215,35 @@ def advise_on_best_market(crop: str, location: str) -> str:
         )
 
 
+@tool("json")
+def format_sms_json(response: str, type: str = "general") -> str:
+    """Submit the final farmer-facing SMS reply as structured JSON.
+
+    Call this once you have gathered all needed data and are ready to reply.
+    Do not call any other tools after this.
+
+    Args:
+        response: Plain-language answer for the farmer (under 320 chars when possible).
+        type: One of advisory, market, weather, loan, or general.
+    """
+    if type not in {"advisory", "market", "weather", "loan", "general"}:
+        type = "general"
+    return json.dumps({"response": response, "type": type})
+
+
+# Terminal tool is bound to the LLM but not executed by ToolNode (see graph.py).
+TERMINAL_TOOL_NAMES = {"json"}
+
 # List of all tools for binding to the LLM
 TOOLS = [
     scrape_kamis_prices,
-    search_kamis_via_tavily,
     advise_on_loan,
     get_farmer_weather,
     answer_farmer_question,
     advise_on_sell_timing,
     advise_on_best_market,
+    format_sms_json,
 ]
+
+# Tools that perform real work and are executed by the ToolNode
+EXECUTABLE_TOOLS = [t for t in TOOLS if t.name not in TERMINAL_TOOL_NAMES]

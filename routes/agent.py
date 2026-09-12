@@ -50,7 +50,7 @@ def post_agent(body: AgentRequest) -> AgentResponse:
     """Send a message to the SokoSense agent.
 
     The agent has tools for:
-    - Crop price lookups via KAMIS
+    - Crop price lookups via cached KAMIS SQLite data
     - Agricultural advisory via Neo4j RAG + weather
     - Loan assessment
     - Weather forecasts
@@ -63,10 +63,8 @@ def post_agent(body: AgentRequest) -> AgentResponse:
             "messages": [HumanMessage(content=body.message)],
         })
 
-        # Extract the final AI response. The agent is prompted to emit JSON for
-        # SMS gateways, but this HTTP route should return plain text to clients.
-        final_message = result["messages"][-1]
-        response_text = final_message.content if hasattr(final_message, "content") else str(final_message)
+        parsed_terminal = _parse_terminal_json_tool_call(result)
+        kamis_reply = _format_kamis_tool_reply(result, body.message)
 
         parsed_response = _parse_agent_response(response_text)
         if parsed_response:
@@ -78,6 +76,21 @@ def post_agent(body: AgentRequest) -> AgentResponse:
         if kamis_reply:
             response_text = kamis_reply
             resp_type = "market"
+        else:
+            # Extract the final AI response. The agent may emit JSON for SMS
+            # gateways, but this HTTP route returns plain text to clients.
+            final_message = result["messages"][-1]
+            response_text = (
+                final_message.content
+                if hasattr(final_message, "content")
+                else str(final_message)
+            )
+
+            parsed_response = _parse_agent_response(response_text)
+            if parsed_response:
+                response_text, resp_type = parsed_response
+            else:
+                resp_type = _detect_type(body.message, response_text)
 
         return AgentResponse(
             response=response_text,
@@ -120,6 +133,69 @@ def _detect_type(user_message: str, response: str) -> str:
     return "general"
 
 
+def _parse_terminal_json_tool_call(result: dict[str, Any]) -> tuple[str, str] | None:
+    """Extract the farmer reply from a terminal `json` tool call."""
+    for message in reversed(result.get("messages", [])):
+        tool_calls = getattr(message, "tool_calls", None)
+        if not tool_calls:
+            continue
+
+        for tool_call in tool_calls:
+            if tool_call.get("name") != "json":
+                continue
+
+            args = tool_call.get("args", {})
+            if not isinstance(args, dict):
+                continue
+
+            reply = args.get("response")
+            if not isinstance(reply, str) or not reply.strip():
+                continue
+
+            resp_type = args.get("type", "general")
+            if resp_type not in {"advisory", "market", "weather", "loan", "general"}:
+                resp_type = "general"
+            return reply, resp_type
+
+    return None
+
+
+def _recover_from_failed_json_tool(exc: Exception) -> tuple[str, str] | None:
+    """Recover a reply when Groq rejected an unregistered `json` tool call."""
+    payload: Any = getattr(exc, "body", None)
+    if not isinstance(payload, dict):
+        return None
+
+    error = payload.get("error", {})
+    if not isinstance(error, dict):
+        return None
+
+    failed_generation = error.get("failed_generation")
+    if not isinstance(failed_generation, str):
+        return None
+
+    try:
+        parsed = json.loads(failed_generation)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+    if not isinstance(parsed, dict) or parsed.get("name") != "json":
+        return None
+
+    args = parsed.get("arguments", parsed.get("args", {}))
+    if not isinstance(args, dict):
+        return None
+
+    reply = args.get("response")
+    if not isinstance(reply, str) or not reply.strip():
+        return None
+
+    resp_type = args.get("type", "general")
+    if resp_type not in {"advisory", "market", "weather", "loan", "general"}:
+        resp_type = "general"
+    return reply, resp_type
+
+
 def _parse_agent_response(response: str) -> tuple[str, str] | None:
     """Unwrap the agent's final JSON response into API fields."""
     text = response.strip()
@@ -156,11 +232,11 @@ def _format_kamis_tool_reply(result: dict[str, Any], user_message: str = "") -> 
     """
     payload = _latest_kamis_payload(result)
     if not payload:
-        return None
+        return _format_kamis_no_data_reply(result, user_message)
 
     rows = payload.get("data")
     if not isinstance(rows, list) or not rows:
-        return None
+        return _format_kamis_no_data_reply(result, user_message)
 
     first = rows[0]
     if not isinstance(first, dict):
@@ -245,11 +321,52 @@ def _format_kamis_rows_deterministic(rows: list[dict[str, Any]]) -> str:
     return body
 
 
-def _latest_kamis_payload(result: dict[str, Any]) -> dict[str, Any] | None:
-    """Find the most recent scrape_kamis_prices ToolMessage payload."""
-    for message in reversed(result.get("messages", [])):
-        name = getattr(message, "name", None)
-        if name != "scrape_kamis_prices":
+def _format_kamis_no_data_reply(result: dict[str, Any], user_message: str) -> str | None:
+    """Return a clear no-data message when a location-specific lookup failed."""
+    for args, payload in reversed(list(_iter_kamis_tool_results(result))):
+        if not _location_requested(args):
+            continue
+        if _has_price_rows(payload):
+            continue
+
+        rows = payload.get("data")
+        if isinstance(rows, list) and rows:
+            first = rows[0]
+            if isinstance(first, dict):
+                message = first.get("message")
+                if isinstance(message, str) and message.strip():
+                    return truncate_sms(message)
+
+        location = args.get("county_name") or args.get("market_name") or "that area"
+        crop = args.get("crop_name") or "that crop"
+        return truncate_sms(
+            f"No cached price data for {crop} in {location}. "
+            "Try again later or check a nearby major market."
+        )
+
+    if _user_requested_location(user_message):
+        return truncate_sms(
+            "No cached price data for that crop in the requested area. "
+            "Try again later or check a nearby major market."
+        )
+
+    return None
+
+
+def _iter_kamis_tool_results(result: dict[str, Any]):
+    """Yield (call_args, payload) for each scrape_kamis_prices invocation."""
+    pending_calls: dict[str, dict[str, Any]] = {}
+
+    for message in result.get("messages", []):
+        tool_calls = getattr(message, "tool_calls", None) or []
+        for tool_call in tool_calls:
+            if tool_call.get("name") != "scrape_kamis_prices":
+                continue
+            call_id = tool_call.get("id")
+            if call_id:
+                pending_calls[call_id] = tool_call.get("args") or {}
+
+        if getattr(message, "name", None) != "scrape_kamis_prices":
             continue
 
         content = getattr(message, "content", None)
@@ -261,10 +378,74 @@ def _latest_kamis_payload(result: dict[str, Any]) -> dict[str, Any] | None:
         except (json.JSONDecodeError, TypeError):
             continue
 
-        if isinstance(parsed, dict) and parsed.get("tool") == "scrape_kamis_prices":
-            return parsed
+        if not isinstance(parsed, dict) or parsed.get("tool") != "scrape_kamis_prices":
+            continue
 
-    return None
+        tool_call_id = getattr(message, "tool_call_id", None)
+        args = pending_calls.get(tool_call_id, {}) if tool_call_id else {}
+        yield args, parsed
+
+
+def _has_price_rows(payload: dict[str, Any]) -> bool:
+    rows = payload.get("data")
+    if not isinstance(rows, list) or not rows:
+        return False
+
+    first = rows[0]
+    if not isinstance(first, dict):
+        return False
+    if first.get("message"):
+        return False
+
+    return bool(first.get("Commodity") or first.get("Market"))
+
+
+def _location_requested(args: dict[str, Any]) -> bool:
+    return bool(args.get("county_name") or args.get("market_name"))
+
+
+def _user_requested_location(user_message: str) -> bool:
+    msg = user_message.lower()
+    location_hints = (
+        " in ", " at ", " kwa ", " meru", " nakuru", " nairobi", " kisumu",
+        " mombasa", " eldoret", " kakamega", " machakos", " nyeri", " kiambu",
+    )
+    return any(hint in msg for hint in location_hints)
+
+
+def _row_matches_location(row: dict[str, Any], location: str) -> bool:
+    needle = location.lower().strip()
+    if not needle:
+        return True
+
+    county = str(row.get("County") or "").lower()
+    market = str(row.get("Market") or "").lower()
+    return needle in county or needle in market or county in needle or market in needle
+
+
+def _best_kamis_payload(
+    result: dict[str, Any],
+    user_message: str = "",
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Pick KAMIS data that matches the farmer's requested location."""
+    candidates = list(_iter_kamis_tool_results(result))
+    location_filter_used = any(_location_requested(args) for args, _ in candidates)
+    user_wants_location = _user_requested_location(user_message)
+
+    for args, payload in reversed(candidates):
+        if not _location_requested(args):
+            continue
+        if _has_price_rows(payload):
+            return payload, args
+
+    if location_filter_used or user_wants_location:
+        return None, {}
+
+    for args, payload in reversed(candidates):
+        if _has_price_rows(payload):
+            return payload, args
+
+    return None, {}
 
 
 def _build_raw(result: dict[str, Any]) -> dict[str, Any]:

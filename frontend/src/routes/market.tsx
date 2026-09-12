@@ -29,7 +29,7 @@ export const Route = createFileRoute("/market")({
       { property: "og:title", content: "Market Intelligence Map — SokoSense" },
       {
         property: "og:description",
-        content: "Live crop prices and arbitrage intelligence across Kenyan markets.",
+        content: "Cached crop prices and arbitrage intelligence across Kenyan markets.",
       },
     ],
   }),
@@ -148,7 +148,7 @@ function MarketMapPage() {
     <div className="mx-auto max-w-[1320px] min-w-0 px-4 sm:px-6 pt-10 sm:pt-14 pb-10 sm:pb-12">
       <PageHeader
         eyebrow="Market intelligence"
-        title="Where prices live."
+        title="Where prices are synced."
         italic="Where to move next."
         sub="Live wholesale pricing across Kenya's primary markets. Select your county and subcounty — SokoSense maps you to the nearest wholesale market and estimates whether travel pays."
       />
