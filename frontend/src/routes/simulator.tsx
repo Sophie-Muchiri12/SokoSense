@@ -28,8 +28,8 @@ type Stage = { id: string; label: string; detail: string };
 const STAGES: Stage[] = [
   { id: "sms-in", label: "SMS received", detail: "Telco gateway · Safaricom 21455" },
   { id: "agent", label: "Agent invoked", detail: "LangGraph · tool-calling loop" },
-  { id: "market", label: "Market engine called", detail: "SQLite market cache · decision engine" },
-  { id: "compose", label: "Response generated", detail: "Groq LLM · SMS shaping" },
+  { id: "market", label: "Market engine called", detail: "KAMIS price feed · arbitrage graph" },
+  { id: "compose", label: "Response generated", detail: "Groq LLM · 160-char shaping" },
   { id: "sms-out", label: "SMS delivered", detail: "DLR confirmed · session closed" },
 ];
 
@@ -121,10 +121,11 @@ function SimulatorPage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const t = COPY[lang];
 
-  const clearTimers = () => {
+  const reset = () => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
     setRec(null);
@@ -165,6 +166,7 @@ function SimulatorPage() {
       }, delay);
       timers.current.push(h);
     };
+
     // Show first 3 stages animating while the real request is in flight
     tick("sms-in", "running",   0);
     tick("sms-in", "completed", 300);
@@ -204,9 +206,7 @@ function SimulatorPage() {
         next[s.id] = next[s.id] === "completed" ? "completed" : "error";
       });
       setStageStates({ ...next });
-      const message = t.error + (err instanceof Error ? ` (${err.message})` : "");
-      setError(message);
-      setRec(null);
+      setError(t.error + (err instanceof Error ? ` (${err.message})` : ""));
       setRunning(false);
     }
   };
@@ -221,7 +221,7 @@ function SimulatorPage() {
   const typeColors = rec ? TYPE_COLORS[rec.type] : TYPE_COLORS.general;
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
+    <div className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
       {/* Header */}
       <header className="max-w-3xl">
         <p className="eyebrow">{t.eyebrow}</p>
@@ -236,7 +236,7 @@ function SimulatorPage() {
       {/* Two-column workspace */}
       <div className="mt-12 grid lg:grid-cols-2 gap-6">
         {/* LEFT — Input */}
-        <section className="card-surface p-7 flex flex-col">
+        <section className="card-surface p-5 sm:p-7 flex flex-col">
           <div className="flex items-start justify-between">
             <div>
               <p className="eyebrow">{t.inputCardTitle}</p>
@@ -298,7 +298,7 @@ function SimulatorPage() {
         </section>
 
         {/* RIGHT — Agent response */}
-        <section className="card-surface p-7 flex flex-col">
+        <section className="card-surface p-5 sm:p-7 flex flex-col">
           <div className="flex items-start justify-between">
             <div>
               <p className="eyebrow">{t.aiTitle}</p>
@@ -378,7 +378,7 @@ function SimulatorPage() {
       </div>
 
       {/* Live Pipeline */}
-      <section className="mt-6 card-surface p-7">
+      <section className="mt-6 card-surface p-5 sm:p-7">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <p className="eyebrow">{t.pipelineTitle}</p>

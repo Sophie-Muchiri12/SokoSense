@@ -61,7 +61,7 @@ function TimingPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1240px] px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
+    <div className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
       <PageHeader
         eyebrow="Sell timing"
         title="Sell today"
@@ -70,7 +70,7 @@ function TimingPage() {
       />
 
       <div className="mt-10 grid lg:grid-cols-2 gap-6">
-        <section className="card-surface p-7">
+        <section className="card-surface p-5 sm:p-7">
           <p className="eyebrow">Parameters</p>
           <div className="mt-6 space-y-5">
             <Field label="Crop">
@@ -96,7 +96,7 @@ function TimingPage() {
               </select>
             </Field>
           </div>
-          <div className="mt-8 flex gap-3">
+          <div className="mt-8 flex flex-col sm:flex-row flex-wrap gap-3">
             <button
               onClick={run}
               disabled={loading}
@@ -114,7 +114,7 @@ function TimingPage() {
           </div>
         </section>
 
-        <section className="card-surface p-7">
+        <section className="card-surface p-5 sm:p-7">
           <p className="eyebrow">Recommendation</p>
           {error && (
             <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700">
