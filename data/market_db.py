@@ -110,20 +110,17 @@ def insert_market_rows(rows: list[dict[str, Any]]) -> int:
 def query_crop_history(
     crop_name: str,
     max_rows: int = 1000,
+    *,
+    prefer_counties: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Return recent stored rows for a crop (used by trend/aggregation engines)."""
-    with _connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT commodity, market, county, wholesale_raw, retail_raw,
-                   wholesale_kes_90kg, retail_kes_90kg, date_reported, fetched_at
-            FROM market_prices
-            WHERE LOWER(commodity) LIKE ?
-            ORDER BY date_reported DESC, fetched_at DESC
-            LIMIT ?
-            """,
-            (f"%{crop_name.lower().strip()}%", max_rows),
-        ).fetchall()
+    """Return recent stored rows for a crop (used by trend/aggregation engines).
+
+    When ``prefer_counties`` is set, also pull up to 200 rows per listed county
+    so infrequently reporting focus markets are not crowded out of a global LIMIT.
+    """
+    crop_like = f"%{crop_name.lower().strip()}%"
+
+    def _rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
         return [
             {
                 "Commodity": r["commodity"],
@@ -136,6 +133,62 @@ def query_crop_history(
             }
             for r in rows
         ]
+
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT commodity, market, county, wholesale_raw, retail_raw,
+                   wholesale_kes_90kg, retail_kes_90kg, date_reported, fetched_at
+            FROM market_prices
+            WHERE LOWER(commodity) LIKE ?
+            ORDER BY date_reported DESC, fetched_at DESC
+            LIMIT ?
+            """,
+            (crop_like, max_rows),
+        ).fetchall()
+        result = _rows_to_dicts(rows)
+
+        if prefer_counties:
+            seen = {
+                (
+                    r["Commodity"],
+                    r["Market"],
+                    r["County"],
+                    r["Date"],
+                    r["Wholesale"],
+                    r["Retail"],
+                )
+                for r in result
+            }
+            for county in prefer_counties:
+                # Match both "Uasin Gishu" and legacy "Uasin-Gishu" spellings.
+                county_norm = county.lower().replace("-", " ")
+                extra = conn.execute(
+                    """
+                    SELECT commodity, market, county, wholesale_raw, retail_raw,
+                           wholesale_kes_90kg, retail_kes_90kg, date_reported, fetched_at
+                    FROM market_prices
+                    WHERE LOWER(commodity) LIKE ?
+                      AND REPLACE(LOWER(county), '-', ' ') = ?
+                    ORDER BY date_reported DESC, fetched_at DESC
+                    LIMIT 200
+                    """,
+                    (crop_like, county_norm),
+                ).fetchall()
+                for item in _rows_to_dicts(extra):
+                    key = (
+                        item["Commodity"],
+                        item["Market"],
+                        item["County"],
+                        item["Date"],
+                        item["Wholesale"],
+                        item["Retail"],
+                    )
+                    if key not in seen:
+                        seen.add(key)
+                        result.append(item)
+
+        return result
 
 
 def query_prices(

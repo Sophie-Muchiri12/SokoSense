@@ -81,15 +81,26 @@ def decide_market(request: MarketDecisionRequest) -> MarketDecisionResponse:
         )
 
     if local_price is None:
+        # Honest nearest-market fallback instead of a dead end.
+        try:
+            from data.price_pipeline import nearest_market
+
+            alt = nearest_market(crop, location)
+        except Exception:
+            alt = {}
+
+        nearest = alt.get("nearest_market")
+        nearest_price = alt.get("nearest_price")
+        note = alt.get("note") or "There is no market found in that area."
         return MarketDecisionResponse(
             crop=crop,
             location=location.title(),
-            recommendation="WAIT",
-            short_reply="There is no market found in that area.",
+            recommendation="SELL_IN_MARKET" if nearest else "WAIT",
+            short_reply=note,
             market_name=location.title(),
-            best_market=best_market.title(),
+            best_market=(nearest or best_market or "").title() or None,
             local_price_kes=None,
-            best_price_kes=best_price,
+            best_price_kes=nearest_price if nearest_price is not None else best_price,
             price_diff_kes=None,
         )
 

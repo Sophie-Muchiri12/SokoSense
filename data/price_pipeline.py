@@ -1,39 +1,82 @@
 """
 SokoSense — Live Price Pipeline
-Lucy Kamau · Data Layer Owner
 
 Reads KAMIS prices from the local SQLite cache populated by
 `data/refresh_market_db.py` (GitHub Actions every 3 hours).
 
 Usage:
-    from data.price_pipeline import get_live_prices, get_best_market
+    from data.price_pipeline import get_live_prices, get_best_market, nearest_market
     prices = get_live_prices("maize")
     # {"nakuru": 3600, "nairobi": 3200, ...}
 """
 
+from __future__ import annotations
+
 import logging
-import os
-import urllib3
+import math
+from datetime import datetime, timedelta, timezone
 from time import time
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # MARKET → COUNTY MAPPING
-# Maps our contract.json market names to KAMIS county names
+# Maps our contract.json market names to KAMIS county names (space form).
+# KAMIS sometimes stores hyphenated counties (Uasin-Gishu); we normalise.
 # ---------------------------------------------------------------------------
 
 MARKET_TO_COUNTY = {
-    "nairobi":  "Nairobi",
-    "nakuru":   "Nakuru",
-    "eldoret":  "Uasin Gishu",
-    "kisumu":   "Kisumu",
-    "mombasa":  "Mombasa",
-    "kitale":   "Trans Nzoia",
-    "nyeri":    "Nyeri",
+    "nairobi": "Nairobi",
+    "nakuru": "Nakuru",
+    "eldoret": "Uasin Gishu",
+    "kisumu": "Kisumu",
+    "mombasa": "Mombasa",
+    "kitale": "Trans Nzoia",
+    "nyeri": "Nyeri",
 }
 
 COUNTY_TO_MARKET = {v: k for k, v in MARKET_TO_COUNTY.items()}
+
+# Prices older than this are treated as missing → nearest_market() kicks in.
+MAX_PRICE_AGE_DAYS = 90
+
+# Approximate GPS for focus markets + a few common farmer locations
+# used by nearest_market() when the requested place has no price.
+MARKET_COORDS: dict[str, tuple[float, float]] = {
+    "nairobi": (-1.2864, 36.8172),
+    "nakuru": (-0.3031, 36.0800),
+    "eldoret": (0.5143, 35.2698),
+    "kisumu": (-0.1022, 34.7617),
+    "mombasa": (-4.0435, 39.6682),
+    "kitale": (1.0167, 35.0000),
+    "nyeri": (-0.4197, 36.9475),
+    # Common non-focus locations (for nearest-market fallback)
+    "meru": (0.0467, 37.6556),
+    "embu": (-0.5396, 37.4519),
+    "thika": (-1.0333, 37.0693),
+    "kakamega": (0.2827, 34.7519),
+    "kericho": (-0.3670, 35.2830),
+    "nandi": (0.1860, 35.1200),
+    "bungoma": (0.5635, 34.5606),
+    "machakos": (-1.5177, 37.2634),
+    "kiambu": (-1.1714, 36.8356),
+    "muranga": (-0.7202, 37.1526),
+    "kirinyaga": (-0.6591, 37.3827),
+    "laikipia": (0.3600, 36.7800),
+    "uasin gishu": (0.5143, 35.2698),
+    "trans nzoia": (1.0167, 35.0000),
+}
+
+# Aliases → focus market keys
+_LOCATION_ALIASES: dict[str, str] = {
+    "uasin gishu": "eldoret",
+    "trans nzoia": "kitale",
+    "nairobi county": "nairobi",
+    "nakuru county": "nakuru",
+    "kisumu county": "kisumu",
+    "mombasa county": "mombasa",
+    "nyeri county": "nyeri",
+}
 
 # ---------------------------------------------------------------------------
 # PRICE CACHE (12-hour TTL)
@@ -53,6 +96,40 @@ def _cache_get(key: str) -> dict | None:
 
 def _cache_set(key: str, val: dict) -> None:
     _cache[key] = (time(), val)
+
+
+# ---------------------------------------------------------------------------
+# NORMALISATION HELPERS
+# ---------------------------------------------------------------------------
+
+def normalize_county(name: str) -> str:
+    """Canonical county label: hyphens → spaces, collapsed whitespace.
+
+    KAMIS stores both "Uasin-Gishu" and "Uasin Gishu"; we treat them as one.
+    """
+    if not name:
+        return ""
+    return " ".join(str(name).replace("-", " ").replace("_", " ").split())
+
+
+def _normalize_key(name: str) -> str:
+    return normalize_county(name).lower()
+
+
+def _canonical_market_key(location: str) -> str:
+    """Map a farmer location string to a focus-market key when possible."""
+    key = _normalize_key(location)
+    if key in MARKET_TO_COUNTY:
+        return key
+    if key in _LOCATION_ALIASES:
+        return _LOCATION_ALIASES[key]
+    for alias, market in _LOCATION_ALIASES.items():
+        if alias in key or key in alias:
+            return market
+    for market in MARKET_TO_COUNTY:
+        if market in key:
+            return market
+    return key
 
 
 # ---------------------------------------------------------------------------
@@ -97,9 +174,9 @@ def _median(values: list[float]) -> float | None:
 
 def _resolve_tracked_county(market: str, county: str) -> str | None:
     """Map a KAMIS market/county label to one of our tracked counties."""
-    haystack = f"{market} {county}".lower()
+    haystack = _normalize_key(f"{market} {county}")
     for market_key, county_name in MARKET_TO_COUNTY.items():
-        if market_key in haystack or county_name.lower() in haystack:
+        if market_key in haystack or _normalize_key(county_name) in haystack:
             return county_name
     return None
 
@@ -109,7 +186,11 @@ def _row_price(row: dict) -> float | None:
 
 
 def _latest_wholesale_by_county(rows: list[dict]) -> dict[str, dict]:
-    """Latest KAMIS price per tracked county (median across markets)."""
+    """Latest KAMIS price per tracked county (median across markets).
+
+    Drops counties whose newest report is older than ``MAX_PRICE_AGE_DAYS`` so
+    callers fall through to nearest_market() instead of quoting stale figures.
+    """
     by_county: dict[str, list[dict]] = {}
     for row in rows:
         county = _resolve_tracked_county(
@@ -126,9 +207,20 @@ def _latest_wholesale_by_county(rows: list[dict]) -> dict[str, dict]:
             {"price": price, "date": dt, "market": row.get("Market", "")}
         )
 
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+        days=MAX_PRICE_AGE_DAYS
+    )
     result: dict[str, dict] = {}
     for county, items in by_county.items():
         latest_dt = max(i["date"] for i in items)
+        if latest_dt < cutoff:
+            logger.info(
+                "Skipping stale %s price from %s (>%d days old)",
+                county,
+                latest_dt.strftime("%Y-%m-%d"),
+                MAX_PRICE_AGE_DAYS,
+            )
+            continue
         latest_prices = [i["price"] for i in items if i["date"] == latest_dt]
         median_price = _median(latest_prices)
         if median_price is None:
@@ -148,10 +240,12 @@ def _county_wholesale_on_date(
     prices: list[float] = []
     target_day = target.date()
     for row in rows:
-        if str(row.get("County", "")).strip() != county and _resolve_tracked_county(
+        resolved = _resolve_tracked_county(
             str(row.get("Market", "")),
             str(row.get("County", "")),
-        ) != county:
+        )
+        raw_county = normalize_county(str(row.get("County", "")))
+        if raw_county != county and resolved != county:
             continue
         dt = _parse_kamis_date(row.get("Date"))
         if dt is None or dt.date() != target_day:
@@ -197,6 +291,19 @@ def _historical_price_for_county(
     return round(median, 0), best_dt.strftime("%Y-%m-%d")
 
 
+def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Great-circle distance in km between two (lat, lng) points."""
+    lat1, lon1 = map(math.radians, a)
+    lat2, lon2 = map(math.radians, b)
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    h = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    )
+    return 6371.0 * 2 * math.asin(math.sqrt(h))
+
+
 # ---------------------------------------------------------------------------
 # LOCAL SQLITE FETCH
 # ---------------------------------------------------------------------------
@@ -206,101 +313,17 @@ def _fetch_kamis(crop: str) -> list[dict]:
     try:
         from data.market_db import init_db, query_crop_history
 
-    dfs = []
-    if product_ids:
-        for pid in product_ids:
-            try:
-                resp = requests.get(
-                    KAMIS_URL,
-                    params={"product": pid, "per_page": 500},
-                    verify=False,
-                    timeout=20,
-                )
-                if resp.status_code == 200:
-                    tables = pd.read_html(io.StringIO(resp.text))
-                    if tables:
-                        dfs.append(tables[0])
-            except Exception as e:
-                logger.warning("KAMIS fetch failed for product_id=%s: %s", pid, e)
-    else:
-        # No ID resolved — try generic fetch
-        try:
-            resp = requests.get(
-                KAMIS_URL,
-                params={"per_page": 500},
-                verify=False,
-                timeout=20,
-            )
-            if resp.status_code == 200:
-                tables = pd.read_html(io.StringIO(resp.text))
-                if tables:
-                    dfs.append(tables[0])
-        except Exception as e:
-            logger.error("KAMIS generic fetch failed: %s", e)
-
-    if not dfs:
-        # Direct KAMIS access failed (commonly a connection timeout when the host
-        # firewalls the hosting provider's IP range). Try a Tavily-based fallback
-        # that pulls KAMIS page content from Tavily's own infrastructure.
-        rows = _fetch_kamis_via_tavily(crop)
-        if rows:
-            logger.info("KAMIS data recovered via Tavily fallback for %s", crop)
-        return rows
-
-
-def _fetch_kamis_via_tavily(crop: str) -> list[dict]:
-    """
-    Best-effort fallback used when the direct KAMIS request is blocked.
-
-    Asks Tavily for the KAMIS market page content (raw HTML when available) and
-    tries to parse the price table out of it. Returns row dicts in the same shape
-    as _fetch_kamis, or [] if nothing usable can be recovered (callers then fall
-    back to mock data).
-    """
-    tavily_key = os.getenv("TAVILY_API_KEY")
-    if not tavily_key:
-        logger.warning("TAVILY_API_KEY not set — skipping KAMIS Tavily fallback")
-        return []
-
-    try:
-        from tavily import TavilyClient
-
-        client = TavilyClient(api_key=tavily_key)
-        result = client.search(
-            query=f"{crop} market price site:kamis.kilimo.go.ke",
-            search_depth="advanced",
-            max_results=5,
-            include_raw_content=True,
+        init_db()
+        rows = query_crop_history(
+            crop,
+            max_rows=8000,
+            prefer_counties=list(MARKET_TO_COUNTY.values()),
         )
-    except Exception as e:
-        logger.warning("KAMIS Tavily fallback search failed for %s: %s", crop, e)
+        logger.info("SQLite returned %d rows for crop=%s", len(rows), crop)
+        return rows
+    except Exception as exc:
+        logger.error("SQLite price fetch failed for %s: %s", crop, exc)
         return []
-
-    dfs = []
-    for res in result.get("results", []):
-        raw = res.get("raw_content")
-        if not raw:
-            continue
-        try:
-            tables = pd.read_html(io.StringIO(raw))
-        except Exception:
-            continue
-        for table in tables:
-            cols = {str(c).strip() for c in table.columns}
-            # Only keep tables that look like the KAMIS price table
-            if {"Commodity", "County"} & cols:
-                dfs.append(table)
-
-    if not dfs:
-        return []
-
-    df = pd.concat(dfs, ignore_index=True)
-    df.columns = [str(c).strip() for c in df.columns]
-    df = df.drop_duplicates()
-    if "Commodity" in df.columns:
-        df = df[df["Commodity"].str.contains(crop, case=False, na=False)]
-
-    return df.to_dict(orient="records")
 
 
 # ---------------------------------------------------------------------------
@@ -332,8 +355,9 @@ def get_live_prices(crop: str) -> dict[str, float]:
     latest = _latest_wholesale_by_county(rows)
     result: dict[str, float] = {}
     for county, info in latest.items():
-        market = COUNTY_TO_MARKET[county]
-        result[market] = info["price"]
+        market = COUNTY_TO_MARKET.get(county)
+        if market:
+            result[market] = info["price"]
 
     if result:
         _cache_set(cache_key, result)
@@ -342,6 +366,108 @@ def get_live_prices(crop: str) -> dict[str, float]:
         logger.warning("No matching counties in KAMIS data for %s", crop)
 
     return result
+
+
+def nearest_market(crop: str, requested_market: str) -> dict:
+    """
+    Suggest the nearest tracked market that has a usable price for ``crop``.
+
+    Used when the farmer's market/county has no fresh KAMIS row — e.g. Meru
+    maize → nearest of the seven focus markets that actually has a price.
+
+    Returns:
+        {
+            "requested_market": str,
+            "resolved_market": str,          # canonical key if known
+            "has_local_price": bool,
+            "nearest_market": str | None,
+            "nearest_price": float | None,
+            "distance_km": float | None,
+            "note": str,
+        }
+    """
+    requested = requested_market.strip().lower()
+    resolved = _canonical_market_key(requested)
+    prices = get_live_prices(crop)
+
+    empty = {
+        "requested_market": requested,
+        "resolved_market": resolved,
+        "has_local_price": False,
+        "nearest_market": None,
+        "nearest_price": None,
+        "distance_km": None,
+        "note": "No cached market price data is available right now.",
+    }
+
+    if not prices:
+        return empty
+
+    if resolved in prices:
+        return {
+            "requested_market": requested,
+            "resolved_market": resolved,
+            "has_local_price": True,
+            "nearest_market": resolved,
+            "nearest_price": prices[resolved],
+            "distance_km": 0.0,
+            "note": "",
+        }
+
+    origin = MARKET_COORDS.get(resolved) or MARKET_COORDS.get(_normalize_key(requested))
+    priced_markets = [m for m in prices if m in MARKET_COORDS]
+
+    if not priced_markets:
+        # Shouldn't happen if prices keys are focus markets, but be safe.
+        best = max(prices, key=prices.get)
+        return {
+            "requested_market": requested,
+            "resolved_market": resolved,
+            "has_local_price": False,
+            "nearest_market": best,
+            "nearest_price": prices[best],
+            "distance_km": None,
+            "note": (
+                f"No price for {requested.title()}. "
+                f"Showing {best.title()} at KSh {prices[best]:,.0f}/bag."
+            ),
+        }
+
+    if origin is None:
+        # Unknown location — fall back to highest-paying focus market.
+        best = max(priced_markets, key=lambda m: prices[m])
+        return {
+            "requested_market": requested,
+            "resolved_market": resolved,
+            "has_local_price": False,
+            "nearest_market": best,
+            "nearest_price": prices[best],
+            "distance_km": None,
+            "note": (
+                f"No price for {requested.title()}. "
+                f"Nearest tracked option with data: {best.title()} "
+                f"at KSh {prices[best]:,.0f}/bag."
+            ),
+        }
+
+    nearest = min(
+        priced_markets,
+        key=lambda m: _haversine_km(origin, MARKET_COORDS[m]),
+    )
+    dist = round(_haversine_km(origin, MARKET_COORDS[nearest]), 0)
+    return {
+        "requested_market": requested,
+        "resolved_market": resolved,
+        "has_local_price": False,
+        "nearest_market": nearest,
+        "nearest_price": prices[nearest],
+        "distance_km": dist,
+        "note": (
+            f"No price for {requested.title()}. "
+            f"Nearest market with data: {nearest.title()} "
+            f"(~{dist:.0f} km) at KSh {prices[nearest]:,.0f}/bag."
+        ),
+    }
 
 
 def get_best_market(crop: str, current_market: str) -> dict:
@@ -357,29 +483,29 @@ def get_best_market(crop: str, current_market: str) -> dict:
             "price_diff_kes": float,
         }
     """
-    prices  = get_live_prices(crop)
-    current = current_market.lower().strip()
+    prices = get_live_prices(crop)
+    current = _canonical_market_key(current_market)
 
     if not prices:
         return {
-            "current_market":  current,
-            "current_price":   None,
-            "best_market":     current,
-            "best_price":      None,
-            "price_diff_kes":  0,
+            "current_market": current,
+            "current_price": None,
+            "best_market": current,
+            "best_price": None,
+            "price_diff_kes": 0,
         }
 
     current_price = prices.get(current)
-    best_market   = max(prices, key=prices.get)
-    best_price    = prices[best_market]
-    diff          = (best_price - current_price) if current_price else 0
+    best_market = max(prices, key=prices.get)
+    best_price = prices[best_market]
+    diff = (best_price - current_price) if current_price else 0
 
     return {
-        "current_market":  current,
-        "current_price":   current_price,
-        "best_market":     best_market,
-        "best_price":      best_price,
-        "price_diff_kes":  max(diff, 0),
+        "current_market": current,
+        "current_price": current_price,
+        "best_market": best_market,
+        "best_price": best_price,
+        "price_diff_kes": max(diff, 0),
     }
 
 
@@ -404,7 +530,7 @@ def get_trend(crop: str, market: str) -> dict:
             "data_source": str,
         }
     """
-    market = market.lower().strip()
+    market = _canonical_market_key(market)
     county = MARKET_TO_COUNTY.get(market)
     empty = {
         "crop": crop,

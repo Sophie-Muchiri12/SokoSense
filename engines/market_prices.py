@@ -21,6 +21,7 @@ _MARKET_ALIASES: dict[str, str] = {
     "nakuru": "Nakuru",
     "eldoret": "Eldoret",
     "uasin gishu": "Eldoret",
+    "uasin-gishu": "Eldoret",
     "kisumu": "Kisumu",
     "mombasa": "Mombasa",
     "kitale": "Kitale",
@@ -32,9 +33,10 @@ _MARKET_ALIASES: dict[str, str] = {
 
 def _canonical_market(market: str, county: str) -> str | None:
     """Map a KAMIS market/county label to one of our seven map markets."""
-    haystack = f"{market} {county}".lower()
+    # Normalise hyphens so "Uasin-Gishu" matches "uasin gishu".
+    haystack = f"{market} {county}".lower().replace("-", " ").replace("_", " ")
     for alias, canonical in _MARKET_ALIASES.items():
-        if alias in haystack:
+        if alias.replace("-", " ") in haystack:
             return canonical
     for name in _MARKET_LOCATIONS:
         if name.lower() in haystack:

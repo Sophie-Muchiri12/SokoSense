@@ -13,7 +13,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 
 from engines.agent.state import AgentState
-from engines.agent.tools import TOOLS
+from engines.agent.tools import EXECUTABLE_TOOLS, TOOLS
 from engines.llm import DEFAULT_GROQ_MODEL, get_groq_llm
 
 load_dotenv()

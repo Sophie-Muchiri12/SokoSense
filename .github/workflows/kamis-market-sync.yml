@@ -15,8 +15,12 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Checkout repository
+      - name: Checkout development branch
         uses: actions/checkout@v4
+        with:
+          # Always refresh the integration branch the app deploys from —
+          # not a stale default checkout that nowhere else reads.
+          ref: development
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,6 +34,7 @@ jobs:
       - name: Refresh KAMIS SQLite cache
         env:
           MARKET_DB_PATH: data/market_prices.db
+        # Exits non-zero if zero rows are inserted (fail loudly).
         run: python -m data.refresh_market_db
 
       - name: Commit and push updated database
@@ -41,5 +46,5 @@ jobs:
             echo "No database changes to commit."
           else
             git commit -m "chore(data): sync KAMIS market prices"
-            git push
+            git push origin HEAD:development
           fi
