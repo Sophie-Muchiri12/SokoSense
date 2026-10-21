@@ -11,16 +11,16 @@ sequenceDiagram
     participant Farmer as Farmer (Feature Phone)
     participant Gateway as SMS & USSD Gateway (e.g. Africa's Talking)
     participant Webhook as Webhook Server (FastAPI)
-    participant Cache as Cache / Database (SQLite)
+    participant Cache as Cache / Database (Postgres)
     participant Agent as SokoSense Agent (LangGraph)
     participant Engines as Decision Engines (Market, Timing, Loans)
-    participant Neo4j as Neo4j Graph & Vector DB
+    participant PG as Postgres + pgvector (Supabase)
 
     Note over Farmer, Gateway: SMS Query Path
     Farmer->>Gateway: Sends SMS (e.g. "Maize Nakuru")
     Gateway->>Webhook: HTTP POST Webhook (Sender, Text)
     Webhook->>Agent: Invoke Agent State Graph
-    Agent->>Neo4j: Query Vector Store / Knowledge Graph
+    Agent->>PG: Query knowledge tables / pgvector store
     Agent-->>Webhook: Returns Structured JSON Response
     Webhook->>Webhook: Format JSON into short, friendly SMS (<320 chars)
     Webhook->>Gateway: API Call to Send SMS
@@ -52,8 +52,8 @@ sequenceDiagram
 |---|---|---|
 | **SMS/USSD Gateway** | **Africa's Talking (AT)** | Industry-standard telco API platform in East Africa. Standard sandbox for testing, low-cost shortcodes, and reliable bulk/two-way SMS and USSD gateways. |
 | **Web Server / Webhook** | **FastAPI** (Python) | High concurrent execution; handles rapid USSD session timeouts (<3 seconds) and incoming webhooks with low latency. |
-| **Database & Cache** | **SQLite** | Stores session states, rate limit records, and caches scraped price datasets for up to 12 hours. |
-| **Decision Engines** | **SokoSense Modules** | Local engines (market, timing, loans) and Neo4j RAG pipeline. |
+| **Database & Cache** | **Postgres (Supabase)** | Stores market prices, advisory knowledge and pgvector RAG chunks; 12-hour in-process price cache on top. |
+| **Decision Engines** | **SokoSense Modules** | Local engines (market, timing, loans) and Postgres/pgvector RAG pipeline. |
 
 ---
 
@@ -160,4 +160,4 @@ Screen 3 (END):
 
 * **Aggressive Caching**: Cache all scrapes and database answers by `(crop, location)` for 12 hours to minimize third-party API and LLM token costs.
 * **SMS Rate Limiting**: Limit individual phone numbers to 5 SMS requests per hour using `agent_query_limiter`.
-* **Fallback Mode**: If Neo4j or LLM APIs fail, the webhook automatically routes requests to mock data templates, ensuring the farmer always receives a response.
+* **Fallback Mode**: If Postgres or LLM APIs fail, the webhook automatically routes requests to mock data templates, ensuring the farmer always receives a response.

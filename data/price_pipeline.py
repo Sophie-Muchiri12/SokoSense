@@ -1,8 +1,9 @@
 """
 SokoSense — Live Price Pipeline
 
-Reads KAMIS prices from the local SQLite cache populated by
-`data/refresh_market_db.py` (GitHub Actions every 3 hours).
+Reads KAMIS prices from the market CSV (`data/market_prices.csv`), built by
+`scripts/collect_market_data.py` (manual) or the admin portal's refresh
+button — see `data/kamis_collect.py` / `data/market_csv.py`.
 
 Usage:
     from data.price_pipeline import get_live_prices, get_best_market, nearest_market
@@ -291,6 +292,78 @@ def _historical_price_for_county(
     return round(median, 0), best_dt.strftime("%Y-%m-%d")
 
 
+def _location_rows(rows: list[dict], location: str) -> list[dict]:
+    """CSV rows for ANY county/market in the file (not just focus markets).
+
+    Matches when the row's county *or* market equals the requested location
+    (normalised), e.g. location="meru" matches County=Meru rows from Maua,
+    Nkubu, Kangeta… and location="maua" matches Market=Maua rows.
+    """
+    needle = _normalize_key(location)
+    if not needle:
+        return []
+    return [
+        r
+        for r in rows
+        if _normalize_key(str(r.get("County", ""))) == needle
+        or _normalize_key(str(r.get("Market", ""))) == needle
+    ]
+
+
+def _price_series_by_date(rows: list[dict]) -> dict[datetime, list[float]]:
+    """Median-ready wholesale prices grouped by report date."""
+    series: dict[datetime, list[float]] = {}
+    for row in rows:
+        dt = _parse_kamis_date(row.get("Date"))
+        price = _row_price(row)
+        if dt is None or price is None:
+            continue
+        series.setdefault(dt, []).append(price)
+    return series
+
+
+def _latest_location_price(
+    rows: list[dict], location: str
+) -> tuple[float | None, str | None, dict[datetime, list[float]]]:
+    """(latest median price, latest date, full series) for a location.
+
+    Applies the same staleness rule as the focus-market path: a location
+    whose newest report is older than MAX_PRICE_AGE_DAYS counts as missing.
+    """
+    series = _price_series_by_date(_location_rows(rows, location))
+    if not series:
+        return None, None, series
+    latest_dt = max(series)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+        days=MAX_PRICE_AGE_DAYS
+    )
+    if latest_dt < cutoff:
+        return None, None, series
+    median = _median(series[latest_dt])
+    if median is None:
+        return None, None, series
+    return round(median, 0), latest_dt.strftime("%Y-%m-%d"), series
+
+
+def _historical_from_series(
+    series: dict[datetime, list[float]], latest_dt: datetime, lookback_days: int = 14
+) -> tuple[float | None, str | None]:
+    """Median price on the report date closest to lookback_days before latest."""
+    if not series:
+        return None, None
+    target = latest_dt - timedelta(days=lookback_days)
+    candidates = [d for d in series if d <= latest_dt]
+    if not candidates:
+        return None, None
+    best_dt = min(candidates, key=lambda d: abs((d - target).days))
+    if abs((best_dt - target).days) > 10 or best_dt == latest_dt:
+        return None, None
+    median = _median(series[best_dt])
+    if median is None:
+        return None, None
+    return round(median, 0), best_dt.strftime("%Y-%m-%d")
+
+
 def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
     """Great-circle distance in km between two (lat, lng) points."""
     lat1, lon1 = map(math.radians, a)
@@ -309,20 +382,19 @@ def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
 # ---------------------------------------------------------------------------
 
 def _fetch_kamis(crop: str) -> list[dict]:
-    """Read stored KAMIS rows for a crop from SQLite."""
+    """Read stored KAMIS rows for a crop from the market CSV."""
     try:
-        from data.market_db import init_db, query_crop_history
+        from data.market_csv import query_crop_history
 
-        init_db()
         rows = query_crop_history(
             crop,
             max_rows=8000,
             prefer_counties=list(MARKET_TO_COUNTY.values()),
         )
-        logger.info("SQLite returned %d rows for crop=%s", len(rows), crop)
+        logger.info("Market CSV returned %d rows for crop=%s", len(rows), crop)
         return rows
     except Exception as exc:
-        logger.error("SQLite price fetch failed for %s: %s", crop, exc)
+        logger.error("Price fetch failed for %s: %s", crop, exc)
         return []
 
 
@@ -332,7 +404,7 @@ def _fetch_kamis(crop: str) -> list[dict]:
 
 def get_live_prices(crop: str) -> dict[str, float]:
     """
-    Fetch prices for a crop from the local SQLite cache, aggregated by market.
+    Fetch prices for a crop from the price cache, aggregated by market.
 
     Returns:
         dict mapping market name (lowercase) → price in KSh per 90kg bag
@@ -340,7 +412,9 @@ def get_live_prices(crop: str) -> dict[str, float]:
 
     Falls back to empty dict on any error — callers use mock fallback.
     """
-    cache_key = f"prices:v2:{crop.lower()}"
+    from data.market_csv import csv_version
+
+    cache_key = f"prices:v3:{crop.lower()}:{csv_version()}"
     cached = _cache_get(cache_key)
     if cached is not None:
         logger.info("Cache hit for %s", crop)
@@ -496,6 +570,9 @@ def get_best_market(crop: str, current_market: str) -> dict:
         }
 
     current_price = prices.get(current)
+    if current_price is None:
+        # Location may be a non-focus county/market with CSV rows (e.g. Meru).
+        current_price = get_trend(crop, current_market).get("price_kes")
     best_market = max(prices, key=prices.get)
     best_price = prices[best_market]
     diff = (best_price - current_price) if current_price else 0
@@ -543,26 +620,34 @@ def get_trend(crop: str, market: str) -> dict:
         "pct_change": None,
         "wait_days": 0,
         "national_avg_kes": None,
-        "data_source": "KAMIS cache (SQLite)",
+        "data_source": "KAMIS CSV (data/market_prices.csv)",
     }
-
-    if not county:
-        return empty
 
     rows = _fetch_kamis(crop)
     if not rows:
         return empty
 
     latest_by_county = _latest_wholesale_by_county(rows)
-    county_info = latest_by_county.get(county)
-    if not county_info:
-        return empty
 
-    latest_price = county_info["price"]
-    kamis_date = county_info["date"]
-    latest_dt = datetime.strptime(kamis_date, "%Y-%m-%d")
-
-    past_price, compare_date = _historical_price_for_county(rows, county, latest_dt)
+    if county:
+        county_info = latest_by_county.get(county)
+        if not county_info:
+            return empty
+        latest_price = county_info["price"]
+        kamis_date = county_info["date"]
+        latest_dt = datetime.strptime(kamis_date, "%Y-%m-%d")
+        past_price, compare_date = _historical_price_for_county(
+            rows, county, latest_dt
+        )
+    else:
+        # Any other county/market present in the CSV (e.g. Meru, Kakamega,
+        # or a market town like Maua) — read its rows directly instead of
+        # declaring "no market found" just because it isn't a focus market.
+        latest_price, kamis_date, series = _latest_location_price(rows, market)
+        if latest_price is None or kamis_date is None:
+            return empty
+        latest_dt = datetime.strptime(kamis_date, "%Y-%m-%d")
+        past_price, compare_date = _historical_from_series(series, latest_dt)
 
     trend = "stable"
     pct_change = None
@@ -591,5 +676,5 @@ def get_trend(crop: str, market: str) -> dict:
         "pct_change": pct_change,
         "wait_days": wait_days,
         "national_avg_kes": national_avg,
-        "data_source": "KAMIS cache (SQLite)",
+        "data_source": "KAMIS CSV (data/market_prices.csv)",
     }

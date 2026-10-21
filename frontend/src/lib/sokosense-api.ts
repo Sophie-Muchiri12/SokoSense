@@ -1,7 +1,9 @@
 /**
  * SokoSense API client — typed fetch wrappers for the FastAPI backend.
- * In dev, Vite on :8081 proxies /api and /health to the backend on :8000.
+ * In dev, Vite on :5173 proxies /api and /health to the backend on :8000.
  */
+
+import { getTokenForPath } from "@/lib/auth";
 
 const BASE_URL =
   typeof window !== "undefined"
@@ -72,7 +74,6 @@ export interface LoanResponse {
   risk_verdict: "SAFE" | "CAUTION" | "HIGH_RISK" | "AVOID";
   short_reply: string;
   comparison_phrase: string;
-  payment_id?: string | null;
 }
 
 export interface MarketDecisionRequest {
@@ -147,9 +148,14 @@ async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const token = getTokenForPath(path);
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
@@ -168,7 +174,7 @@ export async function postAgent(message: string): Promise<AgentResponse> {
   });
 }
 
-/** Fetch cached wholesale prices for a given crop (SQLite-backed). */
+/** Fetch wholesale prices for a given crop from the market CSV (via API). */
 export async function getMarketPrices(
   crop: string,
 ): Promise<MarketMapResponse> {
@@ -278,6 +284,53 @@ export async function postUssd(params: UssdRequest): Promise<UssdResponse> {
 }
 
 export { USSD_SERVICE_CODE };
+
+export interface MarketCsvStatus {
+  path: string;
+  exists: boolean;
+  rows: number;
+  commodities: number;
+  markets: number;
+  latest_date_reported?: string | null;
+  last_fetched_at?: string | null;
+  updated_at?: string | null;
+  size_bytes?: number | null;
+}
+
+export interface MarketRefreshJob {
+  state: "idle" | "running" | "succeeded" | "failed";
+  started_at?: string | null;
+  finished_at?: string | null;
+  progress?: { current: number; total: number; commodity: string } | null;
+  stats?: {
+    mode: string;
+    products_scanned: number;
+    products_with_rows: number;
+    rows_fetched: number;
+    rows_written: number;
+    commodities_in_csv: number;
+    fetched_at: string;
+  } | null;
+  error?: string | null;
+}
+
+export interface MarketRefreshResponse {
+  job: MarketRefreshJob;
+  csv: MarketCsvStatus;
+  already_running?: boolean;
+}
+
+/** Start a full KAMIS → market CSV rebuild (background job on the API). */
+export async function startMarketRefresh(): Promise<MarketRefreshResponse> {
+  return apiFetch<MarketRefreshResponse>("/api/admin/market-refresh", {
+    method: "POST",
+  });
+}
+
+/** Poll market-refresh job status + active CSV metadata. */
+export async function getMarketRefreshStatus(): Promise<MarketRefreshResponse> {
+  return apiFetch<MarketRefreshResponse>("/api/admin/market-refresh");
+}
 
 /** Fetch recent request logs (page / page_size). */
 export async function getLogs(

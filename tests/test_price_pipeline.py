@@ -7,6 +7,7 @@ from data.price_pipeline import (
     _latest_wholesale_by_county,
     _resolve_tracked_county,
     get_live_prices,
+    get_trend,
     nearest_market,
     normalize_county,
 )
@@ -27,6 +28,10 @@ def test_resolve_tracked_county_hyphenated():
 
 
 def test_latest_wholesale_maps_hyphenated_eldoret():
+    # Recent date (dynamic) so the >90-day staleness filter doesn't age out.
+    from datetime import datetime, timezone
+
+    recent = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     rows = [
         {
             "Commodity": "Dry Maize",
@@ -34,7 +39,7 @@ def test_latest_wholesale_maps_hyphenated_eldoret():
             "County": "Uasin-Gishu",
             "Wholesale": "45/Kg",
             "Retail": "50/Kg",
-            "Date": "2026-07-20",
+            "Date": recent,
         },
         {
             "Commodity": "Dry Maize",
@@ -42,7 +47,7 @@ def test_latest_wholesale_maps_hyphenated_eldoret():
             "County": "Trans Nzoia",
             "Wholesale": "40/Kg",
             "Retail": "48/Kg",
-            "Date": "2026-07-20",
+            "Date": recent,
         },
     ]
     latest = _latest_wholesale_by_county(rows)
@@ -102,7 +107,28 @@ def test_latest_wholesale_skips_stale_prices():
     assert "Nairobi" in latest
 
 
-def test_get_live_prices_reads_sqlite_without_crash():
+def test_get_trend_for_non_focus_county_in_csv(monkeypatch):
+    # Meru is not one of the seven focus markets, but its CSV rows must
+    # still drive sell-timing (regression: it used to say "no market found").
+    from datetime import datetime, timedelta, timezone
+
+    today = datetime.now(timezone.utc).replace(tzinfo=None)
+    latest = today.strftime("%Y-%m-%d")
+    earlier = (today - timedelta(days=14)).strftime("%Y-%m-%d")
+    rows = [
+        {"Commodity": "Tomatoes", "Market": "Maua", "County": "Meru",
+         "Wholesale": "30.00/Kg", "Retail": "50.00/Kg", "Date": latest},
+        {"Commodity": "Tomatoes", "Market": "Maua", "County": "Meru",
+         "Wholesale": "20.00/Kg", "Retail": "40.00/Kg", "Date": earlier},
+    ]
+    monkeypatch.setattr("data.price_pipeline._fetch_kamis", lambda crop: rows)
+    trend = get_trend("tomatoes", "meru")
+    assert trend["price_kes"] == 30 * 90
+    assert trend["kamis_date"] == latest
+    assert trend["trend"] == "rising"
+
+
+def test_get_live_prices_reads_price_cache_without_crash():
     # Smoke: must not raise (empty DB / missing crop → {}).
     prices = get_live_prices("maize")
     assert isinstance(prices, dict)

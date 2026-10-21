@@ -37,11 +37,16 @@ SokoSense/
 │   ├── loaning.py                # APR + verdict (+ decide_loan for API)
 │   └── market_prices.py          # Price table for Ian's map
 │
+├── db/                           # Postgres (Supabase) data layer
+│   ├── postgres.py               # DATABASE_URL connection + schema bootstrap
+│   ├── schema.sql                # pgvector + all tables (Supabase SQL Editor-ready)
+│   ├── seed_data.py / seed.py    # Advisory crop/disease knowledge seed
+│
 ├── data/                         # Lucy (+ Job integrations as needed)
-│   ├── neo4j_client.py           # Lucy — AuraDB connection
-│   ├── price_pipeline.py         # Lucy — load prices into Neo4j
-│   ├── trends.py                 # Lucy — get_trend(crop, market) → float
-│   └── masumi_hook.py            # Lucy — payment log on /api/loan
+│   ├── market_csv.py             # KAMIS market CSV — the single price source of truth
+│   ├── kamis_collect.py          # KAMIS scrape → clean → atomic CSV swap (manual + admin)
+│   ├── price_pipeline.py         # Lucy — live prices / trends / best market
+│   └── market_prices.csv         # Built market data (top-10 recent rows per commodity/market)
 │
 ├── parser/                       # Sophie + Job — SMS input only (NOT decisions)
 │   ├── prompts.py
@@ -110,7 +115,7 @@ These are **not** moved into `data/` or `legacy/` — they remain at root for Jo
 | `engines/timing.py` | Job | Timing decision engine |
 | `engines/loaning.py` | Job | Loan APR calculation, agent tool, `decide_loan()` |
 | `engines/market_prices.py` | Job | Map price data for frontend |
-| `data/*` | Lucy | Neo4j, price pipeline, trends, Masumi |
+| `db/*` + `data/*` | Lucy | Postgres/pgvector, price pipeline, trends |
 | `parser/*` | Sophie + Job | SMS text → `{crop, location, intent}` |
 | `frontend/*` | Ian | Demo UI screens |
 | `docs/*` | All | Plans, templates, demo script |
@@ -122,7 +127,7 @@ These are **not** moved into `data/` or `legacy/` — they remain at root for Jo
 | Folder | Owner | Contains |
 |--------|-------|----------|
 | `engines/` | **Job** | `market.py`, `timing.py`, `loaning.py` — all decision logic |
-| `data/` | **Lucy** | Neo4j, price pipeline, trends, Masumi hooks |
+| `db/` + `data/` | **Lucy** | Postgres/pgvector, price pipeline, trends |
 | `parser/` | **Sophie + Job** | SMS text → structured `{crop, location, intent}` |
 | `models/` | **Sophie** | Pydantic schemas only — no logic |
 | `routes/` | **Sophie + Lucy** | HTTP + AT webhooks (handlers call engines/parser) |
@@ -161,7 +166,7 @@ Ian’s SMS Simulator hits the same path via `POST /webhook/sms` or `POST /api/m
 3. **No root-level `*_engine/` folders** — loan logic lives in `engines/loaning.py`.
 4. **`kamis_tool.py`, `rate_limiter.py`, `agent.py`, `index.py` stay at root** — Job's CLI and KAMIS tooling.
 5. **All API types** in `models/` — engines import from `models`, never invent their own shapes.
-6. **`data/` is for Lucy's integrations** — Neo4j, trends, Masumi; not a home for root CLI files.
+6. **`db/`/`data/` are for Lucy's integrations** — Postgres/pgvector, trends; not a home for root CLI files.
 
 ---
 
@@ -188,7 +193,7 @@ Ian’s SMS Simulator hits the same path via `POST /webhook/sms` or `POST /api/m
    ```bash
    cp .env.example .env
    ```
-   Mock endpoints work without API keys. Add keys when wiring LLM parser, Neo4j, and Africa's Talking.
+   Mock endpoints work without API keys. Add keys when wiring the LLM parser, Supabase (DATABASE_URL), and Africa's Talking.
 
 4. **Run the API:**
    ```bash

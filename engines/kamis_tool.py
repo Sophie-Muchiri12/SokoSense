@@ -4,9 +4,6 @@ import logging
 import urllib3
 from typing import Optional
 from langchain_core.tools import tool
-from tavily import TavilyClient
-from engines.rate_limiter import kamis_http_limiter
-from engines.price_fallbacks import run_price_fallback_chain
 
 logger = logging.getLogger(__name__)
 
@@ -331,196 +328,100 @@ def _open_web_fallback(
     return None
 
 
-@tool
-def scrape_kamis_prices(
+def fetch_csv_prices(
     crop_name: Optional[str] = None,
     market_name: Optional[str] = None,
     county_name: Optional[str] = None,
-    limit: int = 10
+    limit: int = 10,
 ) -> str:
-    """
-    Queries the local KAMIS SQLite cache and returns the most recent price entries.
-    IMPORTANT: Always use the default limit of 10. Do NOT pass a higher limit value.
-    
-    Args:
-        crop_name: The name of the crop to filter by (e.g. 'Tomatoes', 'Maize', 'Beans'). Case-insensitive.
-        market_name: Optional name of the market location to filter by (e.g. 'Maua', 'Kibuye'). Case-insensitive.
-        county_name: Optional name of the county to filter by (e.g. 'Meru', 'Kakamega', 'Nairobi'). Case-insensitive.
-        limit: Number of records to return. Maximum is 10. Do NOT change this value.
-    """
-    limit = min(limit, 10)
+    """Plain (non-tool) CSV price lookup — the single request-time price path.
 
+    Queries the SokoSense market CSV (data/market_prices.csv, built by
+    scripts/collect_market_data.py / the admin refresh) and returns the most
+    recent price entries as JSON text. This never queries KAMIS live, so it
+    has no rate-limiter / Tavily / fallback-chain dependencies. Both the
+    LangChain tool below and the agent's tool wrapper call this.
+    """
+    import json
+
+    from data.market_csv import query_prices
+
+    limit = min(limit, 10)
     clean_crop_name = crop_name.strip() if crop_name else None
     clean_market_name = market_name.strip() if market_name else None
     clean_county_name = county_name.strip() if county_name else None
 
-    # If a location filter is set, fetch a deep history from the server so the
-    # local filter can find markets that report infrequently. KAMIS has no
-    # server-side market/county filter — it only returns the most recent N rows
-    # across all markets — so a small window misses markets that haven't
-    # reported lately (e.g. Nakuru maize, last seen mid-2025). Without a filter,
-    # 10 recent rows is enough.
-    has_location = bool(clean_market_name or clean_county_name)
-    server_per_page = 1500 if has_location else 10
-    fetch_timeout = 40 if has_location else 20
+    rows = query_prices(crop_name=clean_crop_name, limit=100_000)
 
-    product_ids = resolve_crop_ids(clean_crop_name)
-    # A broad crop term ("beans") substring-matches ~10 KAMIS product IDs, and
-    # with a location set each ID is a separate deep (per_page=1500) HTTP request.
-    # The 5-calls/60s rate limiter then forces a ~60s sleep mid-query, so a single
-    # "price of beans in Nairobi" lookup took ~85s. Cap the fan-out to the first
-    # few (most common) varieties: it keeps the query under the rate limit while
-    # still returning enough variety rows for a useful summary.
-    if len(product_ids) > _MAX_PRODUCT_FETCHES:
-        product_ids = product_ids[:_MAX_PRODUCT_FETCHES]
-
-    dfs = []
-    had_fetch_error = False
-
-    if product_ids:
-        for pid in product_ids:
-            params = {
-                "product": pid,
-                "per_page": server_per_page
-            }
-            try:
-                kamis_http_limiter.acquire()  # ← rate-limit each outgoing HTTP call
-                response = requests.get(url, params=params, verify=False, timeout=fetch_timeout)
-                if response.status_code == 200:
-                    sub_dfs = pd.read_html(io.StringIO(response.text))
-                    if sub_dfs:
-                        dfs.append(sub_dfs[0])
-            except Exception:
-                had_fetch_error = True
-    else:
-        params = {"per_page": server_per_page}
-        try:
-            kamis_http_limiter.acquire()  # ← rate-limit the fallback HTTP call
-            response = requests.get(url, params=params, verify=False, timeout=fetch_timeout)
-            if response.status_code == 200:
-                sub_dfs = pd.read_html(io.StringIO(response.text))
-                if sub_dfs:
-                    dfs.append(sub_dfs[0])
-        except Exception:
-            had_fetch_error = True
-
-    if not dfs:
-        # Direct KAMIS HTML scrape failed — try Excel export (same official source),
-        # then WFP, Tavily (KAMIS site), and finally open-web search.
-        fallback = run_price_fallback_chain(
-            clean_crop_name,
-            clean_market_name,
-            clean_county_name,
-            limit,
-            try_kamis_excel=True,
-            had_fetch_error=had_fetch_error,
-            **_fallback_chain_kwargs(),
+    if not rows:
+        return (
+            "No price data in the market CSV yet. Run "
+            "`python scripts/collect_market_data.py` (or the admin portal's "
+            "Refresh market data button) to collect KAMIS prices first."
         )
-        if fallback:
-            return fallback
-        return "No price data could be retrieved from the KAMIS website."
 
-    # Combine and clean
-    df = pd.concat(dfs, ignore_index=True)
-    df.columns = [c.strip() for c in df.columns]
-    df = df.drop_duplicates()
-
-    # Filter in pandas (Case-Insensitive)
-    if clean_crop_name:
-        df = df[df['Commodity'].str.contains(clean_crop_name, case=False, na=False)]
-
-    # Location filtering — market-first.
-    #
-    # The farmer usually names a *specific* market (e.g. "Mutindwa"). KAMIS only
-    # returns the most recent N rows across all markets, and many markets report
-    # infrequently, so the requested one is often absent from the fetched
-    # window. The old logic matched "market OR county" together, which meant a
-    # missing market silently returned some *other* market in the same county
-    # (e.g. Kawangware) with no indication of the swap.
-    #
-    # Instead: try the exact market first; if it has no rows, search the other
-    # sources (WFP backup, then Tavily) for that market; only then fall back to
-    # county-level KAMIS rows, clearly flagged as a substitution.
+    # Location filtering — market-first, then county, so a missing market
+    # never silently returns some other market in the same county.
     substitution_note = ""
-
     if clean_market_name:
-        market_mask = df['Market'].str.contains(clean_market_name, case=False, na=False)
-        if market_mask.any():
-            # Best case: the named market reported recently in KAMIS.
-            df = df[market_mask]
-        elif (
-            not clean_county_name
-            and df['County'].str.contains(clean_market_name, case=False, na=False).any()
-        ):
-            # The "market" is really a town/county the LLM put in the market slot
-            # ("Nairobi"); KAMIS stores it as a County. Use fresh county rows —
-            # this is what the farmer meant, so no substitution note is needed.
-            df = df[df['County'].str.contains(clean_market_name, case=False, na=False)]
+        needle = clean_market_name.lower()
+        market_rows = [r for r in rows if needle in str(r.get("Market", "")).lower()]
+        county_rows = [r for r in rows if needle in str(r.get("County", "")).lower()]
+        if market_rows:
+            rows = market_rows
+        elif county_rows and not clean_county_name:
+            # The "market" is really a town/county ("Nairobi") — what the farmer meant.
+            rows = county_rows
         else:
-            # The named market truly isn't in the KAMIS window. Search backup
-            # sources for it specifically before widening to the whole county.
-            fallback = run_price_fallback_chain(
-                clean_crop_name,
-                clean_market_name,
-                clean_county_name,
-                limit,
-                tavily_kamis_prefix=(
-                    f"No recent KAMIS price entries were found for '{clean_market_name}' "
-                    "market specifically, so the results below come from a Tavily web "
-                    "search of the KAMIS site and may reference nearby markets or older "
-                    "reports.\n\n"
-                ),
-                **_fallback_chain_kwargs(),
-            )
-            if fallback:
-                return fallback
-
-            # Last resort: widen to county-level KAMIS rows, flagged transparently.
             county_hint = clean_county_name or clean_market_name
-            df = df[df['County'].str.contains(county_hint, case=False, na=False)]
-            if not df.empty:
+            hint_rows = [
+                r for r in rows if county_hint.lower() in str(r.get("County", "")).lower()
+            ]
+            rows = hint_rows
+            if hint_rows:
                 substitution_note = (
                     f"Note: '{clean_market_name}' has no recent KAMIS price reports, "
                     f"so the prices below are from other markets in "
                     f"{county_hint.title()} county.\n\n"
                 )
     elif clean_county_name:
-        df = df[df['County'].str.contains(clean_county_name, case=False, na=False)]
+        needle = clean_county_name.lower()
+        rows = [r for r in rows if needle in str(r.get("County", "")).lower()]
 
-    total_rows = len(df)
-    if total_rows == 0:
-        # KAMIS returned data, but nothing matched the requested location.
-        fallback = run_price_fallback_chain(
-            clean_crop_name,
-            clean_market_name,
-            clean_county_name,
-            limit,
-            tavily_kamis_prefix=(
-                "No recent KAMIS price entries matched that market directly, so the "
-                "results below come from a Tavily web search of the KAMIS site and "
-                "may reference nearby markets or older reports.\n\n"
-            ),
-            **_fallback_chain_kwargs(),
-        )
-        if fallback:
-            return fallback
-
-        msg = "No price data found matching your query."
+    if not rows:
+        msg = "No price data found matching your query in the market CSV."
         if crop_name:
             msg += f" Crop: '{crop_name}'."
         return msg
 
-    # Sort newest first
-    if 'Date' in df.columns:
-        df = df.sort_values(by='Date', ascending=False)
+    rows = sorted(rows, key=lambda r: str(r.get("Date") or ""), reverse=True)
+    essential = ["Commodity", "Market", "County", "Wholesale", "Retail", "Date"]
+    trimmed = [{c: r.get(c) for c in essential} for r in rows[:limit]]
+    return substitution_note + json.dumps(trimmed, indent=2)
 
-    # Keep only essential columns
-    essential_cols = ['Commodity', 'Market', 'County', 'Wholesale', 'Retail', 'Date']
-    cols_to_keep = [c for c in essential_cols if c in df.columns]
-    df = df[cols_to_keep]
 
-    df_limited = df.head(limit)
-    return substitution_note + df_limited.to_json(orient="records", indent=2)
+@tool
+def scrape_kamis_prices(
+    crop_name: Optional[str] = None,
+    market_name: Optional[str] = None,
+    county_name: Optional[str] = None,
+    limit: int = 10,
+) -> str:
+    """
+    Queries the SokoSense market CSV (data/market_prices.csv) and returns the
+    most recent price entries. The CSV is built by
+    scripts/collect_market_data.py / the admin refresh — this tool never
+    queries KAMIS live.
+    IMPORTANT: Always use the default limit of 10. Do NOT pass a higher limit value.
+
+    Args:
+        crop_name: The name of the crop to filter by (e.g. 'Tomatoes', 'Maize', 'Beans'). Case-insensitive.
+        market_name: Optional name of the market location to filter by (e.g. 'Maua', 'Kibuye'). Case-insensitive.
+        county_name: Optional name of the county to filter by (e.g. 'Meru', 'Kakamega', 'Nairobi'). Case-insensitive.
+        limit: Number of records to return. Maximum is 10. Do NOT change this value.
+    """
+    return fetch_csv_prices(crop_name, market_name, county_name, limit)
+
 
 def _search_kamis_via_tavily(query: str, restrict_to_kamis: bool = True) -> str:
     """
@@ -535,6 +436,8 @@ def _search_kamis_via_tavily(query: str, restrict_to_kamis: bool = True) -> str:
     tavily_key = os.getenv("TAVILY_API_KEY")
     if not tavily_key:
         return "Error: TAVILY_API_KEY is not set in the environment variables."
+
+    from tavily import TavilyClient
 
     client = TavilyClient(api_key=tavily_key)
 

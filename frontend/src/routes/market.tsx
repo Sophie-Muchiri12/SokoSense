@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
+import { RequireAuth } from "@/components/auth-guard";
 import { createFileRoute } from "@tanstack/react-router";
 import type { LMarket } from "@/components/leaflet-market-map";
 import {
@@ -13,6 +14,7 @@ import {
   recommendationHeadline,
 } from "@/lib/marketSignals";
 import type { MarketPricePoint } from "@/lib/sokosense-api";
+import { ArrowLeft, Bean, Carrot, Cherry, LeafyGreen, Sprout, Wheat } from "lucide-react";
 import { useMarketPrices } from "@/lib/useMarketPrices";
 
 const LeafletMarketMap = lazy(() => import("@/components/leaflet-market-map"));
@@ -20,29 +22,29 @@ const LeafletMarketMap = lazy(() => import("@/components/leaflet-market-map"));
 export const Route = createFileRoute("/market")({
   head: () => ({
     meta: [
-      { title: "Market Intelligence Map — SokoSense" },
+      { title: "Market Prices Map — SokoSense" },
       {
         name: "description",
         content:
-          "Live wholesale crop pricing and arbitrage intelligence across Kenya's seven primary markets.",
+          "Today's crop prices in the main markets across Kenya — and which market pays you most.",
       },
       { property: "og:title", content: "Market Intelligence Map — SokoSense" },
       {
         property: "og:description",
-        content: "Cached crop prices and arbitrage intelligence across Kenyan markets.",
+        content: "Today's crop prices across Kenyan markets, on one simple map.",
       },
     ],
   }),
-  component: MarketMapPage,
+  component: () => (<RequireAuth><MarketMapPage /></RequireAuth>),
 });
 
 const CROPS = [
-  { label: "Maize", key: "maize", emoji: "🌽" },
-  { label: "Beans", key: "beans", emoji: "🫘" },
-  { label: "Sorghum", key: "sorghum", emoji: "🌾" },
-  { label: "Millet", key: "millet", emoji: "🌿" },
-  { label: "Potatoes", key: "potatoes", emoji: "🥔" },
-  { label: "Tomatoes", key: "tomatoes", emoji: "🍅" },
+  { label: "Maize", key: "maize", icon: Wheat },
+  { label: "Beans", key: "beans", icon: Bean },
+  { label: "Sorghum", key: "sorghum", icon: Sprout },
+  { label: "Millet", key: "millet", icon: LeafyGreen },
+  { label: "Potatoes", key: "potatoes", icon: Carrot },
+  { label: "Tomatoes", key: "tomatoes", icon: Cherry },
 ] as const;
 
 const COUNTY_MAP: Record<string, string> = {
@@ -147,15 +149,15 @@ function MarketMapPage() {
   return (
     <div className="mx-auto max-w-[1320px] min-w-0 px-4 sm:px-6 pt-10 sm:pt-14 pb-10 sm:pb-12">
       <PageHeader
-        eyebrow="Market intelligence"
-        title="Where prices are synced."
-        italic="Where to move next."
-        sub="Live wholesale pricing across Kenya's primary markets. Select your county and subcounty — SokoSense maps you to the nearest wholesale market and estimates whether travel pays."
+        eyebrow="Market prices"
+        title="Today's prices,"
+        italic="and where to sell."
+        sub="See what each market is paying today. Choose your county and your area — we show your nearest market and whether travelling to a better-paying market is worth it."
       />
 
       {/* Crop pills */}
       <div className="mt-8 sm:mt-10 flex flex-wrap items-center gap-2">
-        <span className="w-full sm:w-auto text-[12px] text-steel sm:mr-1 uppercase tracking-wider">Commodity</span>
+        <span className="w-full sm:w-auto text-[12px] text-steel sm:mr-1 uppercase tracking-wider">Crop</span>
         {CROPS.map((c, i) => (
           <button
             key={c.key}
@@ -168,14 +170,14 @@ function MarketMapPage() {
                 : "bg-paper text-ink border-hairline hover:border-ink/40"
             }`}
           >
-            <span aria-hidden="true">{c.emoji}</span> {c.label}
+            <c.icon className="mr-1.5 inline h-4 w-4 align-[-2px]" aria-hidden="true" />{c.label}
           </button>
         ))}
       </div>
 
       <p className="mt-3 text-[11.5px] text-steel tabular">
-        Prices updated: {updatedLabel}
-        {sourceDate ? ` · KAMIS ${sourceDate}` : ""} · Source: KAMIS
+        Prices checked at {updatedLabel}
+        {sourceDate ? ` · newest reports ${sourceDate}` : ""} · Prices from KAMIS (the government market price service)
         {loading && <span className="ml-2 text-amber">Refreshing…</span>}
       </p>
 
@@ -184,7 +186,7 @@ function MarketMapPage() {
           className="mt-3 border border-amber/40 bg-[#FFF8E8] px-4 py-2.5 text-[12.5px] text-ink"
           role="status"
         >
-          Showing last successful prices — live feed unavailable ({error}).
+          Showing the last prices we received — we could not refresh just now.
           <button type="button" onClick={retry} className="ml-2 underline text-teal">
             Retry
           </button>
@@ -193,7 +195,7 @@ function MarketMapPage() {
 
       {!isStale && error && !markets.length && (
         <div className="mt-6 border border-rose/30 bg-rose/5 px-5 py-8 text-center">
-          <p className="font-serif text-[20px] text-ink">Could not load market prices</p>
+          <p className="font-serif text-[20px] text-ink">We could not load prices</p>
           <p className="mt-2 text-[13px] text-steel">{error}</p>
           <button
             type="button"
@@ -214,7 +216,7 @@ function MarketMapPage() {
                 onClick={handleResetCounties}
                 className="text-[12px] font-medium text-teal border border-hairline px-3 py-1.5 hover:border-teal/40"
               >
-                ← All counties
+                All counties
               </button>
             )}
             <Legend />
@@ -227,14 +229,14 @@ function MarketMapPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3 border-b border-hairline px-4 py-4 sm:px-5">
                   <div>
                     <p className="eyebrow">
-                      Kenya · {crop.label.toLowerCase()} · wholesale markets
+                      Kenya · {crop.label.toLowerCase()} · market prices
                     </p>
                     <h2 className="font-serif text-[22px] sm:text-[24px] text-ink mt-1">
                       {loading && !markets.length ? (
                         <span className="inline-block h-7 w-48 skeleton" />
                       ) : (
                         <>
-                          {markets.length} markets · spread{" "}
+                          {markets.length} markets · difference between highest and lowest:{" "}
                           <span className="text-teal tabular">
                             KSh {spread.toLocaleString()}
                           </span>{" "}
@@ -280,14 +282,14 @@ function MarketMapPage() {
                   {display && markets.length > 0 && !loading && (
                     <div className="pointer-events-none absolute top-2 left-2 sm:top-3 sm:left-3 max-w-[min(11rem,48vw)] sm:max-w-[220px] market-flat-card p-2 sm:p-3">
                       <p className="text-[9px] sm:text-[10px] uppercase tracking-wider text-mist">
-                        {hoverMarketId ? "Hover" : "Selected"} market
+                        {hoverMarketId ? "Market" : "Chosen market"}
                       </p>
                       <p className="font-serif text-[14px] sm:text-[17px] text-ink mt-0.5 truncate">{display.name}</p>
                       <p className="font-serif text-[20px] sm:text-[26px] leading-none text-ink tabular mt-1">
                         {display.price.toLocaleString()}
                       </p>
                       <p className="text-[9px] sm:text-[10px] text-steel mt-0.5 uppercase tracking-wider">
-                        KSh / 90kg · wholesale
+                        Shillings per 90kg bag (wholesale — the price traders pay)
                       </p>
                     </div>
                   )}
@@ -295,7 +297,7 @@ function MarketMapPage() {
 
                 {!selectedCounty && (
                   <p className="border-t border-hairline px-4 py-3 text-[12px] text-steel">
-                    Click a county to zoom in and choose your subcounty.
+                    Tap a county to see its areas, then choose yours.
                   </p>
                 )}
               </div>
@@ -322,17 +324,17 @@ function MarketMapPage() {
               {showArbitrage && origin && (
                 <div className="market-flat-card p-4 sm:p-5">
                   <div className="mb-4">
-                    <p className="eyebrow">Market comparison</p>
+                    <p className="eyebrow">Comparing markets for you</p>
                     <h3 className="font-serif text-[20px] text-ink mt-1">
                       {selectedCounty} · {selectedSubcounty?.name}
                     </h3>
                     <p className="text-[12.5px] text-steel mt-1 leading-snug">
-                      Nearest wholesale market:{" "}
+                      Your nearest market:{" "}
                       <span className="text-ink font-medium">{origin.name}</span>
                       {originResolution ? ` (${originResolution.distanceKm} km)` : ""}{" "}
-                      <span className="text-mist">→</span>{" "}
+                      <span className="text-mist">then</span>{" "}
                       <span className="text-teal font-medium">{best?.name}</span>
-                      <span className="text-steel"> (best price today)</span>
+                      <span className="text-steel"> (pays most today)</span>
                     </p>
                   </div>
 
@@ -345,8 +347,8 @@ function MarketMapPage() {
                           <tr className="text-left text-[10.5px] uppercase tracking-wider text-mist border-b border-hairline">
                             <th className="py-2 font-medium">Market</th>
                             <th className="py-2 font-medium text-right">Price</th>
-                            <th className="py-2 font-medium text-right">Dist.</th>
-                            <th className="py-2 font-medium text-right">Net / bag</th>
+                            <th className="py-2 font-medium text-right">Distance</th>
+                            <th className="py-2 font-medium text-right">You keep / bag</th>
                             <th className="py-2 font-medium" />
                           </tr>
                         </thead>
@@ -405,7 +407,7 @@ function MarketMapPage() {
 
               {selectedCounty && !selectedSubcounty && (
                 <p className="text-[12.5px] text-steel text-center py-2">
-                  Select a subcounty to see nearest-market pricing and arbitrage.
+                  Choose your area to see your nearest market and whether travelling pays.
                 </p>
               )}
             </div>
@@ -434,14 +436,14 @@ function MarketMapPage() {
             {showArbitrage && origin && best && recommendation && (
               <>
                 <div className="market-flat-card p-4 sm:p-5 bg-ink text-paper border-ink">
-                  <p className="text-[10.5px] uppercase tracking-wider text-mist">Best market today</p>
+                  <p className="text-[10.5px] uppercase tracking-wider text-mist">Best-paying market today</p>
                   <h3 className="font-serif text-[26px] sm:text-[32px] mt-1 leading-none">{best.name}</h3>
                   <p className="text-[12px] text-mist mt-1">
                     {crop.label} · {COUNTY_MAP[best.name] ?? best.name} County
                   </p>
                   <div className="mt-5 grid grid-cols-2 gap-px bg-ink-soft border border-ink-soft overflow-hidden">
                     <DarkStat
-                      label="Est. net margin"
+                      label="You could keep (after travel)"
                       value={`KSh ${profitPerBag.toLocaleString()}`}
                       sub="per 90kg bag"
                     />
@@ -451,13 +453,13 @@ function MarketMapPage() {
                       sub={`from ${origin.name}`}
                     />
                     <DarkStat
-                      label="Gross spread"
+                      label="Price difference"
                       value={`KSh ${grossPerBag.toLocaleString()}`}
-                      sub="vs nearest market"
+                      sub="compared with your nearest market"
                       accent={grossPerBag >= 0 ? "text-teal-glow" : "text-rose"}
                     />
                     <DarkStat
-                      label="Est. freight"
+                      label="Cost of transport"
                       value={`KSh ${transportCostPerBag.toLocaleString()}`}
                       sub="per bag"
                     />
@@ -465,7 +467,7 @@ function MarketMapPage() {
                 </div>
 
                 <div className="market-flat-card p-5 bg-green-surface border-green-surface">
-                  <p className="eyebrow text-green-deep">SokoSense recommendation</p>
+                  <p className="eyebrow text-green-deep">Our advice</p>
                   <h3 className="font-serif text-[20px] text-green-deep mt-2 leading-snug">
                     {recommendationHeadline(
                       recommendation,
@@ -476,9 +478,9 @@ function MarketMapPage() {
                     )}
                   </h3>
                   <p className="mt-3 text-[12.5px] text-green-deep/80 leading-relaxed">
-                    Est. net margin{" "}
+                    You could keep{" "}
                     <span className="font-medium">KSh {profitPerBag.toLocaleString()} / bag</span>{" "}
-                    after {distanceToBest} km road freight (KSh {TRANSPORT_KSH_PER_KM_BAG}/km/bag).{" "}
+                    after paying for {distanceToBest} km of transport (KSh {TRANSPORT_KSH_PER_KM_BAG} per km, per bag).{" "}
                     {best.name} is trading{" "}
                     <span className="font-medium">
                       {origin.price > 0
@@ -492,18 +494,18 @@ function MarketMapPage() {
             )}
 
             <div className="market-flat-card p-4 sm:p-5 sm:col-span-2 lg:col-span-2 xl:col-span-1">
-              <p className="eyebrow">Network snapshot</p>
+              <p className="eyebrow">At a glance</p>
               <div className="mt-3 space-y-3 text-[12.5px]">
-                <KV k="Markets online" v={`${markets.length} / 7`} />
-                <KV k="Spread" v={loading ? "…" : `KSh ${spread.toLocaleString()}`} />
+                <KV k="Markets with prices" v={`${markets.length}`} />
+                <KV k="Difference (highest − lowest)" v={loading ? "…" : `KSh ${spread.toLocaleString()}`} />
                 <KV k="Last update" v={updatedLabel} />
-                <KV k="Source" v="KAMIS · kamis.kilimo.go.ke" />
+                <KV k="Prices from" v="KAMIS (government market prices)" />
                 <KV
-                  k="24h change"
+                  k="Change since yesterday"
                   v={<span className="text-mist text-[11px]">Coming soon</span>}
                 />
                 <KV
-                  k="Volume"
+                  k="Amount traded"
                   v={<span className="text-mist text-[11px]">Coming soon</span>}
                 />
               </div>

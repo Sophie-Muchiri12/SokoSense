@@ -29,7 +29,6 @@ if AT_USERNAME and AT_API_KEY:
         sms_client = africastalking.SMS
     except Exception as e:
         print(f"[AT] Failed to initialize Africa's Talking SDK: {e}")
-from masumi_hook import charge_query
 from routes.ussd_i18n import (
     CROP_SW,
     HELP_TEXT_SW,
@@ -47,7 +46,7 @@ router = APIRouter(tags=["webhook"])
 # ---------------------------------------------------------------------------
 
 KNOWN_CROPS = {"maize", "beans", "sorghum", "millet", "potatoes", "tomatoes"}
-KNOWN_MARKETS = {"nairobi", "nakuru", "eldoret", "kisumu", "mombasa", "kitale", "nyeri"}
+KNOWN_MARKETS = {"nairobi", "nakuru", "eldoret", "kisumu", "mombasa", "kitale", "nyeri", "meru"}
 
 CROP_ALIASES = {
     "mahindi": "maize", "corn": "maize",
@@ -129,7 +128,6 @@ def route_sms(text: str) -> str:
     if intent == "loan":
         req = LoanRequest(monthly_rate_percent=parsed["monthly_rate_percent"])
         result = loaning.decide_loan(req)
-        charge_query("loan", payer="demo-sacco")
         return loan_reply_sw(result) if is_sw else result.short_reply
 
     return HELP_TEXT_SW if is_sw else HELP_TEXT
@@ -265,16 +263,3 @@ async def ussd_handler(
     if is_sw:
         return "END Ingizo batili. Tuma HELP kwa maagizo."
     return "END Invalid input. Text HELP for commands."
-
-# MASUMI REVENUE CHECK  (for demo — shows live billing activity)
-# ---------------------------------------------------------------------------
-
-from masumi_hook import get_revenue_summary, get_transaction_log
-
-@router.get("/webhook/revenue")
-def revenue_summary():
-    """Live revenue dashboard data — shows judges automated billing in action."""
-    return {
-        "summary": get_revenue_summary(),
-        "recent_transactions": get_transaction_log(limit=10),
-    }

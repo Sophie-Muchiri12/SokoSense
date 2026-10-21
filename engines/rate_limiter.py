@@ -82,3 +82,11 @@ agent_query_limiter = RateLimiter(
     period_seconds=60,
     name="Agent Query"
 )
+
+# Applied to live KAMIS HTTP fetches (collection / Excel fallback only —
+# request-time price reads come from the market CSV, never KAMIS live).
+kamis_http_limiter = RateLimiter(
+    max_calls=5,
+    period_seconds=60,
+    name="KAMIS HTTP"
+)

@@ -1,4 +1,4 @@
-"""Market decision engine — compares prices from the cached KAMIS SQLite data."""
+"""Market decision engine — compares prices from the KAMIS market CSV."""
 
 from models.common import truncate_sms
 from models.market import MarketDecisionRequest, MarketDecisionResponse
@@ -41,7 +41,7 @@ def parse_price(val) -> float | None:
 
 
 def decide_market(request: MarketDecisionRequest) -> MarketDecisionResponse:
-    """Return where to sell based on cached KAMIS market data."""
+    """Return where to sell based on the KAMIS market CSV."""
     crop     = request.crop.strip().lower()
     location = request.location.strip().lower()
 
@@ -63,7 +63,34 @@ def decide_market(request: MarketDecisionRequest) -> MarketDecisionResponse:
         best_market = max(live_prices, key=live_prices.get)
         best_price  = live_prices[best_market]
 
+    if local_price is None:
+        # The farmer's place may not be one of the seven focus markets but
+        # still have rows in the CSV (e.g. tomatoes in Meru) — use its own
+        # latest CSV price rather than claiming there is no price there.
+        try:
+            from data.price_pipeline import get_trend
+
+            local_price = get_trend(crop, location).get("price_kes")
+        except Exception:
+            local_price = None
+
     # ── 3. Handle missing market data ─────────────────────────────────────
+    if local_price is not None and (best_market is None or best_price is None):
+        # Only a local CSV price exists (no focus-market comparison yet).
+        return MarketDecisionResponse(
+            crop=crop,
+            location=location.title(),
+            recommendation="SELL_HERE",
+            short_reply=truncate_sms(
+                f"SELL HERE. {location.title()} is paying KSh {local_price:,.0f}/bag today."
+            ),
+            market_name=location.title(),
+            best_market=location.title(),
+            local_price_kes=local_price,
+            best_price_kes=local_price,
+            price_diff_kes=0,
+        )
+
     if not live_prices or best_market is None or best_price is None:
         return MarketDecisionResponse(
             crop=crop,

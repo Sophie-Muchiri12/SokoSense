@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+
+from auth.security import require_admin
 
 from models.logs import LogListResponse
 
-router = APIRouter(prefix="/api", tags=["logs"])
+router = APIRouter(prefix="/api", tags=["logs"], dependencies=[Depends(require_admin)])
 
 
 @router.get("/logs", response_model=LogListResponse)
