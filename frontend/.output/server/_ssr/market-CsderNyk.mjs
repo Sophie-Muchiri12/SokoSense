@@ -1,0 +1,51 @@
+import { r as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/market-CsderNyk.js
+var import_jsx_runtime = require_jsx_runtime();
+var $$splitComponentImporter = () => import("./market-DF5VQrls.mjs");
+var Route = createFileRoute("/market")({
+	head: () => ({ meta: [
+		{ title: "Market Prices Map — SokoSense" },
+		{
+			name: "description",
+			content: "Today's crop prices in the main markets across Kenya — and which market pays you most."
+		},
+		{
+			property: "og:title",
+			content: "Market Intelligence Map — SokoSense"
+		},
+		{
+			property: "og:description",
+			content: "Today's crop prices across Kenyan markets, on one simple map."
+		}
+	] }),
+	component: lazyRouteComponent($$splitComponentImporter, "component")
+});
+function PageHeader({ eyebrow, title, italic, sub }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "max-w-3xl",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "eyebrow",
+				children: eyebrow
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h1", {
+				className: "display mt-3 sm:mt-4 text-[34px] sm:text-[48px] md:text-[60px] text-ink text-balance",
+				children: [
+					title,
+					" ",
+					italic && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "italic text-teal",
+						children: italic
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-4 sm:mt-5 text-[14px] sm:text-[14.5px] leading-relaxed text-steel max-w-2xl text-pretty",
+				children: sub
+			})
+		]
+	});
+}
+//#endregion
+export { Route as n, PageHeader as t };
