@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "description": "SokoSense API contract — Ian (UI), Lucy (AT webhook), and Job (engines) build against this.",
+  "description": "SokoSense API contract \u2014 Ian (UI), Lucy (AT webhook), and Job (engines) build against this.",
   "constraints": {
     "short_reply_max_chars": 320,
     "ussd_screen_max_chars": 182
@@ -23,26 +23,39 @@
     "tomatoes"
   ],
   "endpoints": {
-    "POST /api/market": {
-      "description": "Market decision engine — where to sell",
+    "POST /api/advisory": {
+      "description": "RAG advisory engine \u2014 answer farmer questions using Postgres knowledge tables + pgvector + weather + LLM",
       "request": {
-        "crop": "string (required) — e.g. maize",
-        "location": "string (required) — farmer's market or county, e.g. nakuru"
+        "query": "string (required) \u2014 farmer question, e.g. 'What causes maize rust in Nakuru?'"
+      },
+      "response": {
+        "query": "string",
+        "answer": "string \u2014 LLM-generated advisory (320 chars SMS-ready)",
+        "location": "string | null \u2014 detected location",
+        "weather": "object | null \u2014 current weather + 3-day forecast",
+        "sources": "array of strings \u2014 knowledge and data sources used"
+      }
+    },
+    "POST /api/market": {
+      "description": "Market decision engine \u2014 where to sell",
+      "request": {
+        "crop": "string (required) \u2014 e.g. maize",
+        "location": "string (required) \u2014 farmer's market or county, e.g. nakuru"
       },
       "response": {
         "crop": "string",
         "location": "string",
-        "recommendation": "string — SELL_HERE | SELL_IN_MARKET | WAIT",
-        "short_reply": "string (max 320) — SMS-ready one-line decision",
-        "market_name": "string | null — farmer's local market",
-        "best_market": "string | null — recommended market if different",
-        "local_price_kes": "number | null — price at local market per 90kg bag",
-        "best_price_kes": "number | null — price at best market",
-        "price_diff_kes": "number | null — gain per bag if farmer travels"
+        "recommendation": "string \u2014 SELL_HERE | SELL_IN_MARKET | WAIT",
+        "short_reply": "string (max 320) \u2014 SMS-ready one-line decision",
+        "market_name": "string | null \u2014 farmer's local market",
+        "best_market": "string | null \u2014 recommended market if different",
+        "local_price_kes": "number | null \u2014 price at local market per 90kg bag",
+        "best_price_kes": "number | null \u2014 price at best market",
+        "price_diff_kes": "number | null \u2014 gain per bag if farmer travels"
       }
     },
     "POST /api/timing": {
-      "description": "Sell timing engine — when to sell",
+      "description": "Sell timing engine \u2014 when to sell",
       "request": {
         "crop": "string (required)",
         "market": "string (required)"
@@ -50,25 +63,24 @@
       "response": {
         "crop": "string",
         "market": "string",
-        "recommendation": "string — SELL_TODAY | WAIT",
+        "recommendation": "string \u2014 SELL_TODAY | WAIT",
         "short_reply": "string (max 320)",
         "wait_days": "integer | null",
         "reason": "string"
       }
     },
     "POST /api/loan": {
-      "description": "Loan APR engine — safe or not safe",
+      "description": "Loan APR engine \u2014 safe or not safe",
       "request": {
-        "monthly_rate_percent": "number (required) — e.g. 10 for 10% per month"
+        "monthly_rate_percent": "number (required) \u2014 e.g. 10 for 10% per month"
       },
       "response": {
         "monthly_rate_percent": "number",
         "apr_percent": "number",
-        "cbk_rate_percent": "number — benchmark, ~13",
-        "risk_verdict": "string — SAFE | CAUTION | HIGH_RISK | AVOID",
+        "cbk_rate_percent": "number \u2014 benchmark, ~13",
+        "risk_verdict": "string \u2014 SAFE | CAUTION | HIGH_RISK | AVOID",
         "short_reply": "string (max 320)",
-        "comparison_phrase": "string (max 320)",
-        "payment_id": "string | null — Masumi mock ID from Lucy"
+        "comparison_phrase": "string (max 320)"
       }
     },
     "GET /api/logs": {
@@ -85,7 +97,7 @@
           {
             "timestamp": "string ISO8601",
             "raw_input": "string",
-            "engine": "string — market | timing | loan | sms",
+            "engine": "string \u2014 market | timing | loan | sms | advisory",
             "short_reply": "string",
             "latency_ms": "integer",
             "error": "string | null"
@@ -113,11 +125,11 @@
       }
     },
     "POST /webhook/sms": {
-      "description": "Africa's Talking SMS webhook — Lucy implements handler; contract for Ian simulator",
-      "note": "Lucy owns implementation; simulator may POST same shape or call /api/market after parse",
+      "description": "Africa's Talking SMS webhook \u2014 Lucy implements handler; contract for Ian simulator",
+      "note": "Lucy owns implementation; simulator may POST same shape or call /api/advisory after parse",
       "request": {
-        "from": "string — sender phone",
-        "text": "string — raw SMS body"
+        "from": "string \u2014 sender phone",
+        "text": "string \u2014 raw SMS body"
       },
       "response": {
         "short_reply": "string (max 320)"

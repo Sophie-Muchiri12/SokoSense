@@ -1,98 +1,195 @@
-"""Market decision engine — Job replaces stub logic with KACE/KAMIS rules."""
+"""Market decision engine — compares prices from the KAMIS market CSV."""
 
+from models.common import truncate_sms
 from models.market import MarketDecisionRequest, MarketDecisionResponse
-
-# Mock prices per 90kg bag (KSh) — replaced by live KACE data
-_MOCK_PRICES: dict[str, dict[str, float]] = {
-    "maize": {
-        "Nairobi": 3200,
-        "Nakuru": 2900,
-        "Eldoret": 3500,
-        "Kisumu": 3100,
-        "Mombasa": 3300,
-        "Kitale": 3400,
-        "Nyeri": 3000,
-    },
-    "beans": {
-        "Nairobi": 8500,
-        "Nakuru": 8200,
-        "Eldoret": 9100,
-        "Kisumu": 8400,
-        "Mombasa": 8600,
-        "Kitale": 9000,
-        "Nyeri": 8300,
-    },
-}
-
-_MARKET_COORDS = {
-    "nairobi": "Nairobi",
-    "nakuru": "Nakuru",
-    "eldoret": "Eldoret",
-    "kisumu": "Kisumu",
-    "mombasa": "Mombasa",
-    "kitale": "Kitale",
-    "nyeri": "Nyeri",
-}
 
 _PRICE_DIFF_THRESHOLD = 0.08  # 8% minimum to recommend travel
 
 
-def _normalize_location(location: str) -> str:
-    key = location.strip().lower()
-    return _MARKET_COORDS.get(key, location.strip().title())
+def parse_price(val: str | float | None) -> float | None:
+    """Convert KAMIS price string to KSh per 90kg bag."""
+    if val is None or str(val).strip() in ("-", "", "nan"):
+        return None
+    try:
+        cleaned = "".join(c for c in str(val) if c.isdigit() or c == ".")
+        if not cleaned:
+            return None
+        price = float(cleaned)
+        # KAMIS reports per KG — convert to 90kg bag
+        if price < 500:
+            price = price * 90
+        return round(price, 0)
+    except (ValueError, TypeError):
+        return None
+
+
+def parse_price(val) -> float | None:
+    """Convert a KAMIS price string to KSh per 90kg bag (None if unparseable)."""
+    if not val or str(val).strip() in ("-", "", "nan"):
+        return None
+    try:
+        cleaned = "".join(c for c in str(val) if c.isdigit() or c == ".")
+        if cleaned:
+            price = float(cleaned)
+            # KAMIS reports per KG — convert to 90kg bag
+            if price < 500:
+                price = price * 90
+            return round(price, 0)
+    except Exception:
+        pass
+    return None
 
 
 def decide_market(request: MarketDecisionRequest) -> MarketDecisionResponse:
-    """Return where to sell. Stub uses mock prices; Job wires KACE + 8–15% threshold."""
-    crop = request.crop.strip().lower()
-    location = _normalize_location(request.location)
+    """Return where to sell based on the KAMIS market CSV."""
+    crop     = request.crop.strip().lower()
+    location = request.location.strip().lower()
 
-    prices = _MOCK_PRICES.get(crop, _MOCK_PRICES["maize"])
-    local_price = prices.get(location, prices["Nakuru"])
-    best_market = max(prices, key=prices.get)
-    best_price = prices[best_market]
+    # ── 1. Try live prices from pipeline ─────────────────────────────────
+    live_prices: dict[str, float] = {}
+    try:
+        from data.price_pipeline import get_live_prices
+        live_prices = get_live_prices(crop)
+    except Exception:
+        pass
 
-    if best_market == location:
-        short_reply = f"SELL HERE. {location} has the best price at KSh {local_price:,.0f}/bag today."
+    # ── 2. Extract local + best from live data ────────────────────────────
+    local_price: float | None = None
+    best_market: str | None   = None
+    best_price:  float | None = None
+
+    if live_prices:
+        local_price = live_prices.get(location)
+        best_market = max(live_prices, key=live_prices.get)
+        best_price  = live_prices[best_market]
+
+    if local_price is None:
+        # The farmer's place may not be one of the seven focus markets but
+        # still have rows in the CSV (e.g. tomatoes in Meru) — use its own
+        # latest CSV price rather than claiming there is no price there.
+        try:
+            from data.price_pipeline import get_trend
+
+            local_price = get_trend(crop, location).get("price_kes")
+        except Exception:
+            local_price = None
+
+    # ── 3. Handle missing market data ─────────────────────────────────────
+    if local_price is not None and (best_market is None or best_price is None):
+        # Only a local CSV price exists (no focus-market comparison yet).
         return MarketDecisionResponse(
             crop=crop,
-            location=location,
+            location=location.title(),
             recommendation="SELL_HERE",
-            short_reply=short_reply,
-            market_name=location,
-            best_market=location,
+            short_reply=truncate_sms(
+                f"SELL HERE. {location.title()} is paying KSh {local_price:,.0f}/bag today."
+            ),
+            market_name=location.title(),
+            best_market=location.title(),
+            local_price_kes=local_price,
+            best_price_kes=local_price,
+            price_diff_kes=0,
+        )
+
+    if not live_prices or best_market is None or best_price is None:
+        return MarketDecisionResponse(
+            crop=crop,
+            location=location.title(),
+            recommendation="WAIT",
+            short_reply=(
+                "No cached market price data is available right now. "
+                "Please try again after the next background sync."
+            ),
+            market_name=location.title(),
+            best_market=None,
+            local_price_kes=None,
+            best_price_kes=None,
+            price_diff_kes=None,
+        )
+
+    if local_price is None:
+        # Honest nearest-market fallback instead of a dead end.
+        try:
+            from data.price_pipeline import nearest_market
+
+            alt = nearest_market(crop, location)
+        except Exception:
+            alt = {}
+
+        nearest = alt.get("nearest_market")
+        nearest_price = alt.get("nearest_price")
+        note = alt.get("note") or "There is no market found in that area."
+        return MarketDecisionResponse(
+            crop=crop,
+            location=location.title(),
+            recommendation="SELL_IN_MARKET" if nearest else "WAIT",
+            short_reply=note,
+            market_name=location.title(),
+            best_market=(nearest or best_market or "").title() or None,
+            local_price_kes=None,
+            best_price_kes=nearest_price if nearest_price is not None else best_price,
+            price_diff_kes=None,
+        )
+
+    # ── 4. Trend signal (real, derived from cross-market variance) ────────
+    trend_note = ""
+    try:
+        from data.price_pipeline import get_trend
+        trend = get_trend(crop, location)
+        if trend.get("trend") == "up" and trend.get("wait_days", 0) > 0:
+            trend_note = f" Price trending up — consider waiting {trend['wait_days']}d if you can."
+    except Exception:
+        pass
+
+    # ── 5. Decision ───────────────────────────────────────────────────────
+    display_location = location.title()
+    display_best     = best_market.title() if best_market else display_location
+
+    if best_market == location or best_price <= local_price:
+        return MarketDecisionResponse(
+            crop=crop,
+            location=display_location,
+            recommendation="SELL_HERE",
+            short_reply=truncate_sms(
+                f"SELL HERE. {display_location} has the best price at KSh {local_price:,.0f}/bag today."
+                f"{trend_note}"
+            ),
+            market_name=display_location,
+            best_market=display_location,
             local_price_kes=local_price,
             best_price_kes=local_price,
             price_diff_kes=0,
         )
 
     diff = best_price - local_price
-    pct = diff / local_price if local_price else 0
+    pct  = diff / local_price if local_price else 0
 
     if pct >= _PRICE_DIFF_THRESHOLD:
-        short_reply = (
-            f"SELL IN {best_market.upper()}. KSh {diff:,.0f} more per bag. Worth the trip."
-        )
         return MarketDecisionResponse(
             crop=crop,
-            location=location,
+            location=display_location,
             recommendation="SELL_IN_MARKET",
-            short_reply=short_reply,
-            market_name=location,
-            best_market=best_market,
+            short_reply=truncate_sms(
+                f"SELL IN {display_best.upper()}. KSh {diff:,.0f} more per bag. Worth the trip."
+                f"{trend_note}"
+            ),
+            market_name=display_location,
+            best_market=display_best,
             local_price_kes=local_price,
             best_price_kes=best_price,
             price_diff_kes=diff,
         )
 
-    short_reply = f"WAIT. Local price at {location} is competitive. No better market nearby today."
     return MarketDecisionResponse(
         crop=crop,
-        location=location,
+        location=display_location,
         recommendation="WAIT",
-        short_reply=short_reply,
-        market_name=location,
-        best_market=best_market,
+        short_reply=truncate_sms(
+            f"WAIT. {display_location} price is competitive at KSh {local_price:,.0f}/bag. No better market today."
+            f"{trend_note}"
+        ),
+        market_name=display_location,
+        best_market=display_best,
         local_price_kes=local_price,
         best_price_kes=best_price,
         price_diff_kes=diff,

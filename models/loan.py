@@ -23,7 +23,6 @@ class LoanResponse(BaseModel):
     risk_verdict: RiskVerdict
     short_reply: str = Field(..., max_length=320)
     comparison_phrase: str = Field(..., max_length=320)
-    payment_id: str | None = None
 
     @field_validator("short_reply", "comparison_phrase")
     @classmethod

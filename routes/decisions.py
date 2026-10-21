@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from auth.security import get_current_user
 
 from engines import loaning, market, timing
 from models import (
@@ -10,7 +12,7 @@ from models import (
     TimingResponse,
 )
 
-router = APIRouter(prefix="/api", tags=["decisions"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/api", tags=["decisions"])
 
 
 @router.post("/market", response_model=MarketDecisionResponse)

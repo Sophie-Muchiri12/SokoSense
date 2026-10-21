@@ -1,8 +1,16 @@
-from datetime import date
+"""Market map price feed — reads from the KAMIS market CSV."""
 
+from datetime import date, timedelta
+
+from engines.market import parse_price
 from models.market_map import MarketMapResponse, MarketPricePoint
 
-# GPS coords for Ian's Leaflet map
+# A market only appears on the map when its newest CSV report is this
+# recent — older rows (the CSV keeps 10 per market, some years old) must
+# not be presented as current prices. Mirrors price_pipeline's rule.
+MAX_PRICE_AGE_DAYS = 90
+
+# GPS coords for Leaflet map markers
 _MARKET_LOCATIONS: dict[str, tuple[float, float]] = {
     "Nairobi": (-1.2864, 36.8172),
     "Nakuru": (-0.3031, 36.0800),
@@ -11,86 +19,125 @@ _MARKET_LOCATIONS: dict[str, tuple[float, float]] = {
     "Mombasa": (-4.0435, 39.6682),
     "Kitale": (1.0167, 35.0000),
     "Nyeri": (-0.4197, 36.9475),
+    "Meru": (0.0467, 37.6556),
+    "Kakamega": (0.2827, 34.7519),
 }
 
-_MOCK_PRICES: dict[str, dict[str, float]] = {
-    "maize": {
-        "Nairobi": 3200,
-        "Nakuru": 2900,
-        "Eldoret": 3500,
-        "Kisumu": 3100,
-        "Mombasa": 3300,
-        "Kitale": 3400,
-        "Nyeri": 3000,
-    },
-    "beans": {
-        "Nairobi": 8500,
-        "Nakuru": 8200,
-        "Eldoret": 9100,
-        "Kisumu": 8400,
-        "Mombasa": 8600,
-        "Kitale": 9000,
-        "Nyeri": 8300,
-    },
-    "sorghum": {
-        "Nairobi": 4500,
-        "Nakuru": 4300,
-        "Eldoret": 4800,
-        "Kisumu": 4400,
-        "Mombasa": 4600,
-        "Kitale": 4700,
-        "Nyeri": 4350,
-    },
-    "millet": {
-        "Nairobi": 5200,
-        "Nakuru": 5000,
-        "Eldoret": 5500,
-        "Kisumu": 5100,
-        "Mombasa": 5300,
-        "Kitale": 5450,
-        "Nyeri": 5050,
-    },
-    "potatoes": {
-        "Nairobi": 2800,
-        "Nakuru": 2600,
-        "Eldoret": 3100,
-        "Kisumu": 2700,
-        "Mombasa": 2900,
-        "Kitale": 3000,
-        "Nyeri": 2650,
-    },
-    "tomatoes": {
-        "Nairobi": 6500,
-        "Nakuru": 6200,
-        "Eldoret": 7000,
-        "Kisumu": 6400,
-        "Mombasa": 6600,
-        "Kitale": 6800,
-        "Nyeri": 6300,
-    },
+_MARKET_ALIASES: dict[str, str] = {
+    "nairobi": "Nairobi",
+    "nakuru": "Nakuru",
+    "eldoret": "Eldoret",
+    "uasin gishu": "Eldoret",
+    "uasin-gishu": "Eldoret",
+    "kisumu": "Kisumu",
+    "mombasa": "Mombasa",
+    "kitale": "Kitale",
+    "trans-nzoia": "Kitale",
+    "trans nzoia": "Kitale",
+    "nyeri": "Nyeri",
+    "meru": "Meru",
+    "kakamega": "Kakamega",
 }
+
+
+def _canonical_market(market: str, county: str) -> str | None:
+    """Map a KAMIS market/county label to one of our tracked map markets."""
+    # Normalise hyphens so "Uasin-Gishu" matches "uasin gishu".
+    haystack = f"{market} {county}".lower().replace("-", " ").replace("_", " ")
+    for alias, canonical in _MARKET_ALIASES.items():
+        if alias.replace("-", " ") in haystack:
+            return canonical
+    for name in _MARKET_LOCATIONS:
+        if name.lower() in haystack:
+            return name
+    return None
+
+
+def _fetch_csv_prices(crop: str) -> tuple[dict[str, float], str | None]:
+    """Read KAMIS rows from the market CSV and map them to tracked markets.
+
+    Each market's price is the median of its rows on its most recent report
+    date (not the highest price ever seen). Markets whose newest report is
+    older than MAX_PRICE_AGE_DAYS are dropped — they are not recent data —
+    and the returned date is the newest date among the markets shown.
+    All CSV rows for the crop are considered (not just the newest 500
+    globally, which crowded out slower-reporting markets).
+    """
+    prices: dict[str, float] = {}
+    latest_date: str | None = None
+    by_market_date: dict[str, dict[str, list[float]]] = {}
+
+    try:
+        from data.market_csv import query_crop_history
+
+        rows = query_crop_history(crop, max_rows=100_000)
+    except Exception:
+        return prices, latest_date
+
+    for row in rows:
+        canonical = _canonical_market(
+            str(row.get("Market", "")),
+            str(row.get("County", "")),
+        )
+        if not canonical:
+            continue
+
+        price = parse_price(str(row.get("Wholesale", ""))) or parse_price(
+            str(row.get("Retail", ""))
+        )
+        if price is None:
+            continue
+
+        row_date = row.get("Date")
+        if not isinstance(row_date, str) or not row_date:
+            continue
+        by_market_date.setdefault(canonical, {}).setdefault(row_date, []).append(price)
+
+    cutoff = (date.today() - timedelta(days=MAX_PRICE_AGE_DAYS)).isoformat()
+    for canonical, by_date in by_market_date.items():
+        newest = max(by_date)
+        if newest < cutoff:
+            continue  # stale — not recent data, keep it off the map
+        if latest_date is None or newest > latest_date:
+            latest_date = newest
+        day_prices = sorted(by_date[newest])
+        mid = len(day_prices) // 2
+        prices[canonical] = (
+            day_prices[mid]
+            if len(day_prices) % 2
+            else (day_prices[mid - 1] + day_prices[mid]) / 2
+        )
+
+    return prices, latest_date
 
 
 def get_market_prices(crop: str = "maize") -> MarketMapResponse:
-    """Return price table for map. Stub data until Job/Lucy wire live KACE/Neo4j."""
+    """Return price table for the map from the market CSV."""
     crop_key = crop.strip().lower()
-    prices = _MOCK_PRICES.get(crop_key, _MOCK_PRICES["maize"])
-    best_market = max(prices, key=prices.get)
+    db_prices, db_date = _fetch_csv_prices(crop_key)
+    if not db_prices:
+        return MarketMapResponse(
+            crop=crop_key,
+            date=db_date or date.today().isoformat(),
+            markets=[],
+        )
+
+    best_market = max(db_prices, key=db_prices.get)
 
     markets = [
         MarketPricePoint(
             name=name,
             lat=coords[0],
             lng=coords[1],
-            price_kes=price,
+            price_kes=db_prices[name],
             recommended=(name == best_market),
         )
         for name, coords in _MARKET_LOCATIONS.items()
-        for price in [prices[name]]
+        if name in db_prices
     ]
 
     return MarketMapResponse(
         crop=crop_key,
-        date=date.today().isoformat(),
+        date=db_date or date.today().isoformat(),
         markets=markets,
     )

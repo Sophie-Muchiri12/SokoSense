@@ -37,14 +37,18 @@ SokoSense/
 │   ├── loaning.py                # APR + verdict (+ decide_loan for API)
 │   └── market_prices.py          # Price table for Ian's map
 │
+├── db/                           # Postgres (Supabase) data layer
+│   ├── postgres.py               # DATABASE_URL connection + schema bootstrap
+│   ├── schema.sql                # pgvector + all tables (Supabase SQL Editor-ready)
+│   ├── seed_data.py / seed.py    # Advisory crop/disease knowledge seed
+│
 ├── data/                         # Lucy (+ Job integrations as needed)
-│   ├── neo4j_client.py           # Lucy — AuraDB connection
-│   ├── price_pipeline.py         # Lucy — load prices into Neo4j
-│   ├── trends.py                 # Lucy — get_trend(crop, market) → float
-│   └── masumi_hook.py            # Lucy — payment log on /api/loan
+│   ├── market_csv.py             # KAMIS market CSV — the single price source of truth
+│   ├── kamis_collect.py          # KAMIS scrape → clean → atomic CSV swap (manual + admin)
+│   ├── price_pipeline.py         # Lucy — live prices / trends / best market
+│   └── market_prices.csv         # Built market data (top-10 recent rows per commodity/market)
 │
 ├── parser/                       # Sophie + Job — SMS input only (NOT decisions)
-│   ├── sms_parser.py             # Featherless: raw SMS → {crop, location, intent}
 │   ├── prompts.py
 │   └── regex_fallback.py
 │
@@ -53,6 +57,7 @@ SokoSense/
 │   ├── decisions.py              # POST /api/market, /timing, /loan
 │   ├── logs.py                   # GET /api/logs
 │   ├── market_data.py            # GET /api/market-prices
+│   ├── webhook.py                # SMS parser + USSD handler (rule-based, EN/SW)
 │   ├── webhook_sms.py            # POST /webhook/sms — Lucy (Africa's Talking)
 │   └── webhook_ussd.py           # POST /webhook/ussd — Lucy (*384*543#)
 │
@@ -110,7 +115,7 @@ These are **not** moved into `data/` or `legacy/` — they remain at root for Jo
 | `engines/timing.py` | Job | Timing decision engine |
 | `engines/loaning.py` | Job | Loan APR calculation, agent tool, `decide_loan()` |
 | `engines/market_prices.py` | Job | Map price data for frontend |
-| `data/*` | Lucy | Neo4j, price pipeline, trends, Masumi |
+| `db/*` + `data/*` | Lucy | Postgres/pgvector, price pipeline, trends |
 | `parser/*` | Sophie + Job | SMS text → `{crop, location, intent}` |
 | `frontend/*` | Ian | Demo UI screens |
 | `docs/*` | All | Plans, templates, demo script |
@@ -122,7 +127,7 @@ These are **not** moved into `data/` or `legacy/` — they remain at root for Jo
 | Folder | Owner | Contains |
 |--------|-------|----------|
 | `engines/` | **Job** | `market.py`, `timing.py`, `loaning.py` — all decision logic |
-| `data/` | **Lucy** | Neo4j, price pipeline, trends, Masumi hooks |
+| `db/` + `data/` | **Lucy** | Postgres/pgvector, price pipeline, trends |
 | `parser/` | **Sophie + Job** | SMS text → structured `{crop, location, intent}` |
 | `models/` | **Sophie** | Pydantic schemas only — no logic |
 | `routes/` | **Sophie + Lucy** | HTTP + AT webhooks (handlers call engines/parser) |
@@ -161,8 +166,86 @@ Ian’s SMS Simulator hits the same path via `POST /webhook/sms` or `POST /api/m
 3. **No root-level `*_engine/` folders** — loan logic lives in `engines/loaning.py`.
 4. **`kamis_tool.py`, `rate_limiter.py`, `agent.py`, `index.py` stay at root** — Job's CLI and KAMIS tooling.
 5. **All API types** in `models/` — engines import from `models`, never invent their own shapes.
-6. **`data/` is for Lucy's integrations** — Neo4j, trends, Masumi; not a home for root CLI files.
+6. **`db/`/`data/` are for Lucy's integrations** — Postgres/pgvector, trends; not a home for root CLI files.
 
 ---
 
 *Kenya AI Challenge 2026 · SokoSense · update this file when the team agrees changes.*
+
+<!-- 
+
+
+## Quick start (FastAPI — under 5 minutes)
+
+1. **Clone and enter the repo:**
+   ```bash
+   cd SokoSense
+   ```
+
+2. **Virtual environment and dependencies:**
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+3. **Environment (optional for mock API):**
+   ```bash
+   cp .env.example .env
+   ```
+   Mock endpoints work without API keys. Add keys when wiring the LLM parser, Supabase (DATABASE_URL), and Africa's Talking.
+
+4. **Run the API:**
+   ```bash
+   uvicorn main:app --reload
+   ```
+   Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for interactive Swagger UI.
+
+5. **Smoke test:**
+   ```bash
+   pytest tests/test_api.py -q
+   ```
+
+## API endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | Health check |
+| POST | `/api/market` | Where to sell — `{ "crop": "maize", "location": "nakuru" }` |
+| POST | `/api/timing` | When to sell — `{ "crop": "maize", "market": "nakuru" }` |
+| POST | `/api/loan` | Loan APR verdict — `{ "monthly_rate_percent": 10 }` |
+| GET | `/api/logs` | Query log (empty until logging middleware) |
+| GET | `/api/market-prices?crop=maize` | Map price table for Ian's dashboard |
+
+Request/response shapes: see **`contract.json`** in the repo root.
+
+### Example — Wanjiku's market decision
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/market \
+  -H "Content-Type: application/json" \
+  -d '{"crop":"maize","location":"nakuru"}' | python3 -m json.tool
+```
+
+Expected `short_reply`: *SELL IN ELDORET. KSh 600 more per bag. Worth the trip.*
+
+## Project structure
+
+```
+engines/          # Decision engines  — market, timing, loan
+models/           # Shared Pydantic schemas
+routes/           # FastAPI route handlers
+middleware/       # Query logging (Sophie D1 17:00)
+main.py           # App entry — uvicorn main:app
+contract.json     # API contract for Ian, Lucy, Job
+```
+
+## Legacy CLI — KAMIS Market Price Agent
+
+Job's LangGraph KAMIS scraper still runs separately (research / data prototyping):
+
+```bash
+python index.py "maize nairobi"
+```
+
+--- -->

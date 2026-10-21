@@ -1,15 +1,21 @@
 import os
 import io
+import logging
 import urllib3
-import requests
-import pandas as pd
 from typing import Optional
 from langchain_core.tools import tool
-from tavily import TavilyClient
-from rate_limiter import kamis_http_limiter
+
+logger = logging.getLogger(__name__)
 
 # Suppress SSL certificate warning from urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Max number of KAMIS product IDs to fetch for a single query. Broad crop names
+# (e.g. "beans") resolve to ~10 IDs; fetching all of them — each a deep
+# per_page=1500 request — blows past the 5-calls/60s rate limiter and makes the
+# query hang for ~85s. 4 keeps us under the limit while still covering the
+# common varieties of a crop.
+_MAX_PRODUCT_FETCHES = 4
 
 # Full crop name to product ID mapping as extracted from the select2 dropdown options of the website
 CROP_MAPPING = {
@@ -270,111 +276,202 @@ def resolve_crop_ids(crop_name: str) -> list[int]:
             
     return matched_ids
 
+def _build_tavily_query(
+    crop_name: Optional[str],
+    market_name: Optional[str],
+    county_name: Optional[str],
+) -> str:
+    """Builds a natural-language KAMIS price query for the Tavily fallback."""
+    parts = []
+    if crop_name:
+        parts.append(crop_name)
+    parts.append("market price")
+    if market_name:
+        parts.append(f"in {market_name}")
+    if county_name:
+        parts.append(f"{county_name} county")
+    return " ".join(parts).strip() or "latest market prices"
+
+
+def _fallback_chain_kwargs() -> dict:
+    """Shared Tavily helpers for the structured fallback chain."""
+    return {
+        "build_tavily_query": _build_tavily_query,
+        "search_kamis_via_tavily": _search_kamis_via_tavily,
+        "open_web_fallback": _open_web_fallback,
+    }
+
+
+def _open_web_fallback(
+    crop_name: Optional[str],
+    market_name: Optional[str],
+    county_name: Optional[str],
+) -> Optional[str]:
+    """Last-resort open-web price search via Tavily (no KAMIS-site restriction).
+
+    Only call this once KAMIS, WFP, and the KAMIS-site Tavily search have all
+    come up empty. Returns flagged, caveated text on success, or None on miss.
+    Open-web prices are the least reliable source (possibly stale, different
+    units, or national averages), so the disclaimer is baked into the result.
+    """
+    query = _build_tavily_query(crop_name, market_name, county_name)
+    text = _search_kamis_via_tavily(query, restrict_to_kamis=False)
+    if text and not text.startswith(("Error:", "An error occurred")):
+        return (
+            "No official KAMIS or WFP market data was found for this query. The "
+            "estimate below comes from a general web search and may be outdated, "
+            "use a different unit (e.g. per bag vs per kg), or reflect a national "
+            "average rather than this specific market — treat it as a rough guide, "
+            "not an official price.\n\n"
+            + text
+        )
+    return None
+
+
+def fetch_csv_prices(
+    crop_name: Optional[str] = None,
+    market_name: Optional[str] = None,
+    county_name: Optional[str] = None,
+    limit: int = 10,
+) -> str:
+    """Plain (non-tool) CSV price lookup — the single request-time price path.
+
+    Queries the SokoSense market CSV (data/market_prices.csv, built by
+    scripts/collect_market_data.py / the admin refresh) and returns the most
+    recent price entries as JSON text. This never queries KAMIS live, so it
+    has no rate-limiter / Tavily / fallback-chain dependencies. Both the
+    LangChain tool below and the agent's tool wrapper call this.
+    """
+    import json
+
+    from data.market_csv import query_prices
+
+    limit = min(limit, 10)
+    clean_crop_name = crop_name.strip() if crop_name else None
+    clean_market_name = market_name.strip() if market_name else None
+    clean_county_name = county_name.strip() if county_name else None
+
+    rows = query_prices(crop_name=clean_crop_name, limit=100_000)
+
+    if not rows:
+        return (
+            "No price data in the market CSV yet. Run "
+            "`python scripts/collect_market_data.py` (or the admin portal's "
+            "Refresh market data button) to collect KAMIS prices first."
+        )
+
+    # Location filtering — market-first, then county, so a missing market
+    # never silently returns some other market in the same county.
+    substitution_note = ""
+    if clean_market_name:
+        needle = clean_market_name.lower()
+        market_rows = [r for r in rows if needle in str(r.get("Market", "")).lower()]
+        county_rows = [r for r in rows if needle in str(r.get("County", "")).lower()]
+        if market_rows:
+            rows = market_rows
+        elif county_rows and not clean_county_name:
+            # The "market" is really a town/county ("Nairobi") — what the farmer meant.
+            rows = county_rows
+        else:
+            county_hint = clean_county_name or clean_market_name
+            hint_rows = [
+                r for r in rows if county_hint.lower() in str(r.get("County", "")).lower()
+            ]
+            rows = hint_rows
+            if hint_rows:
+                substitution_note = (
+                    f"Note: '{clean_market_name}' has no recent KAMIS price reports, "
+                    f"so the prices below are from other markets in "
+                    f"{county_hint.title()} county.\n\n"
+                )
+    elif clean_county_name:
+        needle = clean_county_name.lower()
+        rows = [r for r in rows if needle in str(r.get("County", "")).lower()]
+
+    if not rows:
+        msg = "No price data found matching your query in the market CSV."
+        if crop_name:
+            msg += f" Crop: '{crop_name}'."
+        return msg
+
+    rows = sorted(rows, key=lambda r: str(r.get("Date") or ""), reverse=True)
+    essential = ["Commodity", "Market", "County", "Wholesale", "Retail", "Date"]
+    trimmed = [{c: r.get(c) for c in essential} for r in rows[:limit]]
+    return substitution_note + json.dumps(trimmed, indent=2)
+
+
 @tool
 def scrape_kamis_prices(
     crop_name: Optional[str] = None,
     market_name: Optional[str] = None,
     county_name: Optional[str] = None,
-    limit: int = 10
+    limit: int = 10,
 ) -> str:
     """
-    Directly queries the KAMIS market price website and returns the 10 most recent price entries.
+    Queries the SokoSense market CSV (data/market_prices.csv) and returns the
+    most recent price entries. The CSV is built by
+    scripts/collect_market_data.py / the admin refresh — this tool never
+    queries KAMIS live.
     IMPORTANT: Always use the default limit of 10. Do NOT pass a higher limit value.
-    
+
     Args:
         crop_name: The name of the crop to filter by (e.g. 'Tomatoes', 'Maize', 'Beans'). Case-insensitive.
         market_name: Optional name of the market location to filter by (e.g. 'Maua', 'Kibuye'). Case-insensitive.
         county_name: Optional name of the county to filter by (e.g. 'Meru', 'Kakamega', 'Nairobi'). Case-insensitive.
         limit: Number of records to return. Maximum is 10. Do NOT change this value.
     """
-    url = "https://kamis.kilimo.go.ke/site/market"
-    limit = min(limit, 10)  # Hard cap — never return more than 10 rows
+    return fetch_csv_prices(crop_name, market_name, county_name, limit)
 
-    clean_crop_name = crop_name.strip() if crop_name else None
-    clean_market_name = market_name.strip() if market_name else None
-    clean_county_name = county_name.strip() if county_name else None
 
-    # If a location filter is set, fetch more rows from the server so the local
-    # filter has enough data to find matches. Without a filter, 10 is enough.
-    has_location = bool(clean_market_name or clean_county_name)
-    server_per_page = 100 if has_location else 10
+def _search_kamis_via_tavily(query: str, restrict_to_kamis: bool = True) -> str:
+    """
+    Plain (non-tool) implementation of the Tavily search so it can be reused as a
+    fallback by other code paths (e.g. when direct KAMIS scraping is blocked).
 
-    product_ids = resolve_crop_ids(clean_crop_name)
-    dfs = []
+    When ``restrict_to_kamis`` is True (default) the search is scoped to the
+    KAMIS website, which is more trustworthy. When False it searches the open
+    web — used only as the very last resort, when KAMIS and WFP have no data and
+    the KAMIS-site search also came up empty.
+    """
+    tavily_key = os.getenv("TAVILY_API_KEY")
+    if not tavily_key:
+        return "Error: TAVILY_API_KEY is not set in the environment variables."
 
-    if product_ids:
-        for pid in product_ids:
-            params = {
-                "product": pid,
-                "per_page": server_per_page
-            }
-            try:
-                kamis_http_limiter.acquire()  # ← rate-limit each outgoing HTTP call
-                response = requests.get(url, params=params, verify=False, timeout=15)
-                if response.status_code == 200:
-                    sub_dfs = pd.read_html(io.StringIO(response.text))
-                    if sub_dfs:
-                        dfs.append(sub_dfs[0])
-            except Exception:
-                pass
-    else:
-        params = {"per_page": server_per_page}
-        try:
-            kamis_http_limiter.acquire()  # ← rate-limit the fallback HTTP call
-            response = requests.get(url, params=params, verify=False, timeout=20)
-            if response.status_code == 200:
-                sub_dfs = pd.read_html(io.StringIO(response.text))
-                if sub_dfs:
-                    dfs.append(sub_dfs[0])
-        except Exception as e:
-            return f"An error occurred while fetching KAMIS data: {str(e)}"
+    from tavily import TavilyClient
 
-    if not dfs:
-        return "No price data could be retrieved from the KAMIS website."
+    client = TavilyClient(api_key=tavily_key)
 
-    # Combine and clean
-    df = pd.concat(dfs, ignore_index=True)
-    df.columns = [c.strip() for c in df.columns]
-    df = df.drop_duplicates()
+    # Scope to the KAMIS site for trustworthy results; drop the filter for the
+    # open-web last-resort tier.
+    modified_query = f"{query} site:kamis.kilimo.go.ke" if restrict_to_kamis else query
 
-    # Filter in pandas (Case-Insensitive)
-    if clean_crop_name:
-        df = df[df['Commodity'].str.contains(clean_crop_name, case=False, na=False)]
+    try:
+        # Perform advanced search
+        search_result = client.search(
+            query=modified_query,
+            search_depth="advanced",
+            max_results=5,
+            include_answer=True
+        )
 
-    if clean_market_name and clean_county_name:
-        # Match either market OR county
-        df = df[
-            df['Market'].str.contains(clean_market_name, case=False, na=False) |
-            df['County'].str.contains(clean_county_name, case=False, na=False)
-        ]
-    else:
-        if clean_market_name:
-            df = df[df['Market'].str.contains(clean_market_name, case=False, na=False)]
-        if clean_county_name:
-            df = df[df['County'].str.contains(clean_county_name, case=False, na=False)]
+        answer = search_result.get("answer")
+        results = search_result.get("results", [])
 
-    total_rows = len(df)
-    if total_rows == 0:
-        msg = "No price data found matching your query."
-        if crop_name:
-            msg += f" Crop: '{crop_name}' (Resolved IDs: {product_ids})."
-        if market_name:
-            msg += f" Market: '{market_name}'."
-        if county_name:
-            msg += f" County: '{county_name}'."
-        return msg
+        response_text = ""
+        if answer:
+            response_text += f"**Direct Answer from Tavily Search:**\n{answer}\n\n"
 
-    # Sort newest first
-    if 'Date' in df.columns:
-        df = df.sort_values(by='Date', ascending=False)
+        response_text += "**Search Results from KAMIS Site:**\n"
+        for idx, res in enumerate(results, 1):
+            title = res.get("title", "No Title")
+            url = res.get("url", "No URL")
+            content = res.get("content", "No Content")
+            response_text += f"{idx}. **[{title}]({url})**\n   {content}\n\n"
 
-    # Keep only essential columns
-    essential_cols = ['Commodity', 'Market', 'County', 'Wholesale', 'Retail', 'Date']
-    cols_to_keep = [c for c in essential_cols if c in df.columns]
-    df = df[cols_to_keep]
+        return response_text
+    except Exception as e:
+        return f"An error occurred during Tavily Search: {str(e)}"
 
-    df_limited = df.head(limit)
-    return df_limited.to_json(orient="records", indent=2)
 
 @tool
 def search_kamis_via_tavily(query: str) -> str:
@@ -385,38 +482,4 @@ def search_kamis_via_tavily(query: str) -> str:
     Args:
         query: Search query containing the crop name, market, and locations (e.g. 'Tomatoes price in Meru county').
     """
-    tavily_key = os.getenv("TAVILY_API_KEY")
-    if not tavily_key:
-        return "Error: TAVILY_API_KEY is not set in the environment variables."
-        
-    client = TavilyClient(api_key=tavily_key)
-    
-    # Force search to focus on the KAMIS website
-    modified_query = f"{query} site:kamis.kilimo.go.ke"
-    
-    try:
-        # Perform advanced search
-        search_result = client.search(
-            query=modified_query,
-            search_depth="advanced",
-            max_results=5,
-            include_answer=True
-        )
-        
-        answer = search_result.get("answer")
-        results = search_result.get("results", [])
-        
-        response_text = ""
-        if answer:
-            response_text += f"**Direct Answer from Tavily Search:**\n{answer}\n\n"
-            
-        response_text += "**Search Results from KAMIS Site:**\n"
-        for idx, res in enumerate(results, 1):
-            title = res.get("title", "No Title")
-            url = res.get("url", "No URL")
-            content = res.get("content", "No Content")
-            response_text += f"{idx}. **[{title}]({url})**\n   {content}\n\n"
-            
-        return response_text
-    except Exception as e:
-        return f"An error occurred during Tavily Search: {str(e)}"
+    return _search_kamis_via_tavily(query)

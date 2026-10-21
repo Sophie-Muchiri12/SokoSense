@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+
+from auth.security import get_current_user
 
 from engines.market_prices import get_market_prices
 from models.market_map import MarketMapResponse
 
-router = APIRouter(prefix="/api", tags=["market-data"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/api", tags=["market-data"])
 
 
 @router.get("/market-prices", response_model=MarketMapResponse)
