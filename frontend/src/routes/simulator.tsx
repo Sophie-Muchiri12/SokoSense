@@ -1,24 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { RequireAuth } from "@/components/auth-guard";
 import { useRef, useState } from "react";
 import { postAgent, type AgentResponse } from "@/lib/sokosense-api";
 
 export const Route = createFileRoute("/simulator")({
   head: () => ({
     meta: [
-      { title: "SMS Intelligence Simulator — SokoSense" },
+      { title: "Try It by Text Message — SokoSense" },
       {
         name: "description",
         content:
-          "Operations-grade simulator for the SokoSense SMS engine. Inspect parsed intent, market signals, credit recommendations and live pipeline state.",
+          "Send a message the way a farmer would, and see the reply we would text back.",
       },
       { property: "og:title", content: "SMS Intelligence Simulator — SokoSense" },
       {
         property: "og:description",
-        content: "Inspect the SokoSense SMS engine: parsed intent, market signals, credit and pipeline state.",
+        content: "Try SokoSense by text message and see our reply, step by step.",
       },
     ],
   }),
-  component: SimulatorPage,
+  component: () => (<RequireAuth><SimulatorPage /></RequireAuth>),
 });
 
 type Lang = "en" | "sw";
@@ -26,76 +27,73 @@ type StageState = "pending" | "running" | "completed" | "error";
 type Stage = { id: string; label: string; detail: string };
 
 const STAGES: Stage[] = [
-  { id: "sms-in", label: "SMS received", detail: "Telco gateway · Safaricom 21455" },
-  { id: "agent", label: "Agent invoked", detail: "LangGraph · tool-calling loop" },
-  { id: "market", label: "Market engine called", detail: "KAMIS price feed · arbitrage graph" },
-  { id: "compose", label: "Response generated", detail: "Groq LLM · 160-char shaping" },
-  { id: "sms-out", label: "SMS delivered", detail: "DLR confirmed · session closed" },
+  { id: "sms-in", label: "Your message arrives", detail: "Sent to our number, 21455" },
+  { id: "agent", label: "We understand your question", detail: "We work out what you are asking" },
+  { id: "market", label: "We check the facts", detail: "Today's market prices and farming guides" },
+  { id: "compose", label: "We write a clear reply", detail: "Short and simple — fits in one text message" },
+  { id: "sms-out", label: "Reply sent to your phone", detail: "Delivered as a normal text message" },
 ];
 
 const TYPE_LABEL: Record<string, string> = {
-  market: "Market intelligence",
-  loan: "Credit assessment",
-  weather: "Weather advisory",
-  advisory: "Agronomic advisory",
-  general: "General assistant",
+  market: "Market prices",
+  loan: "Loan check",
+  weather: "Weather",
+  advisory: "Farming advice",
+  general: "General help",
 };
 
 type Recommendation = {
   type: AgentResponse["type"];
   raw_response: string;
-  toolCalls?: Array<{ name: string; args: Record<string, unknown> }>;
 };
 
 const COPY = {
   en: {
-    eyebrow: "SMS Intelligence Simulator",
-    title: "Inspect every message",
-    titleItalic: "the engine touches.",
+    eyebrow: "Try it by text message",
+    title: "See how a farmer",
+    titleItalic: "gets an answer.",
     subtitle:
-      "Type a farmer message in the format the shortcode expects. We parse intent, run the market and credit engines, then return an SMS-ready reply.",
-    inputCardTitle: "Inbound SMS",
-    inputCardSub: "Farmer message · shortcode 21455",
+      "Type a message the way a farmer would text it. We work out what you mean, check prices and loan costs, then reply with one clear text message.",
+    inputCardTitle: "Your message",
+    inputCardSub: "To our number · 21455",
     placeholder: "PRICE MAIZE NAKURU",
-    send: "Run engine",
-    sending: "Running…",
+    send: "Send and see the reply",
+    sending: "Sending…",
     langLabel: "Language",
     chars: "characters",
-    limit: "320 char limit",
-    aiTitle: "AI recommendation",
-    aiSub: "Decision payload returned to the farmer",
-    responseType: "Response type",
-    agentReply: "Agent reply",
-    toolsUsed: "Tools invoked",
-    pipelineTitle: "Live pipeline",
-    pipelineSub: "Engine stages for the active request",
-    empty: "Run the engine to see a recommendation.",
+    limit: "too long (over 320 letters)",
+    aiTitle: "Our reply",
+    aiSub: "What we would text back to the farmer",
+    responseType: "Type of help",
+    agentReply: "The reply",
+    pipelineTitle: "What happens, step by step",
+    pipelineSub: "Follow your message from phone to answer",
+    empty: "Send a message to see the reply here.",
     reset: "Reset",
     hint: "Try: PRICE MAIZE NAKURU · LOAN 35000 BEANS 6 MONTHS · WEATHER MERU",
-    error: "Agent error — check backend logs.",
+    error: "Sorry — we could not answer right now.",
   },
   sw: {
-    eyebrow: "Simulator ya Akili ya SMS",
-    title: "Chunguza kila ujumbe",
-    titleItalic: "unaopita kwenye injini.",
+    eyebrow: "Jaribu kwa ujumbe wa simu",
+    title: "Tazama jinsi mkulima",
+    titleItalic: "anavyopata jibu.",
     subtitle:
       "Andika ujumbe wa mkulima kwa muundo unaotarajiwa. Tunafafanua nia, tunaita injini ya soko na mkopo, kisha tunarudisha jibu tayari kwa SMS.",
     inputCardTitle: "SMS ya kuingia",
     inputCardSub: "Ujumbe wa mkulima · namba fupi 21455",
     placeholder: "BEI MAHINDI NAKURU",
-    send: "Endesha injini",
+    send: "Tuma uone jibu",
     sending: "Inafanya kazi…",
     langLabel: "Lugha",
     chars: "herufi",
     limit: "kikomo herufi 320",
-    aiTitle: "Pendekezo la AI",
+    aiTitle: "Jibu letu",
     aiSub: "Jibu linalorudi kwa mkulima",
     responseType: "Aina ya jibu",
     agentReply: "Jibu la wakala",
-    toolsUsed: "Zana zilizotumika",
     pipelineTitle: "Hatua za moja kwa moja",
     pipelineSub: "Hatua za injini kwa ombi la sasa",
-    empty: "Endesha injini kuona pendekezo.",
+    empty: "Tuma ujumbe uone jibu hapa.",
     reset: "Anza upya",
     hint: "Jaribu: BEI MAHINDI NAKURU · MKOPO 35000 MAHARAGE MIEZI 6 · HALI YA HEWA MERU",
     error: "Hitilafu ya wakala — angalia kumbukumbu za seva.",
@@ -121,7 +119,6 @@ function SimulatorPage() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const t = COPY[lang];
 
@@ -132,14 +129,10 @@ function SimulatorPage() {
     setError(null);
     setRunning(false);
     setLatencyMs(null);
+    setMessage("");
     setStageStates(
       Object.fromEntries(STAGES.map((s) => [s.id, "pending"])) as Record<string, StageState>,
     );
-  };
-
-  const reset = () => {
-    clearTimers();
-    setMessage("");
   };
 
   const run = async () => {
@@ -189,13 +182,9 @@ function SimulatorPage() {
       tick("sms-out", "completed", 600);
 
       const finish = setTimeout(() => {
-        const toolCalls = result.raw?.messages?.flatMap(
-          (m) => m.tool_calls ?? [],
-        ) ?? [];
         setRec({
           type: result.type,
           raw_response: result.response,
-          toolCalls,
         });
         setRunning(false);
       }, 650);
@@ -246,7 +235,7 @@ function SimulatorPage() {
           </div>
 
           <label className="mt-6 block text-[11px] uppercase tracking-[0.14em] text-mist">
-            Farmer message
+            Ujumbe wako
           </label>
           <textarea
             id="simulator-input"
@@ -290,8 +279,8 @@ function SimulatorPage() {
             <div className="mt-5 flex items-center gap-2 rounded-xl border border-hairline bg-canvas px-4 py-3">
               <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
               <p className="text-[12px] text-steel">
-                Agent responded in{" "}
-                <span className="tabular font-medium text-ink">{latencyMs}ms</span>
+                Tulijibu baada ya{" "}
+                <span className="tabular font-medium text-ink">{latencyMs < 1000 ? "chini ya sekunde moja" : `sekunde ${Math.round(latencyMs / 100) / 10}`}</span>
               </p>
             </div>
           )}
@@ -309,7 +298,7 @@ function SimulatorPage() {
                 error ? "border-rose/40 text-rose" : rec ? "border-teal/40 text-teal" : ""
               }`}
             >
-              {running ? "● running" : error ? "● error" : rec ? "● ready" : "○ idle"}
+              {running ? "Working…" : error ? "Failed" : rec ? "Answered" : "Ready"}
             </span>
           </div>
 
@@ -318,8 +307,8 @@ function SimulatorPage() {
               <p className="text-[11px] uppercase tracking-[0.14em] text-rose/80">Request failed</p>
               <p className="mt-2 text-[13.5px] leading-relaxed text-ink">{error}</p>
               <p className="mt-3 text-[12px] text-steel">
-                Make sure the backend is running on{" "}
-                <code className="font-mono text-ink">localhost:8000</code> (uvicorn main:app).
+                Tafadhali jaribu tena baada ya muda mfupi.{" "}
+                
               </p>
             </div>
           ) : !rec ? (
@@ -349,29 +338,6 @@ function SimulatorPage() {
                   {rec.raw_response}
                 </p>
               </div>
-
-              {rec.toolCalls && rec.toolCalls.length > 0 && (
-                <div>
-                  <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist mb-2">
-                    {t.toolsUsed}
-                  </p>
-                  <ul className="space-y-2">
-                    {rec.toolCalls.map((tc, i) => (
-                      <li
-                        key={`${tc.name}-${i}`}
-                        className="rounded-lg border border-hairline bg-canvas px-3 py-2 text-[12px] font-mono text-steel"
-                      >
-                        <span className="text-teal">{tc.name}</span>
-                        {Object.keys(tc.args).length > 0 && (
-                          <span className="text-mist ml-2">
-                            {JSON.stringify(tc.args)}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
           )}
         </section>
@@ -420,9 +386,9 @@ function LangToggle({ lang, onChange, label }: { lang: Lang; onChange: (l: Lang)
 
 function PipelineLegend() {
   const items: { state: StageState; label: string }[] = [
-    { state: "pending",   label: "Pending" },
-    { state: "running",   label: "Running" },
-    { state: "completed", label: "Completed" },
+    { state: "pending",   label: "Waiting" },
+    { state: "running",   label: "Working" },
+    { state: "completed", label: "Done" },
     { state: "error",     label: "Error" },
   ];
   return (
@@ -449,10 +415,10 @@ function StateDot({ state }: { state: StageState }) {
 
 function PipelineStep({ index, stage, state }: { index: number; stage: Stage; state: StageState }) {
   const stateCopy =
-    state === "completed" ? "Completed"
-    : state === "running"   ? "Running"
+    state === "completed" ? "Done"
+    : state === "running"   ? "Working"
     : state === "error"     ? "Error"
-    : "Pending";
+    : "Waiting";
   return (
     <li
       className={`bg-paper p-5 flex flex-col gap-3 transition-colors ${

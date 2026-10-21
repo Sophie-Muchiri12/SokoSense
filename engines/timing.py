@@ -28,7 +28,7 @@ def decide_timing(request: TimingRequest) -> TimingResponse:
             "pct_change": None,
             "wait_days": 0,
             "national_avg_kes": None,
-            "data_source": "KAMIS cache (SQLite)",
+            "data_source": "KAMIS CSV (data/market_prices.csv)",
         }
 
     price = signal.get("price_kes")
@@ -110,5 +110,5 @@ def decide_timing(request: TimingRequest) -> TimingResponse:
         price_kes=price,
         trend=trend,
         kamis_date=kamis_date,
-        data_source=signal.get("data_source", "KAMIS cache (SQLite)"),
+        data_source=signal.get("data_source", "KAMIS CSV (data/market_prices.csv)"),
     )

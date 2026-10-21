@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteHeader } from "../components/site-header";
+import { AuthProvider } from "../lib/auth";
 import { SiteFooter } from "../components/site-footer";
 import { SplashScreen } from "../components/splash-screen";
 
@@ -82,13 +83,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "AI-powered market intelligence, credit scoring and rural advisory built for African farmers, SACCOs and agribusinesses.",
+          "Today's market prices, farming advice and honest loan checks for farmers and SACCOs — by text message on any phone.",
       },
       { property: "og:title", content: "SokoSense — Agricultural Intelligence for East Africa" },
       {
         property: "og:description",
         content:
-          "AI-powered market intelligence, credit scoring and rural advisory built for African farmers, SACCOs and agribusinesses.",
+          "Today's market prices, farming advice and honest loan checks for farmers and SACCOs — by text message on any phone.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -131,6 +132,7 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
+     <AuthProvider>
       <SplashScreen />
       <div className="min-h-screen bg-canvas text-ink flex flex-col">
         <SiteHeader />
@@ -139,6 +141,7 @@ function RootComponent() {
         </main>
         <SiteFooter />
       </div>
+     </AuthProvider>
     </QueryClientProvider>
   );
 }

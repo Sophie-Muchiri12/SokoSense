@@ -1,7 +1,7 @@
 # Agricultural Knowledge PDFs
 
 Place PDF files containing agricultural advisory content here. 
-These PDFs are ingested into the Neo4j knowledge graph via `page_content_to_neo4j.py`.
+These PDFs are ingested into Postgres (pgvector) via `engines/ingest_pdfs.py`.
 
 ## How to add content
 
@@ -11,7 +11,7 @@ These PDFs are ingested into the Neo4j knowledge graph via `page_content_to_neo4
    python engines/ingest_pdfs.py
    ```
 
-The script extracts text from each PDF and creates nodes/relationships in Neo4j:
+The script extracts text from each PDF and stores chunks + embeddings in the `document_chunks` table:
 - Each PDF page becomes knowledge chunks
 - Chunks are linked to relevant crops and diseases using keyword matching
 

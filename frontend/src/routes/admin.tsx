@@ -1,7 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { RequireAdmin } from "@/components/auth-guard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "./market";
-import { getHealth, getLogs, type LogItem } from "@/lib/sokosense-api";
+import {
+  getHealth,
+  getLogs,
+  getMarketRefreshStatus,
+  startMarketRefresh,
+  type LogItem,
+  type MarketCsvStatus,
+  type MarketRefreshJob,
+} from "@/lib/sokosense-api";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -19,7 +29,7 @@ export const Route = createFileRoute("/admin")({
       },
     ],
   }),
-  component: AdminPage,
+  component: () => (<RequireAdmin><AdminPage /></RequireAdmin>),
 });
 
 // ─── static engine metadata (telemetry TBD) ──────────────────────────────────
@@ -37,7 +47,7 @@ const ENGINES = [
   {
     id: "market",
     name: "Market engine",
-    desc: "SQLite market cache · arbitrage",
+    desc: "KAMIS market CSV · arbitrage",
     p50: null,
     p95: null,
     rps: null,
@@ -46,7 +56,7 @@ const ENGINES = [
   {
     id: "advisory",
     name: "Advisory engine",
-    desc: "Neo4j RAG · weather + crop",
+    desc: "pgvector RAG · weather + crop",
     p50: null,
     p95: null,
     rps: null,
@@ -60,6 +70,7 @@ const STATUSES = ["all", "2xx", "4xx", "5xx"];
 // ─── page ─────────────────────────────────────────────────────────────────────
 
 function AdminPage() {
+  const { adminLogout } = useAuth();
   const [range, setRange] = useState("24h");
   const [statusFilter, setStatusFilter] = useState("all");
   const [q, setQ] = useState("");
@@ -74,6 +85,47 @@ function AdminPage() {
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  // Market CSV refresh
+  const [csvStatus, setCsvStatus] = useState<MarketCsvStatus | null>(null);
+  const [refreshJob, setRefreshJob] = useState<MarketRefreshJob | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const marketPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchMarketStatus = () => {
+    getMarketRefreshStatus()
+      .then((r) => {
+        setCsvStatus(r.csv);
+        setRefreshJob(r.job);
+        setRefreshError(null);
+      })
+      .catch((err) =>
+        setRefreshError(err instanceof Error ? err.message : "Failed to load market data status"),
+      );
+  };
+
+  const handleRefreshMarket = () => {
+    setRefreshError(null);
+    startMarketRefresh()
+      .then((r) => {
+        setCsvStatus(r.csv);
+        setRefreshJob(r.job);
+      })
+      .catch((err) =>
+        setRefreshError(err instanceof Error ? err.message : "Failed to start market refresh"),
+      );
+  };
+
+  // While a refresh runs, poll fast so progress/result appear live.
+  useEffect(() => {
+    if (marketPollRef.current) clearInterval(marketPollRef.current);
+    if (refreshJob?.state === "running") {
+      marketPollRef.current = setInterval(fetchMarketStatus, 3000);
+    }
+    return () => {
+      if (marketPollRef.current) clearInterval(marketPollRef.current);
+    };
+  }, [refreshJob?.state]);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -105,9 +157,11 @@ function AdminPage() {
   useEffect(() => {
     fetchHealth();
     fetchLogs();
+    fetchMarketStatus();
     intervalRef.current = setInterval(() => {
       fetchHealth();
       fetchLogs();
+      fetchMarketStatus();
     }, 15_000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -165,6 +219,12 @@ function AdminPage() {
             <span className={`h-1.5 w-1.5 rounded-full ${dotCls}`} />
             {healthLabel}
           </span>
+          <button
+            onClick={adminLogout}
+            className="rounded-full border border-hairline bg-paper px-3.5 py-1.5 text-[11.5px] text-ink hover:border-rose-300 hover:text-rose-600"
+          >
+            Admin sign out
+          </button>
           <div className="inline-flex rounded-full border border-hairline bg-paper p-0.5">
             {DATE_RANGES.map((r) => (
               <button
@@ -207,6 +267,79 @@ function AdminPage() {
         {ENGINES.map((e) => (
           <EngineCard key={e.id} engine={e} apiHealthy={health === "ok"} />
         ))}
+      </div>
+
+      {/* Market data (KAMIS → CSV) */}
+      <div className="mt-6 card-surface p-6">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+          <div>
+            <p className="eyebrow">Market data</p>
+            <h3 className="font-serif text-[22px] text-ink mt-0.5">KAMIS price CSV</h3>
+            <p className="text-[12.5px] text-steel mt-1 max-w-xl leading-relaxed">
+              Every market price in the system is read from one CSV file. Refreshing
+              re-scrapes all KAMIS commodities (top 10 most recent rows per market),
+              builds a new CSV, and swaps it in — the old file is removed the moment
+              the new one is ready. If a run fails, the current CSV keeps serving.
+            </p>
+          </div>
+          <button
+            onClick={handleRefreshMarket}
+            disabled={refreshJob?.state === "running"}
+            className="shrink-0 rounded-full bg-ink text-paper px-4 py-2 text-[12.5px] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {refreshJob?.state === "running" ? "Refreshing…" : "Refresh market data"}
+          </button>
+        </div>
+
+        <div className="mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-hairline rounded-xl overflow-hidden border border-hairline">
+          <div className="bg-paper p-4">
+            <p className="text-[10.5px] uppercase tracking-wider text-mist">Active file</p>
+            <p className="text-[13px] text-ink mt-1 font-mono truncate">{csvStatus?.path ?? "—"}</p>
+            <p className="text-[11.5px] text-steel mt-0.5">
+              {csvStatus?.exists ? "Serving all market reads" : "Missing — run a refresh"}
+            </p>
+          </div>
+          <div className="bg-paper p-4">
+            <p className="text-[10.5px] uppercase tracking-wider text-mist">Rows / commodities</p>
+            <p className="text-[13px] text-ink mt-1 tabular">
+              {csvStatus ? `${csvStatus.rows.toLocaleString()} rows · ${csvStatus.commodities} commodities · ${csvStatus.markets} markets` : "—"}
+            </p>
+            <p className="text-[11.5px] text-steel mt-0.5">Top 10 most recent per market</p>
+          </div>
+          <div className="bg-paper p-4">
+            <p className="text-[10.5px] uppercase tracking-wider text-mist">Latest KAMIS report</p>
+            <p className="text-[13px] text-ink mt-1 tabular">{csvStatus?.latest_date_reported ?? "—"}</p>
+            <p className="text-[11.5px] text-steel mt-0.5">
+              Collected {csvStatus?.last_fetched_at ? new Date(csvStatus.last_fetched_at).toLocaleString() : "—"}
+            </p>
+          </div>
+          <div className="bg-paper p-4">
+            <p className="text-[10.5px] uppercase tracking-wider text-mist">Last refresh run</p>
+            <p className="text-[13px] text-ink mt-1 capitalize">{refreshJob?.state ?? "idle"}</p>
+            <p className="text-[11.5px] text-steel mt-0.5">
+              {refreshJob?.state === "running" && refreshJob.progress
+                ? `${refreshJob.progress.commodity} (${refreshJob.progress.current}/${refreshJob.progress.total})`
+                : refreshJob?.state === "succeeded" && refreshJob.stats
+                  ? `${refreshJob.stats.rows_written.toLocaleString()} rows from ${refreshJob.stats.products_with_rows}/${refreshJob.stats.products_scanned} commodities`
+                  : refreshJob?.finished_at
+                    ? new Date(refreshJob.finished_at).toLocaleString()
+                    : "Never run from here"}
+            </p>
+          </div>
+        </div>
+
+        {refreshJob?.state === "running" && (
+          <p className="mt-4 text-[12.5px] text-steel flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
+            Scraping KAMIS — this can take a few minutes. The current CSV keeps serving meanwhile.
+          </p>
+        )}
+        {refreshJob?.state === "failed" && refreshJob.error && (
+          <p className="mt-4 text-[12.5px] text-rose-600">
+            Refresh failed: {refreshJob.error} The previous CSV is still serving.
+          </p>
+        )}
+        {refreshError && <p className="mt-4 text-[12.5px] text-rose-600">{refreshError}</p>}
       </div>
 
       {/* Logs */}

@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { RequireAuth } from "@/components/auth-guard";
 import { PageHeader } from "./market";
+import { ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/sacco")({
   head: () => ({
@@ -8,26 +10,26 @@ export const Route = createFileRoute("/sacco")({
       {
         name: "description",
         content:
-          "Operations console for SACCO managers and Mercy Corps program officers: live farmer queries, regional activity, market trends and AI recommendations.",
+          "For SACCO managers: see what farmers are asking, where they are, and what we advised them — all in one place.",
       },
       { property: "og:title", content: "SACCO Partner Dashboard — SokoSense" },
       {
         property: "og:description",
         content:
-          "A deployable operations console for SACCOs and agricultural partners across East Africa.",
+          "One simple page for SACCOs and farming partners to follow farmers and prices.",
       },
     ],
   }),
-  component: SaccoPage,
+  component: () => (<RequireAuth roles={["sacco"]}><SaccoPage /></RequireAuth>),
 });
 
 // ─────────────────────────── data ───────────────────────────
 
 const KPIS = [
-  { label: "Queries today", value: "8,412", delta: "+11.4% vs yesterday", positive: true },
-  { label: "Farmers served (30d)", value: "24,108", delta: "+1,204 new", positive: true },
-  { label: "Top crop", value: "Maize", delta: "42% of queries" },
-  { label: "Top market", value: "Eldoret", delta: "Best margin · KSh 4,820/bag" },
+  { label: "Questions today", value: "8,412", delta: "+11.4% from yesterday", positive: true },
+  { label: "Farmers helped (30 days)", value: "24,108", delta: "+1,204 new farmers", positive: true },
+  { label: "Most-asked crop", value: "Maize", delta: "42% of questions" },
+  { label: "Best-paying market", value: "Eldoret", delta: "KSh 4,820 per bag" },
 ];
 
 const HOTSPOTS = [
@@ -44,12 +46,12 @@ const HOTSPOTS = [
 
 const FEED = [
   { t: "08:42", msisdn: "+254 7•• ••• 412", txt: "MAIZE ELDORET", crop: "Maize", reply: "Sell Eldoret · KSh 4,820/bag", tag: "sell" },
-  { t: "08:42", msisdn: "+254 7•• ••• 098", txt: "BEANS NAKURU", crop: "Beans", reply: "Hold · spread KSh 110", tag: "hold" },
-  { t: "08:41", msisdn: "+254 7•• ••• 553", txt: "LOAN 40000 6", crop: "Loan", reply: "APR 22.4% · Caution", tag: "warn" },
+  { t: "08:42", msisdn: "+254 7•• ••• 098", txt: "BEANS NAKURU", crop: "Beans", reply: "Wait · prices close (KSh 110 apart)", tag: "hold" },
+  { t: "08:41", msisdn: "+254 7•• ••• 553", txt: "LOAN 40000 6", crop: "Loan", reply: "Loan cost 22.4% a year · be careful", tag: "warn" },
   { t: "08:41", msisdn: "+254 7•• ••• 221", txt: "COFFEE MERU", crop: "Coffee", reply: "Sell Mombasa export · +5.0%", tag: "sell" },
   { t: "08:40", msisdn: "+254 7•• ••• 776", txt: "DAIRY KISUMU", crop: "Dairy", reply: "Feed prices easing · buy now", tag: "buy" },
-  { t: "08:40", msisdn: "+254 7•• ••• 044", txt: "MAIZE KITALE", crop: "Maize", reply: "Transport Eldoret · +12% net", tag: "sell" },
-  { t: "08:39", msisdn: "+254 7•• ••• 309", txt: "RICE MWEA", crop: "Rice", reply: "Hold 7d · demand rising", tag: "hold" },
+  { t: "08:40", msisdn: "+254 7•• ••• 044", txt: "MAIZE KITALE", crop: "Maize", reply: "Take to Eldoret · keep 12% more", tag: "sell" },
+  { t: "08:39", msisdn: "+254 7•• ••• 309", txt: "RICE MWEA", crop: "Rice", reply: "Wait 7 days · buyers want more", tag: "hold" },
 ];
 
 const TREND_MAIZE = [3820, 3910, 4020, 3980, 4110, 4240, 4380, 4490, 4520, 4610, 4720, 4820];
@@ -57,10 +59,10 @@ const TREND_BEANS = [9400, 9320, 9280, 9220, 9180, 9150, 9210, 9280, 9240, 9180,
 
 const RECOS = [
   { crop: "Maize", market: "Eldoret", action: "Sell", confidence: 94, members: 312, lift: "+6.2%" },
-  { crop: "Coffee", market: "Mombasa", action: "Sell · export", confidence: 91, members: 88, lift: "+5.0%" },
+  { crop: "Coffee", market: "Mombasa", action: "Sell · for export", confidence: 91, members: 88, lift: "+5.0%" },
   { crop: "Beans", market: "Nakuru", action: "Hold", confidence: 78, members: 144, lift: "0.0%" },
   { crop: "Dairy", market: "Kisumu", action: "Buy feed", confidence: 86, members: 96, lift: "-2.1%" },
-  { crop: "Horticulture", market: "Nairobi", action: "Sell · same-day", confidence: 89, members: 64, lift: "+8.3%" },
+  { crop: "Horticulture", market: "Nairobi", action: "Sell · today", confidence: 89, members: 64, lift: "+8.3%" },
 ];
 
 // ─────────────────────────── page ───────────────────────────
@@ -70,21 +72,21 @@ function SaccoPage() {
     <div className="mx-auto max-w-[1280px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <PageHeader
-          eyebrow="Partner console · Tumaini SACCO + Mercy Corps"
-          title="The pulse of"
-          italic="every farmer."
-          sub="A live operations view of SMS queries, market signals, loan risk and recommendations across 9 counties in Western and Rift Valley Kenya."
+          eyebrow="For partners · Tumaini SACCO + Mercy Corps"
+          title="What farmers"
+          italic="are asking today."
+          sub="A live view of the questions farmers are sending, the prices we are quoting, and the advice we are giving — across 9 counties in Western and Rift Valley Kenya."
         />
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-green-surface px-3 py-1.5 text-[11.5px] text-green-deep">
             <span className="h-1.5 w-1.5 rounded-full bg-green animate-pulse" />
-            Live · 12 nodes
+            Live now
           </span>
           <button className="rounded-full border border-hairline bg-paper px-4 py-2 text-[12.5px] text-ink hover:border-ink/40">
-            Export CSV
+            Download a spreadsheet
           </button>
           <button className="rounded-full bg-ink text-paper px-4 py-2 text-[12.5px] hover:bg-ink-soft">
-            Weekly digest
+            Weekly summary
           </button>
         </div>
       </div>
@@ -114,7 +116,7 @@ function SaccoPage() {
       </div>
 
       <p className="mt-10 text-[11.5px] text-mist">
-        Data refreshes every 60s · Powered by SokoSense AI · 2 USSD aggregators · 4 market feeds
+        This page updates every minute · Prices from KAMIS (government market prices)
       </p>
     </div>
   );
@@ -138,15 +140,15 @@ function RegionalMap() {
     <div className="card-surface p-5 sm:p-7">
       <div className="flex items-start justify-between">
         <div>
-          <p className="eyebrow">Regional activity</p>
-          <h2 className="font-serif text-[24px] text-ink mt-1">Where farmers are querying</h2>
+          <p className="eyebrow">Where farmers are</p>
+          <h2 className="font-serif text-[24px] text-ink mt-1">Where farmers are asking from</h2>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-steel">
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-teal" /> SMS query
+            <span className="h-2 w-2 rounded-full bg-teal" /> Text-message question
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-teal/30" /> Catchment
+            <span className="h-2 w-2 rounded-full bg-teal/30" /> Area covered
           </span>
         </div>
       </div>
@@ -190,8 +192,8 @@ function RegionalMap() {
       </div>
 
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-px bg-hairline rounded-lg overflow-hidden border border-hairline">
-        <Stat label="Counties active" value="9" />
-        <Stat label="Queries last hour" value="612" />
+        <Stat label="Counties" value="9" />
+        <Stat label="Questions in the last hour" value="612" />
         <Stat label="Total today" value={total.toLocaleString()} />
       </div>
     </div>
@@ -212,10 +214,10 @@ function ActivityFeed() {
     <div className="card-surface overflow-hidden flex flex-col">
       <div className="px-6 py-4 border-b border-hairline flex items-center justify-between">
         <div>
-          <p className="eyebrow">Live query feed</p>
-          <h3 className="font-serif text-[22px] text-ink mt-0.5">Last 60 seconds</h3>
+          <p className="eyebrow">Live questions</p>
+          <h3 className="font-serif text-[22px] text-ink mt-0.5">The last minute</h3>
         </div>
-        <span className="chip">Stream</span>
+        <span className="chip">Live</span>
       </div>
       <ul className="divide-y divide-hairline text-[12.5px] overflow-hidden">
         {FEED.map((f, i) => (
@@ -224,7 +226,7 @@ function ActivityFeed() {
             <div className="min-w-0">
               <p className="text-ink truncate">
                 <span className="font-mono text-[11.5px] text-steel">{f.txt}</span>
-                <span className="mx-1.5 text-mist">→</span>
+                <ArrowRight className="mx-1.5 inline h-3.5 w-3.5 text-mist" aria-hidden="true" />
                 <span className="text-ink">{f.reply}</span>
               </p>
               <p className="text-[10.5px] text-mist mt-0.5">{f.msisdn} · {f.crop}</p>
@@ -235,7 +237,7 @@ function ActivityFeed() {
       </ul>
       <div className="px-6 py-3 border-t border-hairline text-[11.5px] text-steel flex justify-between">
         <span>7 shown · 8,405 earlier today</span>
-        <button className="text-teal font-medium hover:text-teal-soft">Open inbox →</button>
+        <button className="text-teal font-medium hover:text-teal-soft">See all questions</button>
       </div>
     </div>
   );
@@ -257,8 +259,8 @@ function MarketTrends() {
     <div className="card-surface p-5 sm:p-7">
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
-          <p className="eyebrow">Market trends · 12 weeks</p>
-          <h3 className="font-serif text-[22px] text-ink mt-1">Reference prices, KSh</h3>
+          <p className="eyebrow">How prices have moved · 12 weeks</p>
+          <h3 className="font-serif text-[22px] text-ink mt-1">Prices in shillings, per 90kg bag</h3>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-[11px]">
           <span className="inline-flex items-center gap-1.5 text-teal">
@@ -281,10 +283,10 @@ function MarketTrends() {
       </div>
 
       <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
-        <Stat label="Maize spot" value="4,820" />
-        <Stat label="12w Δ" value="+26.2%" />
-        <Stat label="Beans spot" value="9,080" />
-        <Stat label="12w Δ" value="-3.4%" />
+        <Stat label="Maize today" value="4,820" />
+        <Stat label="Change in 12 weeks" value="+26.2%" />
+        <Stat label="Beans today" value="9,080" />
+        <Stat label="Change in 12 weeks" value="-3.4%" />
       </div>
     </div>
   );
@@ -326,18 +328,18 @@ function Engagement() {
   const channels = [
     { name: "SMS", pct: 71, n: "5,972" },
     { name: "USSD *483#", pct: 22, n: "1,850" },
-    { name: "Field agent", pct: 5, n: "421" },
+    { name: "Field officer", pct: 5, n: "421" },
     { name: "WhatsApp", pct: 2, n: "169" },
   ];
   return (
     <div className="card-surface p-5 sm:p-7">
-      <p className="eyebrow">Farmer engagement</p>
-      <h3 className="font-serif text-[22px] text-ink mt-1">Channels & retention</h3>
+      <p className="eyebrow">How farmers reach us</p>
+      <h3 className="font-serif text-[22px] text-ink mt-1">Ways farmers ask, and how many stay</h3>
 
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
-        <Stat label="DAU" value="3,140" />
-        <Stat label="WAU" value="11.2k" />
-        <Stat label="Retention 30d" value="68%" />
+        <Stat label="Farmers today" value="3,140" />
+        <Stat label="Farmers this week" value="11,200" />
+        <Stat label="Still using us after a month" value="68%" />
       </div>
 
       <ul className="mt-6 space-y-4">
@@ -356,11 +358,11 @@ function Engagement() {
 
       <div className="mt-6 pt-5 border-t border-hairline text-[12px] text-steel">
         <p>
-          <span className="text-ink font-medium">Median response time</span>
+          <span className="text-ink font-medium">Typical time to answer</span>
           <span className="float-right tabular">1.8s</span>
         </p>
         <p className="mt-2">
-          <span className="text-ink font-medium">SMS delivery success</span>
+          <span className="text-ink font-medium">Text messages delivered</span>
           <span className="float-right tabular text-green">99.4%</span>
         </p>
       </div>
@@ -373,11 +375,11 @@ function Recommendations() {
     <div className="card-surface overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-hairline flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <p className="eyebrow">Recent recommendations</p>
-          <h3 className="font-serif text-[22px] text-ink mt-0.5">Issued in the last hour</h3>
+          <p className="eyebrow">Advice we gave recently</p>
+          <h3 className="font-serif text-[22px] text-ink mt-0.5">Given in the last hour</h3>
         </div>
         <div className="text-[11.5px] text-steel shrink-0">
-          <span className="text-ink font-medium tabular">704</span> issued · <span className="text-green tabular">92%</span> followed
+          <span className="text-ink font-medium tabular">704</span> pieces of advice given · <span className="text-green tabular">92%</span> were followed
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -386,10 +388,10 @@ function Recommendations() {
           <tr className="text-left text-[10.5px] uppercase tracking-wider text-mist bg-canvas">
             <th className="px-6 py-3 font-medium">Crop</th>
             <th className="px-4 py-3 font-medium">Market</th>
-            <th className="px-4 py-3 font-medium">Action</th>
+            <th className="px-4 py-3 font-medium">Advice</th>
             <th className="px-4 py-3 font-medium text-right">Members</th>
-            <th className="px-4 py-3 font-medium text-right">Expected lift</th>
-            <th className="px-4 py-3 font-medium">Confidence</th>
+            <th className="px-4 py-3 font-medium text-right">Expected gain</th>
+            <th className="px-4 py-3 font-medium">How sure we are</th>
           </tr>
         </thead>
         <tbody>

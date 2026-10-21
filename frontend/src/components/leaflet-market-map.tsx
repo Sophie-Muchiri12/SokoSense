@@ -126,14 +126,15 @@ export default function LeafletMarketMap({
       });
       mapRef.current = map;
 
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        subdomains: "abcd",
-        maxZoom: 18,
+      // OpenStreetMap tiles: free, no API key required. (The previous
+      // CARTO basemap tiles now return an "API KEY REQUIRED" watermark.)
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
       }).addTo(map);
 
       L.control
         .attribution({ position: "bottomleft", prefix: false })
-        .addAttribution("© OSM · CARTO")
+        .addAttribution("© OpenStreetMap contributors")
         .addTo(map);
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -159,7 +160,9 @@ export default function LeafletMarketMap({
             const name = countyNameFromFeature(feature);
             if (!name) return;
 
-            const bounds = (layer as Path).getBounds?.();
+            const bounds = (
+              layer as unknown as { getBounds?: () => import("leaflet").LatLngBounds }
+            ).getBounds?.();
             if (bounds?.isValid()) countyBoundsRef.current.set(name, bounds);
 
             layer.on({

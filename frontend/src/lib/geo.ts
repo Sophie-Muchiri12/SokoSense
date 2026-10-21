@@ -1,4 +1,4 @@
-/** Seven wholesale markets tracked by SokoSense (mirrors engines/market_prices.py). */
+/** Wholesale markets tracked by SokoSense (mirrors engines/market_prices.py). */
 export const TRACKED_MARKETS = [
   { id: "nairobi", name: "Nairobi", lat: -1.2864, lng: 36.8172 },
   { id: "nakuru", name: "Nakuru", lat: -0.3031, lng: 36.08 },
@@ -7,6 +7,8 @@ export const TRACKED_MARKETS = [
   { id: "mombasa", name: "Mombasa", lat: -4.0435, lng: 39.6682 },
   { id: "kitale", name: "Kitale", lat: 1.0167, lng: 35.0 },
   { id: "nyeri", name: "Nyeri", lat: -0.4197, lng: 36.9475 },
+  { id: "meru", name: "Meru", lat: 0.0467, lng: 37.6556 },
+  { id: "kakamega", name: "Kakamega", lat: 0.2827, lng: 34.7519 },
 ] as const;
 
 /** GeoJSON feature labels → canonical county names in kenya-subcounties.json */
@@ -63,7 +65,7 @@ export function haversineKm(
 }
 
 export function nearestTrackedMarket(lat: number, lng: number) {
-  let best = TRACKED_MARKETS[0];
+  let best: (typeof TRACKED_MARKETS)[number] = TRACKED_MARKETS[0];
   let bestDist = haversineKm(lat, lng, best.lat, best.lng);
 
   for (const market of TRACKED_MARKETS) {

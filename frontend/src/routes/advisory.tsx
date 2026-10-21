@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { RequireAuth } from "@/components/auth-guard";
 import { useState } from "react";
 import { postAdvisory, postAgent, formatAdvisoryAnswer, type AdvisoryResponse } from "@/lib/sokosense-api";
 import { PageHeader } from "./market";
@@ -10,11 +11,11 @@ export const Route = createFileRoute("/advisory")({
       {
         name: "description",
         content:
-          "Ask farming questions and get RAG-powered answers from Neo4j knowledge graph plus live weather.",
+          "Ask about pests, disease, planting and caring for your crops — and get clear, trusted answers.",
       },
     ],
   }),
-  component: AdvisoryPage,
+  component: () => (<RequireAuth><AdvisoryPage /></RequireAuth>),
 });
 
 const EXAMPLES = [
@@ -56,7 +57,7 @@ function AdvisoryPage() {
         setResult({ ...res, answer: formatAdvisoryAnswer(res.answer) });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Advisory request failed");
+      setError(err instanceof Error ? err.message : "We could not answer right now");
     } finally {
       setLoading(false);
     }
@@ -65,10 +66,10 @@ function AdvisoryPage() {
   return (
     <div className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
       <PageHeader
-        eyebrow="Crop advisory"
+        eyebrow="Farming advice"
         title="Ask anything about"
         italic="your farm."
-        sub="Neo4j RAG retrieves crop guides, disease factsheets and local weather — the same pipeline the SMS agent uses for advisory replies."
+        sub="We answer from trusted farming guides and your local weather — the same help we send farmers by text message."
       />
 
       <div className="mt-10 grid lg:grid-cols-2 gap-6">
@@ -104,7 +105,7 @@ function AdvisoryPage() {
               disabled={!query.trim() || loading}
               className="rounded-full bg-teal px-5 py-2.5 text-[12.5px] font-medium text-paper hover:bg-teal-soft disabled:opacity-50"
             >
-              {loading ? "Thinking…" : "Get advisory"}
+              {loading ? "Finding your answer…" : "Get advice"}
             </button>
             <label className="inline-flex items-center gap-2 text-[12px] text-steel cursor-pointer">
               <input
@@ -113,7 +114,7 @@ function AdvisoryPage() {
                 onChange={(e) => setViaAgent(e.target.checked)}
                 className="accent-teal"
               />
-              Route via agent (tool-calling)
+              Ask in a conversation instead
             </label>
           </div>
         </section>
@@ -127,20 +128,20 @@ function AdvisoryPage() {
           )}
           {!result && !error && !loading && (
             <p className="mt-6 text-[13px] text-mist flex-1">
-              Ask a crop, pest or farming question to see the advisory engine response.
+              Ask about a crop, a pest, or anything on your farm, and we will answer here.
             </p>
           )}
           {loading && (
             <div className="mt-6 flex items-center gap-2 text-[13px] text-steel">
               <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
-              Running advisory pipeline…
+              Looking up farming guides and weather…
             </div>
           )}
           {result && (
             <div className="mt-4 flex flex-col gap-4 flex-1">
               {result.location && (
                 <p className="text-[11px] uppercase tracking-wider text-mist">
-                  Location detected: <span className="text-ink">{result.location}</span>
+                  Your area: <span className="text-ink">{result.location}</span>
                 </p>
               )}
               <div className="rounded-xl border border-teal/25 bg-teal/[0.04] p-5 flex-1">
@@ -150,7 +151,7 @@ function AdvisoryPage() {
               </div>
               {result.sources.length > 0 && (
                 <div>
-                  <p className="text-[10.5px] uppercase tracking-wider text-mist mb-2">Sources / tools</p>
+                  <p className="text-[10.5px] uppercase tracking-wider text-mist mb-2">Where this answer came from</p>
                   <div className="flex flex-wrap gap-1.5">
                     {result.sources.map((s) => (
                       <span key={s} className="chip text-[11px]">{s}</span>

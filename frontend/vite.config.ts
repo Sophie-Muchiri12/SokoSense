@@ -4,14 +4,17 @@
 //     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
+import process from "node:process";
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+// Nitro preset: "vercel" on Vercel (Build Output API in .vercel/output),
+// "node-server" everywhere else (standalone .output/server/index.mjs).
+// Override with NITRO_PRESET if needed.
+const nitroPreset =
+  process.env.NITRO_PRESET ?? (process.env.VERCEL ? "vercel" : "node-server");
+
 export default defineConfig({
-  // Force-enable Nitro with the standalone Node server preset so the build always
-  // emits `.output/server/index.mjs` (what render.yaml's startCommand runs).
-  // Without this the plugin auto-skips Nitro when "No Lovable context" is detected
-  // (e.g. on Render), producing only `dist/` and breaking the deploy.
-  nitro: { preset: "node-server" },
+  nitro: { preset: nitroPreset },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
@@ -19,7 +22,7 @@ export default defineConfig({
   },
   vite: {
     server: {
-      port: 8081,
+      port: 5173,
       strictPort: true,
       proxy: {
         // Must be before the /api catch-all — rewrites to FastAPI POST /ussd.

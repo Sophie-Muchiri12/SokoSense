@@ -14,9 +14,12 @@ import { Route as TimingRouteImport } from './routes/timing'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SimulatorRouteImport } from './routes/simulator'
 import { Route as SaccoRouteImport } from './routes/sacco'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as MarketRouteImport } from './routes/market'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as LoansRouteImport } from './routes/loans'
 import { Route as AdvisoryRouteImport } from './routes/advisory'
+import { Route as AdminLoginRouteImport } from './routes/admin-login'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -45,9 +48,19 @@ const SaccoRoute = SaccoRouteImport.update({
   path: '/sacco',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MarketRoute = MarketRouteImport.update({
   id: '/market',
   path: '/market',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoansRoute = LoansRouteImport.update({
@@ -58,6 +71,11 @@ const LoansRoute = LoansRouteImport.update({
 const AdvisoryRoute = AdvisoryRouteImport.update({
   id: '/advisory',
   path: '/advisory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin-login',
+  path: '/admin-login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -74,9 +92,12 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/admin-login': typeof AdminLoginRoute
   '/advisory': typeof AdvisoryRoute
   '/loans': typeof LoansRoute
+  '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/register': typeof RegisterRoute
   '/sacco': typeof SaccoRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -86,9 +107,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/admin-login': typeof AdminLoginRoute
   '/advisory': typeof AdvisoryRoute
   '/loans': typeof LoansRoute
+  '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/register': typeof RegisterRoute
   '/sacco': typeof SaccoRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -99,9 +123,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/admin-login': typeof AdminLoginRoute
   '/advisory': typeof AdvisoryRoute
   '/loans': typeof LoansRoute
+  '/login': typeof LoginRoute
   '/market': typeof MarketRoute
+  '/register': typeof RegisterRoute
   '/sacco': typeof SaccoRoute
   '/simulator': typeof SimulatorRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -113,9 +140,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/admin-login'
     | '/advisory'
     | '/loans'
+    | '/login'
     | '/market'
+    | '/register'
     | '/sacco'
     | '/simulator'
     | '/sitemap.xml'
@@ -125,9 +155,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/admin-login'
     | '/advisory'
     | '/loans'
+    | '/login'
     | '/market'
+    | '/register'
     | '/sacco'
     | '/simulator'
     | '/sitemap.xml'
@@ -137,9 +170,12 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/admin-login'
     | '/advisory'
     | '/loans'
+    | '/login'
     | '/market'
+    | '/register'
     | '/sacco'
     | '/simulator'
     | '/sitemap.xml'
@@ -150,9 +186,12 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AdminLoginRoute: typeof AdminLoginRoute
   AdvisoryRoute: typeof AdvisoryRoute
   LoansRoute: typeof LoansRoute
+  LoginRoute: typeof LoginRoute
   MarketRoute: typeof MarketRoute
+  RegisterRoute: typeof RegisterRoute
   SaccoRoute: typeof SaccoRoute
   SimulatorRoute: typeof SimulatorRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -197,11 +236,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SaccoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/market': {
       id: '/market'
       path: '/market'
       fullPath: '/market'
       preLoaderRoute: typeof MarketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/loans': {
@@ -216,6 +269,13 @@ declare module '@tanstack/react-router' {
       path: '/advisory'
       fullPath: '/advisory'
       preLoaderRoute: typeof AdvisoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin-login': {
+      id: '/admin-login'
+      path: '/admin-login'
+      fullPath: '/admin-login'
+      preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -238,9 +298,12 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AdminLoginRoute: AdminLoginRoute,
   AdvisoryRoute: AdvisoryRoute,
   LoansRoute: LoansRoute,
+  LoginRoute: LoginRoute,
   MarketRoute: MarketRoute,
+  RegisterRoute: RegisterRoute,
   SaccoRoute: SaccoRoute,
   SimulatorRoute: SimulatorRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

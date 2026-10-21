@@ -93,7 +93,6 @@ The current `/api/loan` schema only accepts `monthly_rate_percent`. However, the
          "risk_verdict": "string — SAFE | CAUTION | HIGH_RISK | AVOID",
          "short_reply": "string (max 320)",
          "comparison_phrase": "string (max 320)",
-         "payment_id": "string | null — Masumi mock ID from Lucy"
        }
      }
 ```

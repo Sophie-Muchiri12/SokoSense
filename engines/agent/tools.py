@@ -39,7 +39,7 @@ def scrape_kamis_prices(
     county_name: str | None = None,
     limit: int = 10,
 ) -> str:
-    """Queries the local KAMIS SQLite cache and returns price data.
+    """Queries the SokoSense market CSV (KAMIS data, data/market_prices.csv) and returns price data.
 
     Use this to find the latest crop prices from Kenyan markets.
 
@@ -49,15 +49,16 @@ def scrape_kamis_prices(
         county_name: Optional county name (e.g. 'Meru', 'Nairobi').
         limit: Max records (default 10, max 10). Do not change this.
     """
-    # Import the actual implementation from engines.kamis_tool
-    from engines.kamis_tool import scrape_kamis_prices as _kamis_impl
+    # CSV is the single source of truth: call the plain implementation
+    # directly (not the LangChain tool wrapper) — see data/market_csv.py.
+    from engines.kamis_tool import fetch_csv_prices
 
-    raw = _kamis_impl.invoke({
-        "crop_name": crop_name,
-        "market_name": market_name,
-        "county_name": county_name,
-        "limit": limit,
-    })
+    raw = fetch_csv_prices(
+        crop_name=crop_name,
+        market_name=market_name,
+        county_name=county_name,
+        limit=limit,
+    )
 
     # Wrap string result in JSON
     try:
@@ -146,7 +147,7 @@ def answer_farmer_question(query: str, include_weather: bool = True) -> str:
     """Runs the full RAG advisory pipeline for agricultural questions.
 
     Extracts crop/disease/location from the query, retrieves knowledge
-    from Neo4j (graph + vector search), fetches weather data, and calls
+    from Postgres (knowledge tables + pgvector search), fetches weather, and calls
     the LLM to generate a complete answer.
 
     Use this as the primary tool for any farming/crop/disease/pest question.

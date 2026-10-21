@@ -7,6 +7,11 @@ def truncate_sms(value: str) -> str:
     return value[:SMS_MAX_CHARS]
 
 
+def truncate_ussd(value: str) -> str:
+    """Enforce USSD screen length limit."""
+    return value[:USSD_MAX_CHARS]
+
+
 def unwrap_llm_json_answer(text: str) -> str:
     """Return plain answer text when the LLM wrapped it in JSON."""
     import json

@@ -1,4 +1,4 @@
-"""Ingest PDF files from engines/data/ into the Neo4j vector knowledge graph.
+"""Ingest PDF files from engines/data/ into Postgres (pgvector).
 
 Usage:
     python engines/ingest_pdfs.py                      # ingest all PDFs
@@ -9,9 +9,9 @@ Pipeline:
   1. Extract text from PDF using pypdf
   2. Chunk text into overlapping segments
   3. Generate vector embeddings for each chunk (hash-based dev fallback)
-  4. Store chunks in Neo4j as DocumentChunk nodes with vector index
+  4. Store chunks in Postgres document_chunks with pgvector embeddings
 
-If Neo4j is not configured, prints the chunk metadata that would be stored.
+If DATABASE_URL is not configured, prints the chunk metadata that would be stored.
 """
 
 import os
@@ -30,7 +30,7 @@ if project_root not in sys.path:
 
 from dotenv import load_dotenv
 
-from engines.neo4j_client import Neo4jClient, get_embedding, VECTOR_DIMENSION
+from engines.knowledge_store import KnowledgeStore, get_embedding, VECTOR_DIMENSION
 
 load_dotenv()
 
@@ -159,14 +159,14 @@ def process_pdf_for_ingestion(
 
 def ingest_pdf(
     pdf_path: str,
-    neo4j_client: Neo4jClient | None = None,
+    store: KnowledgeStore | None = None,
     dry_run: bool = False,
 ) -> str:
-    """Ingest a single PDF into Neo4j vector store.
+    """Ingest a single PDF into the pgvector store.
 
     Args:
         pdf_path: Path to the PDF file.
-        neo4j_client: Neo4j client instance. If None, prints results instead.
+        store: KnowledgeStore instance. If None, prints results instead.
         dry_run: If True, only print what would be done.
 
     Returns:
@@ -193,23 +193,23 @@ def ingest_pdf(
         print()
         return f" Dry-run complete for {pdf_name}: {len(chunks)} chunks"
 
-    # Store in Neo4j
-    if neo4j_client and neo4j_client._enabled:
-        stored = neo4j_client.store_embeddings_batch(chunks)
-        return f" Ingested {pdf_name}: {stored}/{len(chunks)} chunks stored in Neo4j"
+    # Store in Postgres (pgvector)
+    if store and store._enabled:
+        stored = store.store_embeddings_batch(chunks)
+        return f" Ingested {pdf_name}: {stored}/{len(chunks)} chunks stored in Postgres (pgvector)"
     else:
         # Print summary
-        print(f"\n─── Chunks from {pdf_name} (Neo4j not available) ───")
+        print(f"\n─── Chunks from {pdf_name} (Postgres not available) ───")
         for i, chunk in enumerate(chunks):
             print(f"\n  Chunk {i + 1} (page {chunk['metadata']['page_num']}): "
                   f"{chunk['text'][:150]}...")
-        print(f"\nℹ  Configure NEO4J_URI and NEO4J_PASSWORD in .env to store in Neo4j.")
-        return f" Chunked {pdf_name}: {len(chunks)} chunks (not stored — Neo4j not configured)"
+        print(f"\nℹ  Configure DATABASE_URL in .env to store in Postgres.")
+        return f" Chunked {pdf_name}: {len(chunks)} chunks (not stored — Postgres not configured)"
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Ingest PDF files from engines/data/ into Neo4j vector knowledge graph."
+        description="Ingest PDF files from engines/data/ into Postgres (pgvector)."
     )
     parser.add_argument(
         "--file", "-f",
@@ -220,26 +220,26 @@ def main():
     parser.add_argument(
         "--dry-run", "-n",
         action="store_true",
-        help="Print chunks without computing embeddings or storing in Neo4j.",
+        help="Print chunks without computing embeddings or storing in Postgres.",
     )
     parser.add_argument(
-        "--use-neo4j",
+        "--use-postgres",
         action="store_true",
-        help="Force Neo4j execution (if configured in .env).",
+        help="Store in Postgres if configured (default unless --dry-run).",
     )
     args = parser.parse_args()
 
-    # Set up Neo4j client (enabled by default unless dry-run is requested)
-    neo4j_client = None
+    # Set up Postgres knowledge store (enabled by default unless dry-run)
+    store = None
     if not args.dry_run:
-        neo4j_client = Neo4jClient()
-        if neo4j_client._enabled:
-            print(" Connected to Neo4j")
-            print(" Clearing existing DocumentChunk nodes to avoid conflicts...")
-            neo4j_client.clear_document_chunks()
+        store = KnowledgeStore()
+        if store._enabled:
+            print(" Connected to Postgres")
+            print(" Clearing existing document chunks to avoid duplicates...")
+            store.clear_document_chunks()
         else:
-            print(" Neo4j not configured or connection failed — will print chunk info instead")
-            neo4j_client = None
+            print(" Postgres not configured or connection failed — will print chunk info instead")
+            store = None
 
     # Determine which PDFs to process
     if args.file:
@@ -261,7 +261,7 @@ def main():
     for pdf in pdf_files:
         result = ingest_pdf(
             str(pdf),
-            neo4j_client=neo4j_client,
+            store=store,
             dry_run=args.dry_run,
         )
         results.append(result)

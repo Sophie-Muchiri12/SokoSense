@@ -537,7 +537,6 @@ def decide_loan_by_amount_band(band_key: str) -> LoanResponse:
             risk_verdict=RiskVerdict.AVOID,
             short_reply=truncate_sms(f"Invalid loan input: {result['error']}"),
             comparison_phrase=truncate_sms(result["error"]),
-            payment_id=None,
         )
 
     monthly = result["interest_rate"]
@@ -562,7 +561,6 @@ def decide_loan_by_amount_band(band_key: str) -> LoanResponse:
         risk_verdict=mapped,
         short_reply=short_reply,
         comparison_phrase=comparison,
-        payment_id=None,
     )
 
 
@@ -579,7 +577,6 @@ def decide_loan(request: LoanRequest) -> LoanResponse:
             risk_verdict=RiskVerdict.AVOID,
             short_reply=truncate_sms(f"Invalid loan input: {result['error']}"),
             comparison_phrase=truncate_sms(result["error"]),
-            payment_id=None,
         )
 
     apr = result["real_apr"]
@@ -596,5 +593,4 @@ def decide_loan(request: LoanRequest) -> LoanResponse:
         risk_verdict=mapped,
         short_reply=short_reply,
         comparison_phrase=comparison,
-        payment_id=None,
     )
