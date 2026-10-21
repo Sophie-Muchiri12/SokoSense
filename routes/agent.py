@@ -5,9 +5,12 @@ All responses are in JSON format for USSD/SMS gateway integration.
 
 import json
 import logging
+import re
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from auth.security import get_current_user
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
@@ -16,7 +19,7 @@ from models.common import truncate_sms, unwrap_llm_json_answer
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["agent"])
+router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/api", tags=["agent"])
 
 
 class AgentRequest(BaseModel):
@@ -50,8 +53,8 @@ def post_agent(body: AgentRequest) -> AgentResponse:
     """Send a message to the SokoSense agent.
 
     The agent has tools for:
-    - Crop price lookups via cached KAMIS SQLite data
-    - Agricultural advisory via Neo4j RAG + weather
+    - Crop price lookups from the KAMIS market CSV (data/market_prices.csv)
+    - Agricultural advisory via Postgres/pgvector RAG + weather
     - Loan assessment
     - Weather forecasts
 
@@ -63,16 +66,18 @@ def post_agent(body: AgentRequest) -> AgentResponse:
             "messages": [HumanMessage(content=body.message)],
         })
 
+        # A grounded CSV price reply wins over the model's free-form terminal
+        # reply, so quoted prices always come from real market_csv rows.
+        kamis_reply = _format_kamis_tool_reply(result, body.message)
         parsed_terminal = _parse_terminal_json_tool_call(result)
-        kamis_reply = _format_kamis_tool_reply(result, body.message)
+        if parsed_terminal and not kamis_reply:
+            response_text, resp_type = parsed_terminal
+            return AgentResponse(
+                response=response_text,
+                type=resp_type,
+                raw=_build_raw(result),
+            )
 
-        parsed_response = _parse_agent_response(response_text)
-        if parsed_response:
-            response_text, resp_type = parsed_response
-        else:
-            resp_type = _detect_type(body.message, response_text)
-
-        kamis_reply = _format_kamis_tool_reply(result, body.message)
         if kamis_reply:
             response_text = kamis_reply
             resp_type = "market"
@@ -221,6 +226,37 @@ def _parse_agent_response(response: str) -> tuple[str, str] | None:
     return unwrap_llm_json_answer(reply), resp_type
 
 
+_MONTHS = (
+    "January|February|March|April|May|June|July|August|September|October|"
+    "November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept|Sep|Oct|Nov|Dec"
+)
+
+
+def _strip_price_dates(text: str) -> str:
+    """Remove dates from a farmer-facing price reply.
+
+    Price answers must quote the commodity, market and price only — the
+    report date is internal metadata, so strip ISO dates (2026-09-30),
+    long dates (30 September 2026 / September 30, 2026) and "as of …"
+    clauses whether they came from the LLM summariser or the fallback.
+    """
+    text = re.sub(r"\s*\(?\b\d{4}-\d{2}-\d{2}\b\)?", "", text)
+    text = re.sub(
+        rf"\s*\(?\b(?:\d{{1,2}}(?:st|nd|rd|th)?\s+(?:{_MONTHS})(?:,?\s+\d{{4}})?"
+        rf"|(?:{_MONTHS})\s+\d{{1,2}}(?:st|nd|rd|th)?(?:,?\s+\d{{4}})?)\)?",
+        "",
+        text,
+    )
+    text = re.sub(r"\s*\bAs of\b[^.;]*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\(\s*\)", "", text)
+    text = re.sub(r"\s{2,}", " ", text)
+    text = re.sub(r"\s+([,.;])", r"\1", text)
+    text = text.strip()
+    if text and text[-1] not in ".!?":
+        text += "."
+    return text
+
+
 def _format_kamis_tool_reply(result: dict[str, Any], user_message: str = "") -> str | None:
     """Build a market reply grounded in the real KAMIS rows.
 
@@ -230,7 +266,7 @@ def _format_kamis_tool_reply(result: dict[str, Any], user_message: str = "") -> 
     real numbers (Option B), and falls back to a deterministic multi-row summary
     if the LLM is unavailable or fails — so the reply is always grounded.
     """
-    payload = _latest_kamis_payload(result)
+    payload, _args = _best_kamis_payload(result, user_message)
     if not payload:
         return _format_kamis_no_data_reply(result, user_message)
 
@@ -254,9 +290,9 @@ def _format_kamis_tool_reply(result: dict[str, Any], user_message: str = "") -> 
 
     llm_reply = _summarize_kamis_rows_with_llm(price_rows, user_message)
     if llm_reply:
-        return truncate_sms(llm_reply)
+        return truncate_sms(_strip_price_dates(llm_reply))
 
-    return truncate_sms(_format_kamis_rows_deterministic(price_rows))
+    return truncate_sms(_strip_price_dates(_format_kamis_rows_deterministic(price_rows)))
 
 
 def _summarize_kamis_rows_with_llm(rows: list[dict[str, Any]], user_message: str) -> str | None:
@@ -269,16 +305,19 @@ def _summarize_kamis_rows_with_llm(rows: list[dict[str, Any]], user_message: str
     if llm is None:
         return None
 
-    # Cap rows fed to the LLM to keep the prompt small and fast.
-    rows_for_prompt = rows[:8]
+    # Cap rows fed to the LLM to keep the prompt small and fast. Dates are
+    # stripped before the prompt: the farmer-facing reply must not quote them.
+    rows_for_prompt = [
+        {k: v for k, v in row.items() if k != "Date"} for row in rows[:8]
+    ]
 
     system = SystemMessage(content=(
         "You are an SMS assistant for Kenyan farmers. Summarize the market price "
         "rows below into ONE concise reply under 300 characters, no emojis, no "
-        "markdown. Use ONLY the commodities, markets, counties, prices and dates "
+        "markdown. Use ONLY the commodities, markets, counties and prices "
         "given in the data. NEVER invent, estimate, average, or round prices. If "
         "several varieties or markets are present, mention the most relevant few. "
-        "Always include the most recent price date. Reply with the SMS text only."
+        "Do NOT include any date in your reply. Reply with the SMS text only."
     ))
     human = HumanMessage(content=(
         f"Farmer asked: {user_message}\n\n"
@@ -314,11 +353,7 @@ def _format_kamis_rows_deterministic(rows: list[dict[str, Any]]) -> str:
         return f"{commodity} ({market}): {prices}"
 
     head = rows[:3]
-    body = "; ".join(_row_text(r) for r in head)
-    date = next((r.get("Date") for r in head if r.get("Date")), None)
-    if date:
-        body = f"{body}. As of {date}."
-    return body
+    return "; ".join(_row_text(r) for r in head)
 
 
 def _format_kamis_no_data_reply(result: dict[str, Any], user_message: str) -> str | None:

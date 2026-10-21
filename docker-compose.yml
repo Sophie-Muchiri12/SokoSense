@@ -1,0 +1,38 @@
+# Local development database — Postgres + pgvector.
+#
+# This is ONLY for local dev. Production uses Supabase: on Render set
+# DATABASE_URL to the Supabase transaction-pooler connection string
+# (see .env.example / docs/DEPLOYMENT.md) — never this compose file.
+#
+# Usage:
+#   docker compose up -d db        # start local Postgres
+#   docker compose down            # stop (data survives in the volume)
+#   docker compose down -v         # stop AND wipe local data
+#
+# Then point .env at it (the default in .env.example already does):
+#   DATABASE_URL=postgresql://sokosense:sokosense_dev@localhost:5434/sokosense
+#
+# Host port 5434 (not 5432) avoids clashing with a Postgres already
+# installed/running on the developer's machine.
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: sokosense-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sokosense
+      POSTGRES_PASSWORD: sokosense_dev
+      POSTGRES_DB: sokosense
+    ports:
+      - "5434:5432"
+    volumes:
+      - sokosense_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sokosense -d sokosense"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  sokosense_pgdata:

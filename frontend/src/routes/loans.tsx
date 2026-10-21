@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { RequireAuth } from "@/components/auth-guard";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { postAgent, postLoan, type LoanResponse } from "@/lib/sokosense-api";
@@ -6,20 +7,20 @@ import { postAgent, postLoan, type LoanResponse } from "@/lib/sokosense-api";
 export const Route = createFileRoute("/loans")({
   head: () => ({
     meta: [
-      { title: "Loan Risk Analyzer — SokoSense" },
+      { title: "Is This Loan Fair? — SokoSense" },
       {
         name: "description",
         content:
-          "Evaluate agricultural loan risk with APR calculation, benchmark comparison, and farmer-friendly recommendations.",
+          "Enter a loan offer and see what it will really cost you — and whether it is fair.",
       },
       { property: "og:title", content: "Loan Risk Analyzer — SokoSense" },
       {
         property: "og:description",
-        content: "AI-powered loan risk analysis for African smallholder farmers and SACCOs.",
+        content: "A simple loan check for farmers and SACCOs: the true cost, in plain language.",
       },
     ],
   }),
-  component: LoanRiskAnalyzer,
+  component: () => (<RequireAuth><LoanRiskAnalyzer /></RequireAuth>),
 });
 
 const CBR_BENCHMARK = 13; // Kenya Central Bank Rate %
@@ -120,46 +121,46 @@ function LoanRiskAnalyzer() {
 
   const whyRisky = useMemo(() => {
     const reasons: string[] = [];
-    if (monthlyRate > 3) reasons.push("Monthly interest is high — compounding accelerates your debt faster than most crops appreciate.");
-    if (calc.effectiveAPR > CBR_BENCHMARK * 2) reasons.push("Effective APR is more than double the Central Bank benchmark. Lenders at this level rely on penalty income.");
-    if (calc.totalInterest > amount * 0.5) reasons.push("Total interest exceeds half the principal. You are paying more for the loan than for the inputs it buys.");
-    if (months > 9) reasons.push("Long tenor stretches repayment across multiple seasons. If one harvest fails, you may default before the next.");
-    if (amount > 100000) reasons.push("Large principal increases the lender's recovery risk — expect stricter collateral terms.");
-    if (reasons.length === 0) reasons.push("This loan is structured within safe parameters for a smallholder.");
+    if (monthlyRate > 3) reasons.push("The monthly interest is high, so the debt grows faster than most crops can earn.");
+    if (calc.effectiveAPR > CBR_BENCHMARK * 2) reasons.push("Over a year this costs more than double the Central Bank rate. Lenders this expensive often make their money from late-payment fines.");
+    if (calc.totalInterest > amount * 0.5) reasons.push("The interest alone is more than half of what you borrowed — you would pay a lot for the loan itself.");
+    if (months > 9) reasons.push("Repaying over many seasons is risky: if one harvest fails, you may be unable to pay before the next.");
+    if (amount > 100000) reasons.push("A big loan usually means the lender will ask for strong security — like land or group guarantees.");
+    if (reasons.length === 0) reasons.push("This loan looks reasonable for a farmer to manage.");
     return reasons;
   }, [monthlyRate, calc.effectiveAPR, calc.totalInterest, months, amount]);
 
   const recommendation = useMemo(() => {
     if (calc.risk === "Safe") {
-      return "This rate is fair for the market. Ask your SACCO if they can match it, but this offer is defensible. Keep the term short and use the money for high-yield inputs only.";
+      return "This price is fair. You could ask your SACCO if they can do better, but this offer is reasonable. Borrow for a short time, and spend it only on things that will earn.";
     }
     if (calc.risk === "Caution") {
-      return "The rate is steeper than a typical SACCO loan. Try shortening the term by 2 months or reducing the principal by 20%. If the lender allows early repayment without penalty, take it and clear the debt fast.";
+      return "This costs more than a typical SACCO loan. Try borrowing for 2 fewer months, or borrow about a fifth less. If you can repay early without a fine, do so and clear the debt quickly.";
     }
-    return "This loan is expensive. Before signing, visit your cooperative or county agribusiness office. Group lending, input subsidies, or a staged SACCO loan may cost half as much. Do not use this for speculative planting.";
+    return "This loan is expensive. Before you sign, visit your SACCO or county agriculture office. A group loan or SACCO loan paid in stages could cost half as much. Do not borrow this for a gamble.";
   }, [calc.risk]);
 
   return (
     <div className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20">
       <header>
-        <p className="eyebrow">Credit intelligence</p>
+        <p className="eyebrow">Loan check</p>
         <h1 className="display mt-4 text-[40px] sm:text-[52px] text-ink max-w-3xl">
-          Loan Risk Analyzer
+          Is this loan fair?
         </h1>
         <p className="mt-4 text-[15px] leading-relaxed text-steel max-w-2xl">
-          Enter a lender&apos;s terms and see the true cost. We compare effective APR against the Central Bank benchmark and SACCO averages, then translate the risk into plain advice any farmer can act on.
+          Type in what a lender is offering and see the true cost — how much extra you will pay on top of what you borrow. We compare it with typical bank and SACCO rates, then tell you plainly what to do.
         </p>
       </header>
 
       <div className="mt-12 grid lg:grid-cols-[1fr_1.1fr] gap-5">
         {/* Inputs */}
         <div className="card-surface p-5 sm:p-7">
-          <p className="eyebrow">Loan terms</p>
-          <h2 className="font-serif text-[26px] text-ink mt-1">Enter the offer</h2>
+          <p className="eyebrow">The loan offer</p>
+          <h2 className="font-serif text-[26px] text-ink mt-1">What are they offering you?</h2>
 
           <div className="mt-7 space-y-7">
             <Slider
-              label="Monthly interest rate"
+              label="Interest charged each month"
               suffix="%"
               value={monthlyRate}
               min={0.5}
@@ -169,7 +170,7 @@ function LoanRiskAnalyzer() {
               format={(v) => v.toFixed(1)}
             />
             <Slider
-              label="Loan amount"
+              label="How much you borrow"
               suffix="KSh"
               value={amount}
               min={5000}
@@ -179,7 +180,7 @@ function LoanRiskAnalyzer() {
               format={(v) => v.toLocaleString()}
             />
             <Slider
-              label="Duration"
+              label="How long to repay"
               suffix="months"
               value={months}
               min={2}
@@ -206,7 +207,7 @@ function LoanRiskAnalyzer() {
               disabled={engineLoading}
               className="rounded-full bg-ink px-4 py-2 text-[12px] font-medium text-paper hover:bg-ink-soft disabled:opacity-50"
             >
-              {engineLoading ? "Querying agent…" : "Ask agent for full audit"}
+              {engineLoading ? "Checking…" : "Explain this loan to me"}
             </button>
           </div>
         </div>
@@ -216,9 +217,9 @@ function LoanRiskAnalyzer() {
           {/* Engine verdict from POST /api/loan */}
           {(engineResult || engineLoading || engineError) && (
             <div className="card-surface p-5 sm:p-7 border-teal/20">
-              <p className="eyebrow text-teal">SokoSense engine</p>
+              <p className="eyebrow text-teal">Our verdict</p>
               {engineLoading && !engineResult && (
-                <p className="mt-3 text-[13px] text-steel">Checking loan engine…</p>
+                <p className="mt-3 text-[13px] text-steel">Checking this loan…</p>
               )}
               {engineError && (
                 <p className="mt-3 text-[13px] text-rose-600">{engineError}</p>
@@ -227,7 +228,7 @@ function LoanRiskAnalyzer() {
                 <>
                   <div className="mt-3 flex items-center gap-2">
                     <span className="font-serif text-[28px] text-ink tabular">
-                      {engineResult.apr_percent.toFixed(1)}% APR
+                      {engineResult.apr_percent.toFixed(1)}% a year
                     </span>
                     <span className="chip capitalize">{engineResult.risk_verdict.toLowerCase().replace("_", " ")}</span>
                   </div>
@@ -240,49 +241,49 @@ function LoanRiskAnalyzer() {
 
           {agentReply && (
             <div className="card-surface p-5 sm:p-7 bg-canvas">
-              <p className="eyebrow">Agent audit</p>
+              <p className="eyebrow">In simple words</p>
               <p className="mt-3 text-[13.5px] text-ink leading-relaxed whitespace-pre-wrap">{agentReply}</p>
             </div>
           )}
           {/* Risk classification */}
           <div className={`card-surface p-5 sm:p-7 ${riskColor.border}`}>
             <div className="flex items-center justify-between">
-              <p className={`eyebrow ${riskColor.text}`}>Risk classification</p>
+              <p className={`eyebrow ${riskColor.text}`}>How risky is it?</p>
               <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium ${riskColor.badge}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${riskColor.dot}`} />
                 {calc.risk}
               </span>
             </div>
             <h2 className={`font-serif text-[34px] mt-2 leading-tight ${riskColor.text}`}>
-              {calc.risk === "Safe" ? "Manageable debt" : calc.risk === "Caution" ? "Proceed carefully" : "High risk — reconsider"}
+              {calc.risk === "Safe" ? "This looks fair" : calc.risk === "Caution" ? "Be careful with this one" : "Too costly — think again"}
             </h2>
             <p className={`mt-3 text-[13.5px] leading-relaxed ${calc.risk === "Safe" ? "text-green-deep/80" : "text-steel"}`}>
-              Effective APR of <strong className="text-ink">{calc.effectiveAPR.toFixed(2)}%</strong>.
+              Over a year, this loan costs about <strong className="text-ink">{calc.effectiveAPR.toFixed(2)}%</strong> on top of what you borrow.
               {calc.vsCBR > 0
-                ? ` That is ${calc.vsCBR.toFixed(1)} percentage points above the Central Bank benchmark.`
-                : " That is below the Central Bank benchmark — rare and favorable."}
+                ? ` That is ${calc.vsCBR.toFixed(1)} points higher than the Central Bank rate — loans near that rate are much cheaper.`
+                : " That is below even the Central Bank rate — a very good offer."}
             </p>
           </div>
 
           {/* Comparison bars */}
           <div className="card-surface p-5 sm:p-7">
-            <p className="eyebrow">Benchmark comparison</p>
-            <h3 className="font-serif text-[20px] text-ink mt-2">How this loan stacks up</h3>
+            <p className="eyebrow">Compare the cost</p>
+            <h3 className="font-serif text-[20px] text-ink mt-2">How this loan compares</h3>
             <div className="mt-6 space-y-5">
-              <BarRow label="Central Bank Rate" value={CBR_BENCHMARK} color="bg-green" max={MAX_BAR_APR} />
-              <BarRow label="SACCO average" value={SACCO_AVG} color="bg-teal" max={MAX_BAR_APR} />
+              <BarRow label="Central Bank rate (cheapest guide)" value={CBR_BENCHMARK} color="bg-green" max={MAX_BAR_APR} />
+              <BarRow label="Typical SACCO loan" value={SACCO_AVG} color="bg-teal" max={MAX_BAR_APR} />
               <BarRow label="This loan" value={calc.effectiveAPR} color={calc.risk === "Safe" ? "bg-green" : calc.risk === "Caution" ? "bg-amber" : "bg-rose"} max={MAX_BAR_APR} highlight />
             </div>
           </div>
 
           {/* Pricing summary */}
           <div className="card-surface p-5 sm:p-7">
-            <p className="eyebrow">True cost</p>
+            <p className="eyebrow">What you will really pay</p>
             <div className="mt-3 grid grid-cols-2 gap-px bg-hairline rounded-xl overflow-hidden border border-hairline">
-              <Stat label="Effective APR" value={`${calc.effectiveAPR.toFixed(2)}%`} hero />
-              <Stat label="Total interest" value={`KSh ${Math.round(calc.totalInterest).toLocaleString()}`} hero />
-              <Stat label="Principal" value={`KSh ${amount.toLocaleString()}`} />
-              <Stat label="Total repayment" value={`KSh ${Math.round(calc.totalRepayment).toLocaleString()}`} />
+              <Stat label="Cost per year" value={`${calc.effectiveAPR.toFixed(2)}%`} hero />
+              <Stat label="Extra you pay (interest)" value={`KSh ${Math.round(calc.totalInterest).toLocaleString()}`} hero />
+              <Stat label="You borrow" value={`KSh ${amount.toLocaleString()}`} />
+              <Stat label="You pay back in total" value={`KSh ${Math.round(calc.totalRepayment).toLocaleString()}`} />
             </div>
           </div>
 
@@ -300,8 +301,8 @@ function LoanRiskAnalyzer() {
       <div className="mt-6 grid md:grid-cols-3 gap-5">
         {/* Why risky */}
         <div className="card-surface p-5 sm:p-7">
-          <p className="eyebrow">Risk analysis</p>
-          <h3 className="font-serif text-[22px] text-ink mt-2">Why this loan is risky</h3>
+          <p className="eyebrow">Things to watch</p>
+          <h3 className="font-serif text-[22px] text-ink mt-2">Why this loan could hurt</h3>
           <ul className="mt-5 space-y-3">
             {whyRisky.map((r, i) => (
               <li key={i} className="flex items-start gap-3 text-[13px] leading-relaxed text-steel">
@@ -314,19 +315,19 @@ function LoanRiskAnalyzer() {
 
         {/* Hidden costs */}
         <div className="card-surface p-5 sm:p-7">
-          <p className="eyebrow">Transparency</p>
-          <h3 className="font-serif text-[22px] text-ink mt-2">Potential hidden costs</h3>
+          <p className="eyebrow">Watch out</p>
+          <h3 className="font-serif text-[22px] text-ink mt-2">Extra costs that may be added</h3>
           <ul className="mt-5 space-y-3 text-[13px] text-steel">
-            <CostRow label="Processing fee (2%)" value={processingFee} />
+            <CostRow label="Paperwork fee (2%)" value={processingFee} />
             <CostRow label="Loan insurance (1.5%)" value={insurance} />
-            <CostRow label="Disbursement fee" value={disbursementFee} flat />
+            <CostRow label="Release fee" value={disbursementFee} flat />
             <li className="pt-3 border-t border-hairline flex items-center justify-between">
               <span className="text-ink font-medium">Estimated extra cost</span>
               <span className="font-serif text-ink tabular">KSh {Math.round(hiddenTotal).toLocaleString()}</span>
             </li>
           </ul>
           <p className="mt-4 text-[12px] text-mist leading-relaxed">
-            These fees are often deducted upfront, so the amount reaching your phone is smaller than the face value of the loan.
+            These fees are often taken off at the start, so the money that reaches you is less than the amount you asked for.
           </p>
         </div>
 
@@ -338,9 +339,9 @@ function LoanRiskAnalyzer() {
             {recommendation}
           </p>
           <div className="mt-6 rounded-xl bg-paper/60 border border-hairline p-4">
-            <p className="text-[11px] uppercase tracking-wider text-mist">If you still take it</p>
+            <p className="text-[11px] uppercase tracking-wider text-mist">If you still borrow it</p>
             <p className="mt-2 text-[13px] text-ink leading-relaxed">
-              Use the money only for inputs with a known buyer. Do not spend on consumables. Set aside one installment as a buffer before planting.
+              Spend it only on farming inputs you already have a buyer for. Keep one payment aside as a safety net before you plant.
             </p>
           </div>
         </div>
@@ -470,8 +471,8 @@ function LiveVerdictCard({
     <div className="card-surface p-5 sm:p-7 bg-ink text-paper border-ink">
       <div className="flex items-center justify-between">
         <div>
-          <p className="eyebrow text-teal-glow">SokoSense engine · live</p>
-          <h3 className="font-serif text-[20px] mt-1">Official SMS verdict</h3>
+          <p className="eyebrow text-teal-glow">Our official answer</p>
+          <h3 className="font-serif text-[20px] mt-1">The same answer we send by text</h3>
         </div>
         {data && (
           <span
@@ -484,30 +485,30 @@ function LiveVerdictCard({
 
       {isError ? (
         <p className="mt-4 text-[13px] text-paper/80">
-          Couldn&apos;t reach the loan engine. Confirm the API is running on{" "}
-          <code className="font-mono">localhost:8000</code>.
+          We could not check this loan right now. Please try again.{" "}
+          
         </p>
       ) : !data ? (
-        <p className="mt-4 text-[13px] text-paper/60">{isLoading ? "Scoring…" : "Adjust the rate to score this loan."}</p>
+        <p className="mt-4 text-[13px] text-paper/60">{isLoading ? "Checking…" : "Move the interest slider to check a loan."}</p>
       ) : (
         <>
           <div className="mt-5 grid grid-cols-2 gap-px bg-ink-soft border border-ink-soft rounded-lg overflow-hidden">
             <div className="bg-ink p-4">
-              <p className="text-[10px] uppercase tracking-wider text-mist">Real APR</p>
+              <p className="text-[10px] uppercase tracking-wider text-mist">Cost per year</p>
               <p className="font-serif text-[24px] mt-1 tabular text-paper">{data.apr_percent}%</p>
             </div>
             <div className="bg-ink p-4">
-              <p className="text-[10px] uppercase tracking-wider text-mist">CBK benchmark</p>
+              <p className="text-[10px] uppercase tracking-wider text-mist">Central Bank rate</p>
               <p className="font-serif text-[24px] mt-1 tabular text-teal-glow">{data.cbk_rate_percent}%</p>
             </div>
           </div>
           <div className="mt-4 rounded-lg bg-paper/5 border border-paper/10 p-4">
-            <p className="text-[10px] uppercase tracking-wider text-mist">320-char SMS reply</p>
+            <p className="text-[10px] uppercase tracking-wider text-mist">The text message a farmer receives</p>
             <p className="mt-1.5 text-[13.5px] leading-relaxed text-paper">{data.short_reply}</p>
           </div>
           <p className="mt-3 text-[11.5px] text-mist">
-            {data.comparison_phrase} · scored at {monthlyRate}%/month via{" "}
-            <code className="font-mono text-paper/80">/api/loan</code>
+            {data.comparison_phrase} · checked at {monthlyRate}% per month{" "}
+            
           </p>
         </>
       )}

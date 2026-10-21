@@ -1,11 +1,11 @@
-"""Advisory RAG engine — ties Neo4j knowledge graph + Weather API + LLM.
+"""Advisory RAG engine — ties Postgres knowledge base + pgvector + Weather + LLM.
 
 Pipeline:
   1. Parse farmer's question → extract crop, disease, location keywords
-  2. Query Neo4j knowledge graph for relevant (crop, disease, remedy, practice)
+  2. Query Postgres crops/diseases knowledge tables for (crop, disease, remedy, practice)
   3. Fetch weather for location (if present)
   4. Fetch live KAMIS market prices for the crop (prices live in the KAMIS
-     pipeline, not Neo4j) → best market + price trend
+     pipeline) → best market + price trend
   5. Build a prompt with retrieved context + weather + market context
   6. Call Groq LLM → generate final answer
 
@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from engines.llm import get_groq_llm
-from engines.neo4j_client import Neo4jClient
+from engines.knowledge_store import KnowledgeStore
 from engines.weather import get_farmer_weather, _geocode_location, _fetch_weather, _weatheradvice
 from models.common import unwrap_llm_json_answer
 
@@ -134,7 +134,7 @@ def _extract_keywords(query: str) -> dict[str, str | None]:
 
 
 def _format_graph_context(rows: list[dict[str, Any]]) -> str:
-    """Format Neo4j graph results into a readable context block."""
+    """Format knowledge-base rows into a readable context block."""
     if not rows:
         return "No specific crop/disease knowledge found in the database."
 
@@ -160,7 +160,7 @@ def _format_graph_context(rows: list[dict[str, Any]]) -> str:
 
 
 def _format_vector_context(chunks: list[dict[str, Any]]) -> str:
-    """Format Neo4j vector search results into a readable context block."""
+    """Format pgvector search results into a readable context block."""
     if not chunks:
         return ""
 
@@ -182,7 +182,7 @@ def _fetch_market_context(
 ) -> tuple[dict[str, Any] | None, str]:
     """Fetch live KAMIS market context for a crop to enrich the advisory answer.
 
-    Prices live in the KAMIS pipeline (not Neo4j). Returns (market_dict, context_block).
+    Prices live in the KAMIS pipeline. Returns (market_dict, context_block).
     Degrades to (None, "") when prices are unavailable so the RAG answer is unaffected.
     """
     try:
@@ -245,15 +245,15 @@ def answer_farmer_question(
     disease = kw["disease"]
     location = kw["location"]
 
-    # 2. Query Neo4j knowledge graph AND vector store
-    neo4j = Neo4jClient()
+    # 2. Query Postgres knowledge tables AND pgvector store
+    store = KnowledgeStore()
 
-    # 2a. Graph knowledge (structured crop-disease-remedy)
-    graph_rows = neo4j.query_knowledge_graph(crop=crop, disease=disease)
+    # 2a. Structured knowledge (crop-disease-remedy)
+    graph_rows = store.query_knowledge_graph(crop=crop, disease=disease)
     graph_context = _format_graph_context(graph_rows)
 
     # 2b. Vector search (semantic search over PDF document chunks)
-    vector_chunks = neo4j.vector_search(query_text=query, top_k=5)
+    vector_chunks = store.vector_search(query_text=query, top_k=5)
     vector_context = _format_vector_context(vector_chunks)
 
     # 3. Fetch weather if location detected
@@ -288,7 +288,7 @@ def answer_farmer_question(
             logger.warning("Weather fetch failed: %s", exc)
             weather_context = ""
 
-    # 4. Fetch live market context (prices live in KAMIS pipeline, not Neo4j)
+    # 4. Fetch live market context (prices live in KAMIS pipeline)
     market_data: dict | None = None
     market_context = ""
     if crop:
@@ -400,7 +400,7 @@ def run_query(query: str, *, include_weather: bool = True) -> dict[str, Any]:
     print(f"  disease:  {kw['disease'] or '—'}")
     print(f"  location: {kw['location'] or '—'}")
 
-    print("\nRunning advisory pipeline (Neo4j + Featherless LLM)…")
+    print("\nRunning advisory pipeline (Postgres/pgvector + LLM)…")
     result = answer_farmer_question(query, include_weather=include_weather)
 
     if result.get("sources"):
@@ -424,7 +424,7 @@ def main() -> None:
     load_dotenv()
 
     parser = argparse.ArgumentParser(
-        description="SokoSense advisory CLI — Neo4j RAG + weather + Featherless LLM",
+        description="SokoSense advisory CLI — Postgres/pgvector RAG + weather + LLM",
     )
     parser.add_argument(
         "query",

@@ -67,7 +67,6 @@ export type LoanResponse = {
   risk_verdict: "SAFE" | "CAUTION" | "HIGH_RISK" | "AVOID";
   short_reply: string;
   comparison_phrase: string;
-  payment_id: string | null;
 };
 
 export type MarketDecisionResponse = {

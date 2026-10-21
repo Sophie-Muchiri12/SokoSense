@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { RequireAuth } from "@/components/auth-guard";
 import { useCallback, useRef, useState } from "react";
 import {
   postUssd,
@@ -13,16 +14,16 @@ export const Route = createFileRoute("/ussd")({
       {
         name: "description",
         content:
-          "Live *384*543# USSD simulator — dial the shortcode, pick menu options, and fetch real market, timing and loan decisions from the backend.",
+          "Try the phone menu farmers use: dial the code, choose from simple menus, and get real prices and advice.",
       },
       { property: "og:title", content: "USSD Simulator — SokoSense" },
       {
         property: "og:description",
-        content: "Interactive feature-phone USSD simulator wired to the live SokoSense gateway.",
+        content: "See exactly what a farmer sees on a basic phone — simple menus, real answers.",
       },
     ],
   }),
-  component: UssdPage,
+  component: () => (<RequireAuth><UssdPage /></RequireAuth>),
 });
 
 type SessionStep = {
@@ -91,7 +92,7 @@ function UssdPage() {
         setError(
           err instanceof Error
             ? err.message
-            : "USSD request failed — is the backend running on localhost:8000?",
+            : "We could not connect right now. Please try again.",
         );
         throw err;
       } finally {
@@ -106,7 +107,7 @@ function UssdPage() {
     if (loading || connecting) return;
     reset();
     setConnecting(true);
-    await invokeUssd("", "(dial)", newSessionId());
+    await invokeUssd("", "(dialled)", newSessionId());
   };
 
   const sendInput = async () => {
@@ -134,16 +135,15 @@ function UssdPage() {
   return (
     <div className="mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24">
       <header className="max-w-3xl">
-        <p className="eyebrow">USSD simulator · {USSD_SERVICE_CODE}</p>
+        <p className="eyebrow">On any basic phone · {USSD_SERVICE_CODE}</p>
         <h1 className="display mt-4 text-[40px] sm:text-[56px] text-ink leading-[1.02]">
           Dial the code.
           <br />
-          <span className="italic text-teal">Get a real decision.</span>
+          <span className="italic text-teal">Get a real answer.</span>
         </h1>
         <p className="mt-5 text-[14px] leading-relaxed text-steel">
-          Same feature-phone flow as Safaricom USSD — wired to the live{" "}
-          <code className="font-mono text-[13px] text-ink">POST /ussd</code> handler.
-          Pick menu options and the market, timing and loan engines respond with real data.
+          This is exactly what happens on a basic phone — no internet needed.
+          Dial the code, choose from the simple menus, and get today's prices, selling advice and loan checks.
         </p>
       </header>
 
@@ -152,7 +152,7 @@ function UssdPage() {
         <section className="card-surface p-5 sm:p-7 bg-ink text-paper flex flex-col">
           <div className="flex items-start justify-between">
             <div>
-              <p className="eyebrow text-teal-glow">Feature phone</p>
+              <p className="eyebrow text-teal-glow">A basic phone</p>
               <h2 className="font-serif text-[22px] text-paper mt-2">
                 {USSD_SERVICE_CODE}
               </h2>
@@ -167,12 +167,12 @@ function UssdPage() {
               }`}
             >
               {connecting || loading
-                ? "● connecting"
+                ? "Connecting"
                 : sessionEnded
-                  ? "○ session ended"
+                  ? "Finished"
                   : sessionOpen
-                    ? "● live session"
-                    : "○ idle"}
+                    ? "Connected"
+                    : "Not started"}
             </span>
           </div>
 
@@ -189,7 +189,7 @@ function UssdPage() {
                     <>
                       Connecting to SokoSense…
                       {"\n\n"}
-                      Session establishing.
+                      Please wait…
                     </>
                   ) : screenBody ? (
                     screenBody
@@ -197,7 +197,7 @@ function UssdPage() {
                     <>
                       Dial {USSD_SERVICE_CODE}
                       {"\n\n"}
-                      Press the green call button to start a live USSD session.
+                      Press the green Dial button below to start.
                     </>
                   )}
                 </div>
@@ -211,7 +211,7 @@ function UssdPage() {
             {/* Keypad + input */}
             <div className="mt-5 space-y-3">
               <label className="block text-[10.5px] uppercase tracking-[0.14em] text-paper/50">
-                Menu input
+                Type your choice
               </label>
               <div className="flex gap-2">
                 <input
@@ -266,18 +266,18 @@ function UssdPage() {
               disabled={loading && !screenBody}
               className="rounded-full border border-paper/20 bg-transparent px-4 py-2.5 text-[12.5px] font-medium text-paper hover:border-paper/40 disabled:opacity-50 transition-colors"
             >
-              Cancel session
+              Start again
             </button>
             {lastLatencyMs !== null && (
               <span className="ml-auto text-[11px] text-paper/50 tabular">
-                Last hop: {lastLatencyMs}ms
+                Last step took {lastLatencyMs < 1000 ? "under a second" : `${Math.round(lastLatencyMs / 100) / 10} seconds`}
               </span>
             )}
           </div>
 
           {sessionText && (
             <p className="mt-4 text-[11px] text-paper/45 font-mono break-all">
-              Session path: {sessionText || "(root)"}
+              Your choices so far: {sessionText || "(start)"}
             </p>
           )}
         </section>
@@ -286,12 +286,12 @@ function UssdPage() {
         <section className="card-surface p-5 sm:p-7 flex flex-col">
           <div className="flex items-start justify-between">
             <div>
-              <p className="eyebrow">Session trace</p>
+              <p className="eyebrow">What happened</p>
               <h2 className="font-serif text-[22px] text-ink mt-2">
-                Live gateway hops
+                Step by step
               </h2>
             </div>
-            <span className="chip">{steps.length} hop{steps.length === 1 ? "" : "s"}</span>
+            <span className="chip">{steps.length} step{steps.length === 1 ? "" : "s"}</span>
           </div>
 
           {error ? (
@@ -301,15 +301,15 @@ function UssdPage() {
               </p>
               <p className="mt-2 text-[13.5px] leading-relaxed text-ink">{error}</p>
               <p className="mt-3 text-[12px] text-steel">
-                Start the backend with{" "}
-                <code className="font-mono text-ink">uvicorn main:app --port 8000</code>.
+                Please try again shortly.{" "}
+                
               </p>
             </div>
           ) : steps.length === 0 ? (
             <div className="mt-8 flex-1 rounded-xl border border-dashed border-fog bg-canvas/60 p-10 flex items-center justify-center text-center">
               <p className="text-[13px] text-mist max-w-xs">
                 Dial the shortcode to open a session, then reply with menu numbers (e.g.{" "}
-                <span className="font-mono text-steel">1</span> for English →{" "}
+                <span className="font-mono text-steel">1</span> for English, then{" "}
                 <span className="font-mono text-steel">1</span> for market prices).
               </p>
             </div>
@@ -322,7 +322,7 @@ function UssdPage() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-[10.5px] uppercase tracking-[0.14em] text-mist">
-                      Hop {i + 1} · input{" "}
+                      Step {i + 1} · you chose{" "}
                       <span className="font-mono text-ink">{step.input}</span>
                     </p>
                     <div className="flex items-center gap-2">
@@ -333,10 +333,10 @@ function UssdPage() {
                             : "bg-green-surface text-green-deep"
                         }`}
                       >
-                        {step.response.kind}
+                        {step.response.kind === "CON" ? "Menu continues" : "Finished"}
                       </span>
                       <span className="text-[11px] tabular text-steel">
-                        {step.latencyMs}ms
+                        {step.latencyMs < 1000 ? "Under a second" : `${Math.round(step.latencyMs / 100) / 10}s`}
                       </span>
                     </div>
                   </div>
@@ -356,7 +356,7 @@ function UssdPage() {
               <code className="font-mono text-ink bg-canvas px-1 rounded">1</code>,{" "}
               <code className="font-mono text-ink bg-canvas px-1 rounded">1</code>,{" "}
               <code className="font-mono text-ink bg-canvas px-1 rounded">1</code>{" "}
-              (English → Market → Maize → Nairobi).
+              (English, then Market, then Maize, then Nairobi).
             </p>
           </div>
         </section>

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Start SokoSense: FastAPI backend (:8000) + TanStack frontend (:8081)
+# Start SokoSense: FastAPI backend (:8000) + TanStack frontend (:5173)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 BACKEND_PORT=8000
-FRONTEND_PORT=8081
+FRONTEND_PORT=5173
 
 # Stop any process listening on the given TCP port so dev can restart cleanly.
 free_port() {

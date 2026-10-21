@@ -1,19 +1,19 @@
-# Render Blueprint for SokoSense
-# Deploys two services:
-#   1. sokosense-api  — FastAPI backend (Python)
-#   2. sokosense-web  — TanStack Start SSR frontend (Node)
+# Render Blueprint for SokoSense — BACKEND ONLY
+#
+# Deployment topology:
+#   * Backend  (this file)  — FastAPI on Render
+#   * Frontend              — Vercel (see frontend/vercel.json)
+#   * Database              — Supabase Postgres + pgvector (DATABASE_URL)
 #
 # Usage:
 #   1. Push this file to GitHub.
 #   2. Render Dashboard → New → Blueprint → pick the SokoSense repo.
-#   3. Render reads this file and creates both services.
-#   4. Fill in the secret env vars marked `sync: false`.
-#   5. After the API is live, set VITE_API_URL on sokosense-web to the API's
-#      public URL (e.g. https://sokosense-api.onrender.com) and redeploy the web
-#      service so the URL is baked into the frontend build.
+#   3. Fill in the secret env vars marked `sync: false` (DATABASE_URL is the
+#      Supabase transaction-pooler connection string, port 6543).
+#   4. After the API is live, set VITE_API_URL on the Vercel project to the
+#      API's public URL (e.g. https://sokosense-api.onrender.com).
 
 services:
-  # ─────────────────────────── Backend (FastAPI) ───────────────────────────
   - type: web
     name: sokosense-api
     runtime: python
@@ -25,6 +25,9 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.4
+      # --- Supabase (Postgres + pgvector) ---
+      - key: DATABASE_URL
+        sync: false
       # --- Secrets: set these in the Render dashboard (never commit values) ---
       - key: GROQ_API_KEY
         sync: false
@@ -32,42 +35,17 @@ services:
         value: llama-3.3-70b-versatile
       - key: TAVILY_API_KEY
         sync: false
-      - key: NEO4J_URI
-        sync: false
-      - key: NEO4J_USERNAME
-        sync: false
-      - key: NEO4J_PASSWORD
-        sync: false
-      - key: NEO4J_DATABASE
-        value: neo4j
-      - key: AURA_INSTANCEID
-        sync: false
-      - key: AURA_INSTANCENAME
-        sync: false
       - key: AT_API_KEY
         sync: false
       - key: AT_USERNAME
         value: sandbox
       - key: AT_SMS_SHORTCODE
         sync: false
-
-  # ─────────────────────────── Frontend (SSR) ───────────────────────────
-  - type: web
-    name: sokosense-web
-    runtime: node
-    plan: free
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    startCommand: node .output/server/index.mjs
-    envVars:
-      - key: NODE_VERSION
-        value: "22"
-      # NITRO_PRESET makes the build emit a standalone Node server
-      # (.output/server/index.mjs) instead of the default Cloudflare bundle.
-      - key: NITRO_PRESET
-        value: node-server
-      # Public URL of sokosense-api. Baked into the build (Vite import.meta.env),
-      # so it MUST be set before/at build time. Set it after the API is live,
-      # then redeploy this service. Example: https://sokosense-api.onrender.com
-      - key: VITE_API_URL
+      # --- Auth: REQUIRED in production ---
+      # AUTH_SECRET signs login sessions (generate: openssl rand -hex 32).
+      # Without it an ephemeral secret is used and all sessions die on restart.
+      - key: AUTH_SECRET
+        sync: false
+      # 7-digit PIN for the admin portal (/admin-login).
+      - key: ADMIN_PIN
         sync: false

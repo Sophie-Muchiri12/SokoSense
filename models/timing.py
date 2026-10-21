@@ -20,7 +20,7 @@ class TimingResponse(BaseModel):
     price_kes: float | None = None
     trend: Literal["rising", "falling", "stable"] | None = None
     kamis_date: str | None = None
-    data_source: str = "KAMIS cache (SQLite)"
+    data_source: str = "KAMIS CSV (data/market_prices.csv)"
 
     @field_validator("short_reply")
     @classmethod
