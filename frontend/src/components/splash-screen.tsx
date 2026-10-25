@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { SokoSenseLogo } from "./sokosense-logo";
-
 const STORAGE_KEY = "sokosense-welcome-seen";
 const AUTO_DISMISS_MS = 4500;
 
@@ -53,7 +51,11 @@ export function SplashScreen() {
         }`}
       >
         <div className="flex justify-center splash-rise">
-          <SokoSenseLogo size="xl" variant="plain" animate />
+          <img
+            src="/sokosenselogo.jpeg"
+            alt="SokoSense — Sell Smarter. Borrow Better."
+            className="h-40 w-40 sm:h-48 sm:w-48 rounded-full object-contain splash-logo-float"
+          />
         </div>
 
         <p className="eyebrow mt-10 splash-rise splash-rise-delay-1">Welcome</p>
