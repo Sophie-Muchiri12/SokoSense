@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
+import { SokoSenseLogo } from "./sokosense-logo";
 
 export function SiteFooter() {
   const { user } = useAuth();
@@ -7,15 +8,7 @@ export function SiteFooter() {
     <footer className="border-t border-hairline bg-paper mt-16 sm:mt-24">
       <div className="mx-auto max-w-[1240px] px-5 sm:px-6 py-12 sm:py-16 grid gap-10 sm:gap-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
-          <div className="flex items-center gap-2.5">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-ink text-paper">
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M4 18c4-10 12-10 16 0" />
-                <path d="M12 4v14" />
-              </svg>
-            </span>
-            <span className="font-serif text-[22px] text-ink">Soko<span className="text-teal">Sense</span></span>
-          </div>
+          <SokoSenseLogo />
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-steel">
             Today's market prices, selling advice and honest loan checks for farmers and SACCOs across East Africa — by text message, on any phone.
           </p>

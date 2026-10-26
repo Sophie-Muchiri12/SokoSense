@@ -1,0 +1,159 @@
+import { r as __toESM } from "../_runtime.mjs";
+import { i as require_react, r as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as PageHeader } from "./market-CsderNyk.mjs";
+import { n as RequireAuth } from "./auth-guard-CUFQePul.mjs";
+import { c as postAgent, n as formatAdvisoryAnswer, s as postAdvisory } from "./sokosense-api-BEmahCSf.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/advisory-V2OMjDFS.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var EXAMPLES = [
+	"What causes maize rust in Nakuru?",
+	"How do I control fall armyworm on beans?",
+	"When should I spray tomatoes in Meru?",
+	"Best fertilizer for sorghum in dry season?"
+];
+function AdvisoryPage() {
+	const [query, setQuery] = (0, import_react.useState)("");
+	const [result, setResult] = (0, import_react.useState)(null);
+	const [loading, setLoading] = (0, import_react.useState)(false);
+	const [error, setError] = (0, import_react.useState)(null);
+	const [viaAgent, setViaAgent] = (0, import_react.useState)(false);
+	const run = async (text) => {
+		const q = (text ?? query).trim();
+		if (!q || loading) return;
+		setQuery(q);
+		setLoading(true);
+		setError(null);
+		setResult(null);
+		try {
+			if (viaAgent) {
+				const agent = await postAgent(q);
+				setResult({
+					query: q,
+					answer: formatAdvisoryAnswer(agent.response),
+					location: null,
+					weather: null,
+					sources: agent.raw?.messages?.flatMap((m) => m.tool_calls?.map((t) => t.name) ?? []).filter(Boolean) ?? []
+				});
+			} else {
+				const res = await postAdvisory(q);
+				setResult({
+					...res,
+					answer: formatAdvisoryAnswer(res.answer)
+				});
+			}
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "We could not answer right now");
+		} finally {
+			setLoading(false);
+		}
+	};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "mx-auto max-w-[1240px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-16 sm:pb-24",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PageHeader, {
+			eyebrow: "Farming advice",
+			title: "Ask anything about",
+			italic: "your farm.",
+			sub: "We answer from trusted farming guides and your local weather — the same help we send farmers by text message."
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "mt-10 grid lg:grid-cols-2 gap-6",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "card-surface p-5 sm:p-7",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "eyebrow",
+						children: "Your question"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+						value: query,
+						onChange: (e) => setQuery(e.target.value),
+						onKeyDown: (e) => {
+							if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
+						},
+						rows: 5,
+						placeholder: "What causes maize rust in Nakuru?",
+						className: "mt-4 w-full resize-none rounded-xl border border-hairline bg-paper px-4 py-3 text-[14px] text-ink placeholder:text-mist/70 focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/15"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "mt-4 flex flex-wrap gap-2",
+						children: EXAMPLES.map((ex) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							onClick: () => run(ex),
+							disabled: loading,
+							className: "rounded-full border border-hairline bg-canvas px-3 py-1.5 text-[11.5px] text-steel hover:border-teal/40 hover:text-ink disabled:opacity-50",
+							children: ex.length > 42 ? `${ex.slice(0, 42)}…` : ex
+						}, ex))
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "mt-6 flex items-center gap-3 flex-wrap",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							onClick: () => run(),
+							disabled: !query.trim() || loading,
+							className: "rounded-full bg-teal px-5 py-2.5 text-[12.5px] font-medium text-paper hover:bg-teal-soft disabled:opacity-50",
+							children: loading ? "Finding your answer…" : "Get advice"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+							className: "inline-flex items-center gap-2 text-[12px] text-steel cursor-pointer",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+								type: "checkbox",
+								checked: viaAgent,
+								onChange: (e) => setViaAgent(e.target.checked),
+								className: "accent-teal"
+							}), "Ask in a conversation instead"]
+						})]
+					})
+				]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "card-surface p-5 sm:p-7 flex flex-col",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "eyebrow",
+						children: "Answer"
+					}),
+					error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700",
+						children: error
+					}),
+					!result && !error && !loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-6 text-[13px] text-mist flex-1",
+						children: "Ask about a crop, a pest, or anything on your farm, and we will answer here."
+					}),
+					loading && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "mt-6 flex items-center gap-2 text-[13px] text-steel",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-2 w-2 rounded-full bg-teal animate-pulse" }), "Looking up farming guides and weather…"]
+					}),
+					result && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "mt-4 flex flex-col gap-4 flex-1",
+						children: [
+							result.location && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+								className: "text-[11px] uppercase tracking-wider text-mist",
+								children: ["Your area: ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "text-ink",
+									children: result.location
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "rounded-xl border border-teal/25 bg-teal/[0.04] p-5 flex-1",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "text-[14px] leading-relaxed text-ink whitespace-pre-wrap",
+									children: result.answer
+								})
+							}),
+							result.sources.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "text-[10.5px] uppercase tracking-wider text-mist mb-2",
+								children: "Where this answer came from"
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "flex flex-wrap gap-1.5",
+								children: result.sources.map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "chip text-[11px]",
+									children: s
+								}, s))
+							})] })
+						]
+					})
+				]
+			})]
+		})]
+	});
+}
+var SplitComponent = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RequireAuth, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AdvisoryPage, {}) });
+//#endregion
+export { SplitComponent as component };

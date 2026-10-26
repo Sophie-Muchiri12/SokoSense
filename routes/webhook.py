@@ -9,7 +9,7 @@ Matches contract.json: POST /webhook/sms
 import os
 import re
 import africastalking
-from fastapi import APIRouter, Request, Form
+from fastapi import APIRouter, BackgroundTasks, Request, Form
 from fastapi.responses import PlainTextResponse
 
 from engines import market, timing, loaning
@@ -28,7 +28,34 @@ if AT_USERNAME and AT_API_KEY:
         africastalking.initialize(AT_USERNAME, AT_API_KEY)
         sms_client = africastalking.SMS
     except Exception as e:
-        print(f"[AT] Failed to initialize Africa's Talking SDK: {e}")
+        print(f"[AT] Failed to initialize Africa's Talking SDK: {e}", flush=True)
+
+
+def _send_sms(message: str, recipient: str, label: str = "SMS") -> None:
+    """Send one SMS via Africa's Talking. Safe to run as a background task.
+
+    Runs outside the request so a slow AT response can never delay a USSD
+    reply (USSD sessions time out within seconds). flush=True makes the log
+    lines appear immediately on hosts that buffer stdout (e.g. Render).
+    """
+    if not sms_client:
+        print(f"[AT] SMS client not configured — {label} NOT sent to {recipient}", flush=True)
+        return
+    try:
+        response = sms_client.send(message, [recipient])
+        print(f"[AT] {label} sent to {recipient}: {response}", flush=True)
+    except Exception as e:
+        print(f"[AT] Failed to send {label} to {recipient}: {e}", flush=True)
+
+
+def _normalize_phone(raw: str) -> str:
+    """Form-decoding turns a bare '+' into a space; restore E.164."""
+    phone = (raw or "").strip().replace(" ", "")
+    if phone and phone != "unknown" and not phone.startswith("+") and phone.isdigit():
+        phone = "+" + phone
+    return phone or "unknown"
+
+
 from routes.ussd_i18n import (
     CROP_SW,
     HELP_TEXT_SW,
@@ -61,6 +88,34 @@ TIMING_KEYWORDS = {"TIMING", "WHEN", "SHOULD I SELL", "WAIT", "LINI", "KUUZA", "
 LOAN_KEYWORDS   = {"LOAN", "INTEREST", "MKOPO", "BORROW", "%"}
 HELP_KEYWORDS   = {"HELP", "MSAADA", "START", "HI", "HELLO"}
 
+# Words that follow a number when it is a loan TERM or an AMOUNT, not a rate.
+_NOT_A_RATE_UNIT = re.compile(
+    r"^\s*(MONTHS?|MOS?|YEARS?|YRS?|WEEKS?|DAYS?|MIEZI|MWEZI|MIAKA|MWAKA|WIKI|SIKU|ELFU|K\b|KSH|KES|SHILLINGS?)", re.IGNORECASE
+)
+# Swahili puts the unit first: "miezi 6" (6 months).
+_UNIT_BEFORE = re.compile(r"(MIEZI|MWEZI|MIAKA|MWAKA|WIKI|SIKU)\s*$", re.IGNORECASE)
+MAX_MONTHLY_RATE = 100.0  # a monthly rate above 100% is an amount, not a rate
+
+
+def extract_monthly_rate(clean: str) -> float | None:
+    """Pull the monthly interest rate out of a loan SMS.
+
+    Prefers an explicit percentage ("10%"). Otherwise takes the first number
+    that is not followed by a term/amount unit and is a plausible rate.
+    "LOAN 35000 BEANS 6 MONTHS" has no rate -> None (caller asks for one).
+    """
+    pct = re.search(r"(?<![\d.])(\d+(?:\.\d+)?)\s*%", clean)
+    if pct:
+        value = float(pct.group(1))
+        return value if 0 <= value <= MAX_MONTHLY_RATE else None
+    for m in re.finditer(r"(?<![\d.])(\d+(?:\.\d+)?)(?![\d.])", clean):
+        if _NOT_A_RATE_UNIT.match(clean[m.end():]) or _UNIT_BEFORE.search(clean[:m.start()]):
+            continue
+        value = float(m.group(1))
+        if 0 <= value <= MAX_MONTHLY_RATE:
+            return value
+    return None
+
 
 def parse_sms(text: str) -> dict:
     clean  = text.strip().upper()
@@ -70,9 +125,10 @@ def parse_sms(text: str) -> dict:
         return {"intent": "help"}
 
     if any(kw in clean for kw in LOAN_KEYWORDS):
-        match = re.search(r"(\d+\.?\d*)", clean)
-        if match:
-            return {"intent": "loan", "monthly_rate_percent": float(match.group(1))}
+        rate = extract_monthly_rate(clean)
+        if rate is not None:
+            return {"intent": "loan", "monthly_rate_percent": rate}
+        return {"intent": "loan_missing_rate"}
 
     for crop_raw in KNOWN_CROPS | set(CROP_ALIASES.keys()):
         if crop_raw.upper() in clean and any(kw in clean for kw in TIMING_KEYWORDS):
@@ -95,6 +151,9 @@ def parse_sms(text: str) -> dict:
 
     return {"intent": "unknown"}
 
+
+LOAN_NEEDS_RATE_TEXT = "To check a loan, text LOAN and the monthly interest rate. Example: LOAN 5 (for 5% a month)."
+LOAN_NEEDS_RATE_TEXT_SW = "Kukagua mkopo, tuma MKOPO na riba ya mwezi. Mfano: MKOPO 5 (riba 5% kwa mwezi)."
 
 HELP_TEXT = (
     "SokoSense:\n"
@@ -125,6 +184,9 @@ def route_sms(text: str) -> str:
         result = timing.decide_timing(req)
         return timing_reply_sw(result) if is_sw else result.short_reply
 
+    if intent == "loan_missing_rate":
+        return LOAN_NEEDS_RATE_TEXT_SW if is_sw else LOAN_NEEDS_RATE_TEXT
+
     if intent == "loan":
         req = LoanRequest(monthly_rate_percent=parsed["monthly_rate_percent"])
         result = loaning.decide_loan(req)
@@ -138,25 +200,21 @@ def route_sms(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 @router.post("/webhook/sms")
-async def sms_webhook(request: Request):
+async def sms_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Africa's Talking inbound SMS webhook.
     AT POSTs form-encoded: from, to, text, date, id, linkId
     """
     form   = await request.form()
     text   = form.get("text", "").strip()
-    sender = form.get("from", "unknown")
+    sender = _normalize_phone(form.get("from", "unknown"))
 
     reply = truncate_sms(route_sms(text))
 
-    if sms_client and sender != "unknown":
-        try:
-            at_response = sms_client.send(reply, [sender])
-            print(f"[AT] SMS sent to {sender}: {at_response}")
-        except Exception as e:
-            print(f"[AT] Failed to send SMS reply to {sender}: {e}")
+    if sender != "unknown":
+        background_tasks.add_task(_send_sms, reply, sender, "SMS reply")
     else:
-        print(f"[AT] SMS client not configured — reply NOT sent to {sender}: {reply}")
+        print("[AT] Inbound SMS had no sender — reply NOT sent", flush=True)
 
     return {"short_reply": reply}
 
@@ -164,8 +222,17 @@ async def sms_webhook(request: Request):
 # ---------------------------------------------------------------------------
 # USSD HANDLER
 # ---------------------------------------------------------------------------
+def _loan_followup_sms(band_key: str, is_sw: bool, result) -> str:
+    """Follow-up SMS after a USSD Loan Check, in the session's language."""
+    if not is_sw:
+        return loaning.build_loan_sms_followup(band_key)
+    alternatives = loaning._get_alternatives_list()
+    return truncate_sms(f"{loan_reply_sw(result)} Jaribu: {alternatives}")
+
+
 @router.post("/ussd", response_class=PlainTextResponse)
 async def ussd_handler(
+    background_tasks: BackgroundTasks,
     sessionId: str = Form(...),
     serviceCode: str = Form(...),
     phoneNumber: str = Form(...),
@@ -250,13 +317,15 @@ async def ussd_handler(
             result = loaning.decide_loan_by_amount_band(parts[2])
             reply = loan_reply_sw(result) if is_sw else result.short_reply
 
-            if sms_client:
-                try:
-                    sms_text = loaning.build_loan_sms_followup(parts[2])
-                    sms_client.send(sms_text, [phoneNumber])
-                    print(f"[AT] USSD loan follow-up SMS sent to {phoneNumber}")
-                except Exception as e:
-                    print(f"[AT] Failed to send USSD loan follow-up SMS to {phoneNumber}: {e}")
+            # Only text a valid choice (an invalid band must not cost an SMS),
+            # in the farmer's language, and never block the USSD reply on it.
+            if parts[2] in loaning.LOAN_AMOUNT_BANDS:
+                background_tasks.add_task(
+                    _send_sms,
+                    _loan_followup_sms(parts[2], is_sw, result),
+                    _normalize_phone(phoneNumber),
+                    "USSD loan follow-up SMS",
+                )
 
             return f"END {truncate_ussd(reply)}"
 

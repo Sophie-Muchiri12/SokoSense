@@ -4,9 +4,9 @@
   "description": "Agricultural intelligence for East Africa",
   "icons": [
     {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/sokosenselogo.jpeg",
+      "sizes": "339x344",
+      "type": "image/jpeg"
     }
   ],
   "theme_color": "#0D9280",

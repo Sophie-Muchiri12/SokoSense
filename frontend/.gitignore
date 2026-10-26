@@ -33,3 +33,5 @@ dist-ssr
 
 # Vercel build output
 .vercel
+node_modules/
+.output/
