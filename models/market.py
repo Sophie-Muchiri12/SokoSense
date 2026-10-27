@@ -20,6 +20,9 @@ class MarketDecisionResponse(BaseModel):
     local_price_kes: float | None = None
     best_price_kes: float | None = None
     price_diff_kes: float | None = None
+    price_date: str | None = None  # latest KAMIS report date (data freshness)
+    sell_by_date: str | None = None  # recommended sell-by (today + a few days)
+    distance_km: float | None = None
 
     @field_validator("short_reply")
     @classmethod

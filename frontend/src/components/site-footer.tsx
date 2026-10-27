@@ -10,7 +10,7 @@ export function SiteFooter() {
         <div>
           <SokoSenseLogo />
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-steel">
-            Today's market prices, selling advice and honest loan checks for farmers and SACCOs across East Africa — by text message, on any phone.
+            Today's market prices, farming advice and honest loan checks for farmers and SACCOs across East Africa — by text message, on any phone.
           </p>
           <p className="mt-6 text-[11px] uppercase tracking-[0.14em] text-mist">
             Nairobi · Kampala · Kigali
@@ -23,7 +23,6 @@ export function SiteFooter() {
               links={[
                 { to: "/simulator", label: "SMS Simulator" },
                 { to: "/market", label: "Market Map" },
-                { to: "/timing", label: "Sell Timing" },
                 { to: "/advisory", label: "Advisory" },
                 { to: "/loans", label: "Loan Analyzer" },
                 ...(user.role === "sacco"

@@ -70,7 +70,7 @@ const COPY = {
     pipelineSub: "Follow your message from phone to answer",
     empty: "Send a message to see the reply here.",
     reset: "Reset",
-    hint: "Try: PRICE MAIZE NAKURU · LOAN 35000 BEANS 6 MONTHS · WEATHER MERU",
+    hint: "Try: what is the price of maize in Nakuru · LOAN 35000 BEANS 6 MONTHS · WEATHER MERU",
     error: "Sorry — we could not answer right now.",
   },
   sw: {

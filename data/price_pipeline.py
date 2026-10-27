@@ -51,7 +51,7 @@ MARKET_COORDS: dict[str, tuple[float, float]] = {
     "mombasa": (-4.0435, 39.6682),
     "kitale": (1.0167, 35.0000),
     "nyeri": (-0.4197, 36.9475),
-    # Common non-focus locations (for nearest-market fallback)
+    # Counties + common market towns (for nearest-market distance)
     "meru": (0.0467, 37.6556),
     "embu": (-0.5396, 37.4519),
     "thika": (-1.0333, 37.0693),
@@ -66,6 +66,19 @@ MARKET_COORDS: dict[str, tuple[float, float]] = {
     "laikipia": (0.3600, 36.7800),
     "uasin gishu": (0.5143, 35.2698),
     "trans nzoia": (1.0167, 35.0000),
+    "bomet": (-0.7813, 35.3416),
+    "kwale": (-4.1737, 39.4521),
+    "kitui": (-1.3670, 38.0100),
+    "taita taveta": (-3.3167, 38.4833),
+    "chebunyo": (-0.8500, 35.2200),
+    "mogogosiek": (-0.7200, 35.2800),
+    "ndanai": (-0.8500, 35.0500),
+    "kibuye": (-0.0910, 34.7680),
+    "muhoroni": (-0.1550, 35.1980),
+    "katito": (-0.2200, 34.9600),
+    "butere": (0.2100, 34.4900),
+    "langas": (0.4800, 35.2700),
+    "eldoret main": (0.5143, 35.2698),
 }
 
 # Aliases → focus market keys
@@ -85,18 +98,38 @@ _LOCATION_ALIASES: dict[str, str] = {
 
 _cache: dict[str, tuple[float, dict]] = {}
 CACHE_TTL = 12 * 60 * 60
+# Live portal rows (USE_LIVE) — short TTL so prices stay fresh without
+# hammering KAMIS on every SMS.
+_live_row_cache: dict[str, tuple[float, list]] = {}
+LIVE_CACHE_TTL = 5 * 60
 
 
-def _cache_get(key: str) -> dict | None:
+def _cache_get(key: str, ttl: float | None = None) -> dict | None:
     if key in _cache:
         ts, val = _cache[key]
-        if time() - ts < CACHE_TTL:
+        limit = CACHE_TTL if ttl is None else ttl
+        if time() - ts < limit:
             return val
     return None
 
 
 def _cache_set(key: str, val: dict) -> None:
     _cache[key] = (time(), val)
+
+
+def _live_rows_get(crop: str) -> list | None:
+    key = crop.strip().lower()
+    hit = _live_row_cache.get(key)
+    if not hit:
+        return None
+    ts, rows = hit
+    if time() - ts < LIVE_CACHE_TTL:
+        return list(rows)
+    return None
+
+
+def _live_rows_set(crop: str, rows: list) -> None:
+    _live_row_cache[crop.strip().lower()] = (time(), list(rows))
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +415,37 @@ def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
 # ---------------------------------------------------------------------------
 
 def _fetch_kamis(crop: str) -> list[dict]:
-    """Read stored KAMIS rows for a crop from the market CSV."""
+    """Load KAMIS rows for a crop — live portal when ``USE_LIVE=true``, else CSV.
+
+    Live failures fall back to the market CSV so decisions keep working.
+    """
+    try:
+        from data.kamis_collect import fetch_live_crop_rows, use_live_kamis
+    except Exception:
+        use_live_kamis = lambda: False  # noqa: E731
+        fetch_live_crop_rows = None  # type: ignore
+
+    if use_live_kamis() and fetch_live_crop_rows is not None:
+        cached = _live_rows_get(crop)
+        if cached is not None:
+            logger.info("USE_LIVE cache hit for %s (%d rows)", crop, len(cached))
+            return cached
+        try:
+            live = fetch_live_crop_rows(crop)
+            if live:
+                _live_rows_set(crop, live)
+                logger.info("USE_LIVE portal returned %d rows for crop=%s", len(live), crop)
+                return live
+            logger.warning(
+                "USE_LIVE returned no rows for %s — falling back to market CSV", crop
+            )
+        except Exception as exc:
+            logger.warning(
+                "USE_LIVE fetch failed for %s (%s) — falling back to market CSV",
+                crop,
+                exc,
+            )
+
     try:
         from data.market_csv import query_crop_history
 
@@ -414,8 +477,19 @@ def get_live_prices(crop: str) -> dict[str, float]:
     """
     from data.market_csv import csv_version
 
-    cache_key = f"prices:v3:{crop.lower()}:{csv_version()}"
-    cached = _cache_get(cache_key)
+    try:
+        from data.kamis_collect import use_live_kamis
+
+        live = use_live_kamis()
+    except Exception:
+        live = False
+
+    cache_key = (
+        f"prices:live:v1:{crop.lower()}"
+        if live
+        else f"prices:v3:{crop.lower()}:{csv_version()}"
+    )
+    cached = _cache_get(cache_key, ttl=LIVE_CACHE_TTL if live else None)
     if cached is not None:
         logger.info("Cache hit for %s", crop)
         return cached
@@ -583,6 +657,263 @@ def get_best_market(crop: str, current_market: str) -> dict:
         "best_market": best_market,
         "best_price": best_price,
         "price_diff_kes": max(diff, 0),
+    }
+
+
+def _format_sell_date(iso_date: str | None) -> str | None:
+    """Turn YYYY-MM-DD into a short farmer-facing date, e.g. 27 Oct 2026."""
+    if not iso_date:
+        return None
+    try:
+        return datetime.strptime(iso_date, "%Y-%m-%d").strftime("%d %b %Y")
+    except ValueError:
+        return iso_date
+
+
+def _market_price_date(crop: str, market: str) -> str | None:
+    """Latest KAMIS report date for a crop/market, if available."""
+    try:
+        return get_trend(crop, market).get("kamis_date")
+    except Exception:
+        return None
+
+
+def _coords_for(name: str) -> tuple[float, float] | None:
+    """Lookup GPS for a market or county label."""
+    key = _normalize_key(name)
+    if key in MARKET_COORDS:
+        return MARKET_COORDS[key]
+    # Strip common suffixes: "Mogogosiek Market" → "mogogosiek"
+    for suffix in (" market", " livestock market", " retail market", " town"):
+        if key.endswith(suffix):
+            trimmed = key[: -len(suffix)].strip(" -_")
+            if trimmed in MARKET_COORDS:
+                return MARKET_COORDS[trimmed]
+    return None
+
+
+def _latest_market_quotes(crop: str, max_age_days: int = 14) -> list[dict]:
+    """Latest wholesale quote per KAMIS market town (not county medians).
+
+    Each item: market, county, price_kes, date, coords (if known).
+    Only keeps quotes within ``max_age_days`` of today.
+    """
+    rows = _fetch_kamis(crop)
+    if not rows:
+        return []
+
+    by_market: dict[tuple[str, str], dict] = {}
+    for row in rows:
+        market = str(row.get("Market") or "").strip()
+        county = normalize_county(str(row.get("County") or ""))
+        if not market:
+            continue
+        price = _row_price(row)
+        dt = _parse_kamis_date(row.get("Date"))
+        if price is None or dt is None:
+            continue
+        key = (_normalize_key(market), _normalize_key(county))
+        prev = by_market.get(key)
+        if prev is None or dt > prev["dt"]:
+            by_market[key] = {
+                "market": market,
+                "county": county,
+                "price_kes": float(price),
+                "date": dt.strftime("%Y-%m-%d"),
+                "dt": dt,
+                "coords": _coords_for(market) or _coords_for(county),
+            }
+
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=max_age_days)
+    quotes: list[dict] = []
+    for item in by_market.values():
+        if item["dt"] < cutoff:
+            continue
+        quotes.append(
+            {
+                "market": item["market"],
+                "county": item["county"],
+                "price_kes": item["price_kes"],
+                "date": item["date"],
+                "coords": item["coords"],
+            }
+        )
+    return quotes
+
+
+def _quote_matches_location(quote: dict, location: str) -> bool:
+    """True if a market quote belongs to the farmer's place (county or market)."""
+    needle = _normalize_key(location)
+    if not needle:
+        return False
+    market = _normalize_key(quote.get("market") or "")
+    county = _normalize_key(quote.get("county") or "")
+    return (
+        needle == market
+        or needle == county
+        or needle in market
+        or needle in county
+        or market in needle
+        or county in needle
+    )
+
+
+def recommend_nearest_sell(crop: str, location: str) -> dict:
+    """Recommend where to sell using latest *market-level* prices + distance.
+
+    Rules:
+    - Baseline = latest price at the farmer's location (named KAMIS market).
+    - If local is best (or tied), recommend selling there.
+    - Otherwise recommend the *nearest* other market that pays more
+      (haversine). Never fall back to a distant highest-paying county median.
+    - Quotes use real market wholesale prices from the CSV (e.g. Chebunyo,
+      Kibuye), not blended county averages.
+    """
+    crop_key = crop.strip().lower()
+    requested = location.strip().lower()
+    resolved = _canonical_market_key(requested) or _normalize_key(requested)
+    quotes = _latest_market_quotes(crop_key)
+
+    empty = {
+        "crop": crop_key,
+        "location": resolved or requested,
+        "local_market": None,
+        "recommendation": "WAIT",
+        "sell_market": None,
+        "sell_price_kes": None,
+        "local_price_kes": None,
+        "profit_kes": None,
+        "distance_km": None,
+        "price_date": None,
+        "price_date_display": None,
+        "note": "No recent market price data is available right now.",
+    }
+    if not quotes:
+        return empty
+
+    local_quotes = [q for q in quotes if _quote_matches_location(q, requested)]
+    # Prefer the newest local report; if several markets share that date, take median.
+    local_price: float | None = None
+    local_date: str | None = None
+    local_market: str | None = None
+    if local_quotes:
+        newest = max(q["date"] for q in local_quotes)
+        on_day = [q for q in local_quotes if q["date"] == newest]
+        prices_on_day = [q["price_kes"] for q in on_day]
+        med = _median(prices_on_day)
+        local_price = round(med, 0) if med is not None else on_day[0]["price_kes"]
+        local_date = newest
+        # Name the highest-volume-looking / highest price market on that day for clarity
+        local_market = max(on_day, key=lambda q: q["price_kes"])["market"]
+
+    origin = (
+        _coords_for(resolved)
+        or _coords_for(requested)
+        or next((q["coords"] for q in local_quotes if q.get("coords")), None)
+    )
+
+    local_county = _normalize_key(
+        (local_quotes[0]["county"] if local_quotes else "") or requested
+    )
+
+    def _elsewhere(q: dict) -> bool:
+        county = _normalize_key(q.get("county") or "")
+        market = _normalize_key(q.get("market") or "")
+        if local_county and county == local_county:
+            return False
+        if resolved and (market == resolved or county == resolved):
+            return False
+        return True
+
+    elsewhere = [q for q in quotes if _elsewhere(q) and q.get("coords")]
+
+    if local_price is not None:
+        better = [q for q in elsewhere if q["price_kes"] > local_price]
+        if not better or not origin:
+            # No better reachable market (or no GPS) → sell locally.
+            sell_name = local_market or (resolved or requested)
+            return {
+                "crop": crop_key,
+                "location": resolved or requested,
+                "local_market": local_market,
+                "recommendation": "SELL_HERE",
+                "sell_market": sell_name,
+                "sell_price_kes": local_price,
+                "local_price_kes": local_price,
+                "profit_kes": 0.0,
+                "distance_km": 0.0,
+                "price_date": local_date,
+                "price_date_display": _format_sell_date(local_date),
+                "note": "",
+            }
+
+        # Nearest market that pays more; ties → higher price.
+        def _rank(q: dict) -> tuple[float, float]:
+            dist = _haversine_km(origin, q["coords"])
+            return (dist, -q["price_kes"])
+
+        chosen = min(better, key=_rank)
+        dist = round(_haversine_km(origin, chosen["coords"]), 0)
+        sell_label = chosen["market"]
+        county = chosen.get("county") or ""
+        if county and _normalize_key(county) not in _normalize_key(sell_label):
+            sell_label = f"{chosen['market']} ({county})"
+
+        return {
+            "crop": crop_key,
+            "location": resolved or requested,
+            "local_market": local_market,
+            "recommendation": "SELL_IN_MARKET",
+            "sell_market": sell_label,
+            "sell_price_kes": chosen["price_kes"],
+            "local_price_kes": local_price,
+            "profit_kes": round(chosen["price_kes"] - local_price, 0),
+            "distance_km": dist,
+            "price_date": chosen["date"],
+            "price_date_display": _format_sell_date(chosen["date"]),
+            "note": "",
+        }
+
+    # No local price — nearest market with any quote + coords.
+    if not origin:
+        # Unknown place: pick highest paying named market (honest about price).
+        best = max(quotes, key=lambda q: q["price_kes"])
+        return {
+            "crop": crop_key,
+            "location": resolved or requested,
+            "local_market": None,
+            "recommendation": "SELL_IN_MARKET",
+            "sell_market": best["market"],
+            "sell_price_kes": best["price_kes"],
+            "local_price_kes": None,
+            "profit_kes": None,
+            "distance_km": None,
+            "price_date": best["date"],
+            "price_date_display": _format_sell_date(best["date"]),
+            "note": (
+                f"No price for {requested.title()}. "
+                f"Showing {best['market']} at KSh {best['price_kes']:,.0f}/bag."
+            ),
+        }
+
+    with_coords = [q for q in quotes if q.get("coords")]
+    if not with_coords:
+        return empty
+    nearest = min(with_coords, key=lambda q: _haversine_km(origin, q["coords"]))
+    dist = round(_haversine_km(origin, nearest["coords"]), 0)
+    return {
+        "crop": crop_key,
+        "location": resolved or requested,
+        "local_market": None,
+        "recommendation": "SELL_IN_MARKET",
+        "sell_market": nearest["market"],
+        "sell_price_kes": nearest["price_kes"],
+        "local_price_kes": None,
+        "profit_kes": None,
+        "distance_km": dist,
+        "price_date": nearest["date"],
+        "price_date_display": _format_sell_date(nearest["date"]),
+        "note": "",
     }
 
 

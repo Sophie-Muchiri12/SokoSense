@@ -3,36 +3,7 @@
 
 ---
 
-## 1. Upgrade `TimingResponse` for Sell/Buy/Hold Actions
-
-Currently, the `recommendation` for timing is restricted to `SELL_TODAY` or `WAIT`. To support complete action decisions (Sell, Buy, or Hold), update the recommendation literal types and schema.
-
-### Proposed Changes
-
-```diff
-     "POST /api/timing": {
-       "description": "Sell timing engine — when to sell",
-       "request": {
-         "crop": "string (required)",
--        "market": "string (required)"
-+        "market": "string (required)",
-+        "intent": "string (optional) — sell | buy (defaults to sell)"
-       },
-       "response": {
-         "crop": "string",
-         "market": "string",
--        "recommendation": "string — SELL_TODAY | WAIT",
-+        "recommendation": "string — SELL_TODAY | BUY_TODAY | WAIT",
-         "short_reply": "string (max 320)",
-         "wait_days": "integer | null",
-         "reason": "string"
-       }
-     }
-```
-
----
-
-## 2. Upgrade `MarketDecisionRequest` for Buy/Sell Support
+## 1. Upgrade `MarketDecisionRequest` for Buy/Sell Support
 
 The market engine can recommend where to buy or sell. Adding an `intent` field allows the decision logic to tailor its price comparison (e.g., maximizing profit for sellers vs. minimizing cost for buyers).
 
@@ -64,7 +35,7 @@ The market engine can recommend where to buy or sell. Adding an `intent` field a
 
 ---
 
-## 3. Upgrade `LoanRequest` to Support Full Parameters
+## 2. Upgrade `LoanRequest` to Support Full Parameters
 
 The current `/api/loan` schema only accepts `monthly_rate_percent`. However, the core loaning engine (`loaning.py`) supports complex and realistic calculations including principal, term, period, and compounding frequency. Exposing these variables yields a significantly more robust API.
 

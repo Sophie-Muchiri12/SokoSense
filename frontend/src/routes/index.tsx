@@ -3,7 +3,6 @@ import { useMemo, useRef, useState } from "react";
 import { postAgent, type AgentResponse } from "@/lib/sokosense-api";
 import {
   ArrowRight,
-  CalendarClock,
   HandCoins,
   Languages,
   Leaf,
@@ -104,17 +103,17 @@ function HowItWorks() {
     {
       n: "1",
       title: "Ask a question",
-      desc: "Text us on any phone, or log in here. Ask about prices, when to sell, a loan, or a problem with your crops.",
+      desc: "Text us on any phone, or log in here. Ask about prices, a loan, or a problem with your crops.",
     },
     {
       n: "2",
       title: "We check for you",
-      desc: "We look at today's prices from markets across Kenya, how prices have been moving, and trusted farming know-how.",
+      desc: "We look at today's prices from markets across Kenya and trusted farming know-how.",
     },
     {
       n: "3",
       title: "Get a clear answer",
-      desc: "One short, clear reply: sell here, wait a few days, this loan is too costly — and why. No jargon, no guesswork.",
+      desc: "One short, clear reply: sell here, this loan is too costly — and why. No jargon, no guesswork.",
     },
   ];
   return (
@@ -545,13 +544,6 @@ function ProductGrid() {
       tag: "Prices",
     },
     {
-      icon: CalendarClock,
-      to: "/timing",
-      title: "Sell now or wait?",
-      desc: "We look at how prices have been moving and tell you plainly: sell today, or wait a few days.",
-      tag: "When to sell",
-    },
-    {
       icon: HandCoins,
       to: "/loans",
       title: "Is this loan fair?",
@@ -599,7 +591,7 @@ function ProductGrid() {
           </h2>
         </div>
         <p className="text-[14px] text-steel max-w-sm">
-          Prices, timing, loans and farming advice — the same help whether you reach us by text message or here on the web.
+          Prices, loans and farming advice — the same help whether you reach us by text message or here on the web.
         </p>
       </div>
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">

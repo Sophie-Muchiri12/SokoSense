@@ -13,7 +13,6 @@ from langchain_core.tools import tool
 from engines.loaning import _assess_loan
 from engines.weather import get_farmer_weather as raw_weather
 from engines.advisory import answer_farmer_question as raw_advisory
-from engines.timing import decide_timing as raw_timing
 from engines.market import decide_market as raw_market
 
 logger = logging.getLogger(__name__)
@@ -39,7 +38,7 @@ def scrape_kamis_prices(
     county_name: str | None = None,
     limit: int = 10,
 ) -> str:
-    """Queries the SokoSense market CSV (KAMIS data, data/market_prices.csv) and returns price data.
+    """Queries KAMIS market prices (CSV by default; live portal when USE_LIVE=true).
 
     Use this to find the latest crop prices from Kenyan markets.
 
@@ -170,32 +169,12 @@ def answer_farmer_question(query: str, include_weather: bool = True) -> str:
 
 
 @tool
-def advise_on_sell_timing(crop: str, market: str) -> str:
-    """Performs price trend analysis to advise a farmer on the best time to sell a crop (e.g. SELL_TODAY, WAIT/HOLD).
-
-    Args:
-        crop: The name of the crop (e.g. 'Tomatoes', 'Maize', 'Beans').
-        market: The local market or location name (e.g. 'Meru', 'Nakuru').
-    """
-    try:
-        from models.timing import TimingRequest
-        req = TimingRequest(crop=crop, market=market)
-        result = raw_timing(req)
-        return json.dumps(
-            {"tool": "advise_on_sell_timing", "data": result.model_dump(), "status": "ok"},
-            default=str,
-        )
-    except Exception as exc:
-        return json.dumps(
-            {"tool": "advise_on_sell_timing", "error": str(exc), "status": "error"},
-            default=str,
-        )
-
-
-@tool
 def advise_on_best_market(crop: str, location: str) -> str:
-    """Compares the crop price in the farmer's local location with other markets in Kenya
-    and advises on the best market to sell in.
+    """Recommends where to sell using the latest prices and nearest-market distance.
+
+    If the farmer's location already has the best price, recommend selling there.
+    Otherwise recommend the nearest market that pays more, with profit (extra KSh
+    per bag vs selling locally) and the price report date.
 
     Args:
         crop: The name of the crop (e.g. 'Tomatoes', 'Maize', 'Beans').
@@ -241,7 +220,6 @@ TOOLS = [
     advise_on_loan,
     get_farmer_weather,
     answer_farmer_question,
-    advise_on_sell_timing,
     advise_on_best_market,
     format_sms_json,
 ]
