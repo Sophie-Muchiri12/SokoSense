@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="SokoSense",
     description=(
-        "Farmer decision engine for Kenya — market, timing, and loan recommendations "
+        "Farmer decision engine for Kenya — market and loan recommendations "
         "via SMS-ready API responses (max 320 chars)."
     ),
     version="0.1.0",

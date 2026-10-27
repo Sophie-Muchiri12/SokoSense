@@ -1,6 +1,6 @@
 # SokoSense — Farmer Decision Engine for AgriFin
 
-SokoSense turns raw market data into **one clear instruction** for Kenyan smallholder farmers — via SMS, USSD, and demo UI. Three rule-based engines (market, timing, loan) return ≤320-character decisions. Built for Kenya AI Challenge 2026 · AgriFin Track.
+SokoSense turns raw market data into **one clear instruction** for Kenyan smallholder farmers — via SMS, USSD, and demo UI. Rule-based engines (market, loan) return ≤320-character decisions. Built for Kenya AI Challenge 2026 · AgriFin Track.
 
 ## Features (KAMIS CLI agent)
 - **Multi-crop / Variety Resolution**: Resolves broad crop queries (e.g., "maize") into specific product varieties (e.g., "Dry Maize", "Green Maize", "Maize Flour") automatically.
@@ -89,13 +89,16 @@ Start the backend first so the UI can reach it. Pages wired to the live API:
 - **Market Map** (`/market`) → `GET /api/market-prices` (KAMIS market CSV feed)
 - **Operations** (`/admin`) → `GET /health` (live API status badge)
 
-### Market data (KAMIS → CSV)
+### Market data (KAMIS → CSV / live)
 
-All market prices come from **one CSV file** (`data/market_prices.csv`,
-path override: `MARKET_CSV_PATH`) — every engine, the market map, and the
-agent read it via `data/market_csv.py`, and nothing queries KAMIS or a
-price database at request time. Each commodity keeps its **10 most recent
-rows per market/county** (by KAMIS report date).
+By default, market prices come from **one CSV file** (`data/market_prices.csv`,
+path override: `MARKET_CSV_PATH`), built by the collector below. Engines, the
+market map, and the agent read it via `data/market_csv.py`. Each commodity
+keeps its **10 most recent rows per market/county** (by KAMIS report date).
+
+Set **`USE_LIVE=true`** in `.env` to pull from the live KAMIS portal
+(`https://kamis.kilimo.go.ke`) on price requests (short-cached ~5 min). If the
+portal is unreachable or returns nothing, the CSV is used as fallback.
 
 Collect it manually (run from the project root):
 
@@ -118,7 +121,7 @@ account, enforced in the UI **and** on the API (unauthenticated calls to
 `/api/market`, `/api/loan`, `/api/agent`, `/api/market-prices`, … return 401):
 
 - **Register / log in** (`/register`, `/login`) — phone number + password.
-  Roles: **farmer** (market, loans, timing, advisory, simulator, USSD) and
+  Roles: **farmer** (market, loans, advisory, simulator, USSD) and
   **sacco** (everything a farmer has, plus the SACCO dashboard at `/sacco`).
   Accounts live in Postgres (`users` table) — `DATABASE_URL` must be set;
   without it register/login respond 503 by design. **Locally** run it in
@@ -142,7 +145,6 @@ Kept public on purpose: `/health` and the Africa's Talking webhooks
 | GET  | `/health` | Service health check |
 | POST | `/api/agent` | Full LangGraph agent (price, advisory, weather, loan) |
 | POST | `/api/market` | Market decision engine |
-| POST | `/api/timing` | Sell-timing engine |
 | POST | `/api/loan` | Loan-risk engine |
 | POST | `/api/advisory` | RAG crop advisory |
 | GET  | `/api/market-prices` | KAMIS market prices (from CSV) |
@@ -159,7 +161,7 @@ Kept public on purpose: `/health` and the Africa's Talking webhooks
 > database is the Docker container (`docker compose up -d db`); production uses
 > Supabase via `DATABASE_URL` on Render. Without `DATABASE_URL`
 > the platform falls back to the bundled SQLite price cache + in-code seed
-> knowledge, and the rule-based engines (`/api/loan`, `/api/timing`, `/api/market`)
+> knowledge, and the rule-based engines (`/api/loan`, `/api/market`)
 > work without any keys — but registration/login return 503.
 >
 > **Deploy:** Backend on **Render** (`render.yaml`), frontend on **Vercel**

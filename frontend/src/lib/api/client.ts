@@ -79,19 +79,9 @@ export type MarketDecisionResponse = {
   local_price_kes?: number | null;
   best_price_kes?: number | null;
   price_diff_kes?: number | null;
-};
-
-export type TimingResponse = {
-  crop: string;
-  market: string;
-  recommendation: "SELL_TODAY" | "WAIT";
-  short_reply: string;
-  wait_days?: number | null;
-  reason: string;
-  price_kes?: number | null;
-  trend?: "rising" | "falling" | "stable" | null;
-  kamis_date?: string | null;
-  data_source?: string;
+  price_date?: string | null;
+  sell_by_date?: string | null;
+  distance_km?: number | null;
 };
 
 export type AdvisoryResponse = {
@@ -139,12 +129,6 @@ export const api = {
     request<MarketDecisionResponse>("/api/market", {
       method: "POST",
       body: JSON.stringify({ crop, location }),
-    }),
-
-  timing: (crop: string, market: string) =>
-    request<TimingResponse>("/api/timing", {
-      method: "POST",
-      body: JSON.stringify({ crop, market }),
     }),
 
   advisory: (query: string) =>

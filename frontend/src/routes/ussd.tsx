@@ -143,7 +143,7 @@ function UssdPage() {
         </h1>
         <p className="mt-5 text-[14px] leading-relaxed text-steel">
           This is exactly what happens on a basic phone — no internet needed.
-          Dial the code, choose from the simple menus, and get today's prices, selling advice and loan checks.
+          Dial the code, choose from the simple menus, and get today's prices and loan checks.
         </p>
       </header>
 
