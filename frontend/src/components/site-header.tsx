@@ -13,7 +13,6 @@ import { ArrowRight } from "lucide-react";
 const accountNav = [
   { to: "/simulator", label: "SMS Simulator" },
   { to: "/market", label: "Market Map" },
-  { to: "/timing", label: "Sell Timing" },
   { to: "/advisory", label: "Advisory" },
   { to: "/loans", label: "Loan Analyzer" },
   { to: "/sacco", label: "SACCO Dashboard", roles: ["sacco"] },

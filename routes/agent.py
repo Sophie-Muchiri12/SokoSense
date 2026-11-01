@@ -66,19 +66,27 @@ def post_agent(body: AgentRequest) -> AgentResponse:
             "messages": [HumanMessage(content=body.message)],
         })
 
-        # A grounded CSV price reply wins over the model's free-form terminal
-        # reply, so quoted prices always come from real market_csv rows.
-        kamis_reply = _format_kamis_tool_reply(result, body.message)
+        # Prefer the nearest-market recommendation (date + market + profit/bag)
+        # when advise_on_best_market ran. If the agent only scraped prices for a
+        # located crop query, still build that recommendation from the engine.
+        # Otherwise fall back to grounded KAMIS rows, then terminal json.
+        market_rec_reply = (
+            _format_best_market_tool_reply(result)
+            or _fallback_market_recommendation(result, body.message)
+        )
+        kamis_reply = None if market_rec_reply else _format_kamis_tool_reply(result, body.message)
         parsed_terminal = _parse_terminal_json_tool_call(result)
-        if parsed_terminal and not kamis_reply:
+
+        if market_rec_reply:
+            response_text, resp_type = market_rec_reply, "market"
+        elif parsed_terminal and not kamis_reply:
             response_text, resp_type = parsed_terminal
             return AgentResponse(
                 response=response_text,
                 type=resp_type,
                 raw=_build_raw(result),
             )
-
-        if kamis_reply:
+        elif kamis_reply:
             response_text = kamis_reply
             resp_type = "market"
         else:
@@ -255,6 +263,91 @@ def _strip_price_dates(text: str) -> str:
     if text and text[-1] not in ".!?":
         text += "."
     return text
+
+
+def _format_best_market_tool_reply(result: dict[str, Any]) -> str | None:
+    """Use advise_on_best_market.short_reply when the tool ran successfully.
+
+    This is the farmer-facing recommendation: sell-by date, nearest/best
+    market name, and extra KSh per bag vs selling where they are.
+    """
+    for message in reversed(result.get("messages", [])):
+        if getattr(message, "name", None) != "advise_on_best_market":
+            continue
+        content = getattr(message, "content", None)
+        if not isinstance(content, str):
+            continue
+        try:
+            parsed = json.loads(content)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(parsed, dict) or parsed.get("status") != "ok":
+            continue
+        data = parsed.get("data")
+        if not isinstance(data, dict):
+            continue
+        reply = data.get("short_reply")
+        if isinstance(reply, str) and reply.strip():
+            return truncate_sms(reply.strip())
+    return None
+
+
+def _fallback_market_recommendation(
+    result: dict[str, Any], user_message: str
+) -> str | None:
+    """Build a sell recommendation when the agent scraped prices but skipped
+    advise_on_best_market — common for 'price of X in Y' simulator queries.
+    """
+    crop, location = _extract_crop_location(result, user_message)
+    if not crop or not location:
+        return None
+    try:
+        from engines.market import decide_market
+        from models.market import MarketDecisionRequest
+
+        decision = decide_market(MarketDecisionRequest(crop=crop, location=location))
+        return truncate_sms(decision.short_reply)
+    except Exception as exc:
+        logger.warning("Market recommendation fallback failed: %s", exc)
+        return None
+
+
+def _extract_crop_location(
+    result: dict[str, Any], user_message: str
+) -> tuple[str | None, str | None]:
+    """Pull crop + place from KAMIS tool args, else from the user message."""
+    for args, _payload in reversed(list(_iter_kamis_tool_results(result))):
+        crop = args.get("crop_name")
+        location = args.get("market_name") or args.get("county_name")
+        if isinstance(crop, str) and crop.strip() and isinstance(location, str) and location.strip():
+            return crop.strip().lower(), location.strip().lower()
+
+    # advise_on_best_market args (even if the tool errored)
+    for message in result.get("messages", []):
+        for tool_call in getattr(message, "tool_calls", None) or []:
+            if tool_call.get("name") != "advise_on_best_market":
+                continue
+            args = tool_call.get("args") or {}
+            crop = args.get("crop")
+            location = args.get("location")
+            if isinstance(crop, str) and crop.strip() and isinstance(location, str) and location.strip():
+                return crop.strip().lower(), location.strip().lower()
+
+    msg = user_message.lower()
+    crops = (
+        "maize", "beans", "tomatoes", "potatoes", "sorghum", "millet",
+        "mahindi", "maharagwe", "nyanya", "viazi",
+    )
+    places = (
+        "nairobi", "nakuru", "eldoret", "kisumu", "mombasa", "kitale", "nyeri",
+        "meru", "kakamega", "kiambu", "machakos", "kericho", "thika", "embu",
+    )
+    crop = next((c for c in crops if c in msg), None)
+    location = next((p for p in places if p in msg), None)
+    aliases = {"mahindi": "maize", "maharagwe": "beans", "nyanya": "tomatoes", "viazi": "potatoes"}
+    if crop:
+        crop = aliases.get(crop, crop)
+    return crop, location
 
 
 def _format_kamis_tool_reply(result: dict[str, Any], user_message: str = "") -> str | None:

@@ -334,13 +334,11 @@ def fetch_csv_prices(
     county_name: Optional[str] = None,
     limit: int = 10,
 ) -> str:
-    """Plain (non-tool) CSV price lookup — the single request-time price path.
+    """Plain (non-tool) price lookup used by the agent.
 
-    Queries the SokoSense market CSV (data/market_prices.csv, built by
-    scripts/collect_market_data.py / the admin refresh) and returns the most
-    recent price entries as JSON text. This never queries KAMIS live, so it
-    has no rate-limiter / Tavily / fallback-chain dependencies. Both the
-    LangChain tool below and the agent's tool wrapper call this.
+    Default: market CSV (``data/market_prices.csv``).
+    When ``USE_LIVE=true``, prefers a live KAMIS portal pull for the crop,
+    then falls back to the CSV if the portal returns nothing.
     """
     import json
 
@@ -351,13 +349,33 @@ def fetch_csv_prices(
     clean_market_name = market_name.strip() if market_name else None
     clean_county_name = county_name.strip() if county_name else None
 
-    rows = query_prices(crop_name=clean_crop_name, limit=100_000)
+    rows: list = []
+    try:
+        from data.kamis_collect import fetch_live_crop_rows, use_live_kamis
+        from data.price_pipeline import _live_rows_get, _live_rows_set
+
+        if use_live_kamis() and clean_crop_name:
+            cached = _live_rows_get(clean_crop_name)
+            if cached is not None:
+                rows = cached
+            else:
+                live = fetch_live_crop_rows(clean_crop_name)
+                if live:
+                    _live_rows_set(clean_crop_name, live)
+                    rows = live
+    except Exception as exc:
+        logger.warning("USE_LIVE price path failed: %s", exc)
+        rows = []
+
+    if not rows:
+        rows = query_prices(crop_name=clean_crop_name, limit=100_000)
 
     if not rows:
         return (
-            "No price data in the market CSV yet. Run "
+            "No price data available. With USE_LIVE=false, run "
             "`python scripts/collect_market_data.py` (or the admin portal's "
-            "Refresh market data button) to collect KAMIS prices first."
+            "Refresh market data button). With USE_LIVE=true, check KAMIS "
+            "portal reachability."
         )
 
     # Location filtering — market-first, then county, so a missing market
@@ -408,10 +426,8 @@ def scrape_kamis_prices(
     limit: int = 10,
 ) -> str:
     """
-    Queries the SokoSense market CSV (data/market_prices.csv) and returns the
-    most recent price entries. The CSV is built by
-    scripts/collect_market_data.py / the admin refresh — this tool never
-    queries KAMIS live.
+    Returns the most recent price entries for a crop. Reads the market CSV by
+    default; when USE_LIVE=true, pulls from the KAMIS portal first.
     IMPORTANT: Always use the default limit of 10. Do NOT pass a higher limit value.
 
     Args:

@@ -2,14 +2,12 @@ from fastapi import APIRouter, Depends
 
 from auth.security import get_current_user
 
-from engines import loaning, market, timing
+from engines import loaning, market
 from models import (
     LoanRequest,
     LoanResponse,
     MarketDecisionRequest,
     MarketDecisionResponse,
-    TimingRequest,
-    TimingResponse,
 )
 
 router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/api", tags=["decisions"])
@@ -18,11 +16,6 @@ router = APIRouter(dependencies=[Depends(get_current_user)], prefix="/api", tags
 @router.post("/market", response_model=MarketDecisionResponse)
 def post_market_decision(body: MarketDecisionRequest) -> MarketDecisionResponse:
     return market.decide_market(body)
-
-
-@router.post("/timing", response_model=TimingResponse)
-def post_timing_decision(body: TimingRequest) -> TimingResponse:
-    return timing.decide_timing(body)
 
 
 @router.post("/loan", response_model=LoanResponse)

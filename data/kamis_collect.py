@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import re
 import time
 from datetime import datetime, timezone
@@ -41,8 +42,16 @@ KAMIS_URL = "https://kamis.kilimo.go.ke/site/market"
 # that report infrequently — and we need enough history to pick each
 # market's 10 most recent rows.
 ROW_LIMIT_PER_PRODUCT = 1500
+# On-demand live reads (USE_LIVE=true) use a smaller page to stay fast.
+LIVE_ROW_LIMIT_PER_PRODUCT = 400
+LIVE_MAX_PRODUCTS = 4
 REQUEST_DELAY_SECONDS = 0.5
 REQUEST_TIMEOUT_SECONDS = 40
+
+
+def use_live_kamis() -> bool:
+    """True when ``USE_LIVE=true`` — request-time reads hit the KAMIS portal."""
+    return os.getenv("USE_LIVE", "").strip().lower() in {"1", "true", "yes", "on"}
 
 ProgressFn = Callable[[dict], None] | None
 
@@ -137,6 +146,83 @@ def fetch_rows_for_product(
             }
         )
     logger.info("product_id=%s → %d rows", product_id, len(out))
+    return out
+
+
+# ── on-demand live fetch (USE_LIVE) ─────────────────────────────────────
+
+
+def _to_pipeline_row(row: dict) -> dict:
+    """Shape a collector row the way ``price_pipeline`` / agent tools expect."""
+    return {
+        "Commodity": row.get("commodity") or "",
+        "Market": row.get("market") or "",
+        "County": row.get("county") or "",
+        "Wholesale": row.get("wholesale_raw"),
+        "Retail": row.get("retail_raw"),
+        "Date": row.get("date_reported"),
+        "fetched_at": row.get("fetched_at"),
+    }
+
+
+def fetch_live_crop_rows(
+    crop: str,
+    *,
+    per_page: int = LIVE_ROW_LIMIT_PER_PRODUCT,
+    max_products: int = LIVE_MAX_PRODUCTS,
+    delay_seconds: float = REQUEST_DELAY_SECONDS,
+) -> list[dict]:
+    """Pull current KAMIS portal rows for ``crop`` (legacy dict shape).
+
+    Used when ``USE_LIVE=true``. Does not write the CSV. Returns [] on
+    failure so callers can fall back to the cached CSV.
+    """
+    crop = (crop or "").strip()
+    if not crop:
+        return []
+
+    try:
+        from engines.rate_limiter import kamis_http_limiter
+
+        kamis_http_limiter.wait_if_needed()
+    except Exception:
+        pass
+
+    try:
+        catalogue = discover_products()
+    except Exception as exc:
+        logger.warning("USE_LIVE: could not load KAMIS catalogue: %s", exc)
+        return []
+
+    targets = [p for p in catalogue if _matches(p["commodity"], crop)]
+    if not targets:
+        logger.warning("USE_LIVE: no KAMIS commodity matches '%s'", crop)
+        return []
+
+    targets = targets[: max(1, max_products)]
+    fetched_at = utc_now_iso()
+    out: list[dict] = []
+    for idx, product in enumerate(targets):
+        try:
+            from engines.rate_limiter import kamis_http_limiter
+
+            kamis_http_limiter.wait_if_needed()
+        except Exception:
+            pass
+        rows = fetch_rows_for_product(
+            product["product_id"], fetched_at=fetched_at, per_page=per_page
+        )
+        out.extend(_to_pipeline_row(r) for r in rows)
+        if idx < len(targets) - 1 and delay_seconds:
+            time.sleep(delay_seconds)
+
+    out.sort(key=lambda r: str(r.get("Date") or ""), reverse=True)
+    logger.info(
+        "USE_LIVE: crop=%s products=%d rows=%d",
+        crop,
+        len(targets),
+        len(out),
+    )
     return out
 
 

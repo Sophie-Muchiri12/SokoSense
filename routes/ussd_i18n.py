@@ -3,7 +3,6 @@
 from models.common import truncate_sms
 from models.loan import LoanResponse, RiskVerdict
 from models.market import MarketDecisionResponse
-from models.timing import TimingResponse
 
 CROP_SW = {
     "maize": "mahindi",
@@ -22,7 +21,6 @@ SW_KEYWORDS = frozenset({
 HELP_TEXT_SW = (
     "SokoSense:\n"
     "BEI: MAHINDI NAKURU\n"
-    "WAKATI: MAHINDI LINI\n"
     "MKOPO: MKOPO 5\n"
     "Bure. Hakuna programu."
 )
@@ -52,36 +50,37 @@ def is_swahili_sms(text: str) -> bool:
 
 def market_reply_sw(result: MarketDecisionResponse) -> str:
     loc = result.location
+    crop = (result.crop or "zao").title()
+    local = result.local_price_kes
+    lead = (
+        f"{crop} {loc}: KSh {local:,.0f}/gunia. "
+        if local is not None
+        else f"Hakuna bei ya {crop} {loc}. "
+    )
+    sell_by = result.sell_by_date
+    date_bit = f" ifikapo {sell_by}" if sell_by else ""
     if result.recommendation == "SELL_HERE":
-        price = result.local_price_kes or 0
         return truncate_sms(
-            f"UZA HAPA. {loc} ina bei bora ya KSh {price:,.0f}/gunia leo."
+            f"{lead}Uza{date_bit} sokoni {loc} — bei bora karibu. "
+            f"Hakuna faida ya ziada kwa kusafiri."
         )
     if result.recommendation == "SELL_IN_MARKET":
-        best = (result.best_market or loc).upper()
-        diff = result.price_diff_kes or 0
+        best = (result.best_market or loc).title()
+        diff = result.price_diff_kes
+        dist = result.distance_km
+        dist_bit = f" (~{dist:.0f} km)" if dist is not None else ""
+        if diff is not None and local is not None:
+            return truncate_sms(
+                f"{lead}Unaweza kuuza zao{date_bit} sokoni {best}{dist_bit} "
+                f"na faida ya KSh {diff:,.0f}/gunia kuliko kuuza {loc}."
+            )
+        price = result.best_price_kes or 0
         return truncate_sms(
-            f"UZA {best}. KSh {diff:,.0f} zaidi kwa gunia. Inafaa safari."
-        )
-    price = result.local_price_kes or 0
-    return truncate_sms(
-        f"SUBIRI. Bei ya {loc} ni shindani kwa KSh {price:,.0f}/gunia. "
-        f"Hakuna soko bora leo."
-    )
-
-
-def timing_reply_sw(result: TimingResponse) -> str:
-    crop = CROP_SW.get(result.crop, result.crop)
-    market = result.market.title()
-    if result.recommendation == "WAIT":
-        days = result.wait_days or 3
-        return truncate_sms(
-            f"SHIKILIA. Bei ya {crop} inaongezeka. "
-            f"Subiri siku {days} kama unaweza. Wanunuzi: nunua leo."
+            f"{lead}Unaweza kuuza zao{date_bit} sokoni jirani {best}{dist_bit} "
+            f"kwa KSh {price:,.0f}/gunia."
         )
     return truncate_sms(
-        f"UZA LEO. Bei ya {crop} katika {market} ni shindani sasa. "
-        f"Wanunuzi: nunua au subiri kulingana na mahitaji."
+        f"{lead}Hakuna bei ya soko ya hivi karibuni sasa. Jaribu tena baadaye."
     )
 
 

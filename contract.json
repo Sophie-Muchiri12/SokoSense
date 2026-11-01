@@ -37,7 +37,7 @@
       }
     },
     "POST /api/market": {
-      "description": "Market decision engine \u2014 where to sell",
+      "description": "Market decision engine \u2014 nearest better market (or local if best)",
       "request": {
         "crop": "string (required) \u2014 e.g. maize",
         "location": "string (required) \u2014 farmer's market or county, e.g. nakuru"
@@ -46,27 +46,15 @@
         "crop": "string",
         "location": "string",
         "recommendation": "string \u2014 SELL_HERE | SELL_IN_MARKET | WAIT",
-        "short_reply": "string (max 320) \u2014 SMS-ready one-line decision",
+        "short_reply": "string (max 320) \u2014 sell-by date, market name, profit KSh/bag",
         "market_name": "string | null \u2014 farmer's local market",
-        "best_market": "string | null \u2014 recommended market if different",
+        "best_market": "string | null \u2014 recommended nearest better market",
         "local_price_kes": "number | null \u2014 price at local market per 90kg bag",
-        "best_price_kes": "number | null \u2014 price at best market",
-        "price_diff_kes": "number | null \u2014 gain per bag if farmer travels"
-      }
-    },
-    "POST /api/timing": {
-      "description": "Sell timing engine \u2014 when to sell",
-      "request": {
-        "crop": "string (required)",
-        "market": "string (required)"
-      },
-      "response": {
-        "crop": "string",
-        "market": "string",
-        "recommendation": "string \u2014 SELL_TODAY | WAIT",
-        "short_reply": "string (max 320)",
-        "wait_days": "integer | null",
-        "reason": "string"
+        "best_price_kes": "number | null \u2014 price at recommended market",
+        "price_diff_kes": "number | null \u2014 extra KSh/bag vs selling locally",
+        "price_date": "string | null \u2014 latest KAMIS report date YYYY-MM-DD",
+        "sell_by_date": "string | null \u2014 recommended sell-by (today + a few days)",
+        "distance_km": "number | null \u2014 km to recommended market"
       }
     },
     "POST /api/loan": {
@@ -97,7 +85,7 @@
           {
             "timestamp": "string ISO8601",
             "raw_input": "string",
-            "engine": "string \u2014 market | timing | loan | sms | advisory",
+            "engine": "string \u2014 market | loan | sms | advisory",
             "short_reply": "string",
             "latency_ms": "integer",
             "error": "string | null"

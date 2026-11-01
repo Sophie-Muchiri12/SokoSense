@@ -109,7 +109,7 @@ def test_latest_wholesale_skips_stale_prices():
 
 def test_get_trend_for_non_focus_county_in_csv(monkeypatch):
     # Meru is not one of the seven focus markets, but its CSV rows must
-    # still drive sell-timing (regression: it used to say "no market found").
+    # still resolve a trend (regression: it used to say "no market found").
     from datetime import datetime, timedelta, timezone
 
     today = datetime.now(timezone.utc).replace(tzinfo=None)

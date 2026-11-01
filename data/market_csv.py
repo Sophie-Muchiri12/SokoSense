@@ -1,9 +1,9 @@
-"""CSV store for KAMIS market prices — the single source of truth.
+"""CSV store for KAMIS market prices — default offline source of truth.
 
-All market-price reads in SokoSense go through this module and the one
-active CSV file (default ``data/market_prices.csv``, override with
-``MARKET_CSV_PATH``). No code path queries KAMIS live or reads a price
-database anymore:
+Request-time reads normally go through this module and the one active CSV
+file (default ``data/market_prices.csv``, override with ``MARKET_CSV_PATH``).
+When ``USE_LIVE=true``, ``data/price_pipeline`` / the agent price tool hit
+the KAMIS portal first and fall back here if live fetch fails.
 
 * Collection is manual / admin-triggered — see
   ``scripts/collect_market_data.py`` and ``data/kamis_collect.py``.

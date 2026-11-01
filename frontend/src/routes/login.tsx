@@ -99,7 +99,7 @@ function LoginPage() {
       eyebrow="Welcome back"
       title="Log in to"
       italic="SokoSense."
-      sub="Farmers and SACCO partners — sign in with your phone number to reach market prices, loans, timing and advisory."
+      sub="Farmers and SACCO partners — sign in with your phone number to reach market prices, loans and advisory."
     >
       <form onSubmit={submit} className="space-y-4">
         <div>

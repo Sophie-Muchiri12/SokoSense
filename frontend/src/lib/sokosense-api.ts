@@ -91,24 +91,9 @@ export interface MarketDecisionResponse {
   local_price_kes?: number | null;
   best_price_kes?: number | null;
   price_diff_kes?: number | null;
-}
-
-export interface TimingRequest {
-  crop: string;
-  market: string;
-}
-
-export interface TimingResponse {
-  crop: string;
-  market: string;
-  recommendation: "SELL_TODAY" | "WAIT";
-  short_reply: string;
-  wait_days?: number | null;
-  reason: string;
-  price_kes?: number | null;
-  trend?: "rising" | "falling" | "stable" | null;
-  kamis_date?: string | null;
-  data_source?: string;
+  price_date?: string | null;
+  sell_by_date?: string | null;
+  distance_km?: number | null;
 }
 
 export interface AdvisoryRequest {
@@ -191,17 +176,6 @@ export async function postMarketDecision(
   return apiFetch<MarketDecisionResponse>("/api/market", {
     method: "POST",
     body: JSON.stringify({ crop, location } satisfies MarketDecisionRequest),
-  });
-}
-
-/** Sell-timing decision engine. */
-export async function postTimingDecision(
-  crop: string,
-  market: string,
-): Promise<TimingResponse> {
-  return apiFetch<TimingResponse>("/api/timing", {
-    method: "POST",
-    body: JSON.stringify({ crop, market } satisfies TimingRequest),
   });
 }
 

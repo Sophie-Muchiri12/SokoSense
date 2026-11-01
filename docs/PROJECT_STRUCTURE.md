@@ -25,15 +25,13 @@ SokoSense/
 │   ├── __init__.py
 │   ├── common.py
 │   ├── market.py
-│   ├── timing.py
 │   ├── loan.py
 │   ├── logs.py
 │   └── market_map.py
 │
-├── engines/                      # Job — all three decision engines
+├── engines/                      # Job — decision engines
 │   ├── __init__.py
 │   ├── market.py                 # Where to sell
-│   ├── timing.py                 # When to sell
 │   ├── loaning.py                # APR + verdict (+ decide_loan for API)
 │   └── market_prices.py          # Price table for Ian's map
 │
@@ -54,7 +52,7 @@ SokoSense/
 │
 ├── routes/                       # Sophie + Lucy — HTTP handlers only
 │   ├── __init__.py
-│   ├── decisions.py              # POST /api/market, /timing, /loan
+│   ├── decisions.py              # POST /api/market, /loan
 │   ├── logs.py                   # GET /api/logs
 │   ├── market_data.py            # GET /api/market-prices
 │   ├── webhook.py                # SMS parser + USSD handler (rule-based, EN/SW)
@@ -68,7 +66,6 @@ SokoSense/
 ├── tests/                        # All
 │   ├── test_api.py
 │   ├── test_market_engine.py     # Job
-│   ├── test_timing_engine.py     # Job
 │   ├── test_loan_engine.py       # Job
 │   └── test_sms_parser.py        # Sophie + Job
 │
@@ -112,7 +109,6 @@ These are **not** moved into `data/` or `legacy/` — they remain at root for Jo
 | `routes/*` | Sophie + Lucy | FastAPI endpoints + AT webhooks |
 | `middleware/*` | Sophie | Query logging |
 | `engines/market.py` | Job | Market decision engine |
-| `engines/timing.py` | Job | Timing decision engine |
 | `engines/loaning.py` | Job | Loan APR calculation, agent tool, `decide_loan()` |
 | `engines/market_prices.py` | Job | Map price data for frontend |
 | `db/*` + `data/*` | Lucy | Postgres/pgvector, price pipeline, trends |
@@ -126,7 +122,7 @@ These are **not** moved into `data/` or `legacy/` — they remain at root for Jo
 
 | Folder | Owner | Contains |
 |--------|-------|----------|
-| `engines/` | **Job** | `market.py`, `timing.py`, `loaning.py` — all decision logic |
+| `engines/` | **Job** | `market.py`, `loaning.py` — all decision logic |
 | `db/` + `data/` | **Lucy** | Postgres/pgvector, price pipeline, trends |
 | `parser/` | **Sophie + Job** | SMS text → structured `{crop, location, intent}` |
 | `models/` | **Sophie** | Pydantic schemas only — no logic |
@@ -146,7 +142,7 @@ Africa's Talking  →  routes/webhook_sms.py     (Lucy — see sms_integration_p
     ↓
 parser/sms_parser.py                            (Sophie + Job — extract crop/location/intent)
     ↓
-engines/market.py | timing.py | loaning.py      (Job — one clear decision)
+engines/market.py | loaning.py                  (Job — one clear decision)
     ↓
 models/* Response                               (Sophie — fixed JSON shape)
     ↓
@@ -162,7 +158,7 @@ Ian’s SMS Simulator hits the same path via `POST /webhook/sms` or `POST /api/m
 ## Naming rules
 
 1. **Job owns all decision logic** in `engines/` — one file per engine.
-2. **Public engine functions:** `decide_market()`, `decide_timing()`, `decide_loan()` (in `loaning.py`).
+2. **Public engine functions:** `decide_market()`, `decide_loan()` (in `loaning.py`).
 3. **No root-level `*_engine/` folders** — loan logic lives in `engines/loaning.py`.
 4. **`kamis_tool.py`, `rate_limiter.py`, `agent.py`, `index.py` stay at root** — Job's CLI and KAMIS tooling.
 5. **All API types** in `models/` — engines import from `models`, never invent their own shapes.
@@ -212,7 +208,6 @@ Ian’s SMS Simulator hits the same path via `POST /webhook/sms` or `POST /api/m
 |--------|------|---------|
 | GET | `/health` | Health check |
 | POST | `/api/market` | Where to sell — `{ "crop": "maize", "location": "nakuru" }` |
-| POST | `/api/timing` | When to sell — `{ "crop": "maize", "market": "nakuru" }` |
 | POST | `/api/loan` | Loan APR verdict — `{ "monthly_rate_percent": 10 }` |
 | GET | `/api/logs` | Query log (empty until logging middleware) |
 | GET | `/api/market-prices?crop=maize` | Map price table for Ian's dashboard |
@@ -232,7 +227,7 @@ Expected `short_reply`: *SELL IN ELDORET. KSh 600 more per bag. Worth the trip.*
 ## Project structure
 
 ```
-engines/          # Decision engines  — market, timing, loan
+engines/          # Decision engines  — market, loan
 models/           # Shared Pydantic schemas
 routes/           # FastAPI route handlers
 middleware/       # Query logging (Sophie D1 17:00)

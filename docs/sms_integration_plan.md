@@ -1,6 +1,6 @@
 # SokoSense: SMS & USSD Integration Plan for Feature Phones
 
-This document outlines the architecture, data flow, and implementation details to enable Kenyan farmers using basic feature (non-smart) phones to query SokoSense market prices, timing decisions, loan verifications, and crop advisory RAG tools via SMS and USSD.
+This document outlines the architecture, data flow, and implementation details to enable Kenyan farmers using basic feature (non-smart) phones to query SokoSense market prices, loan verifications, and crop advisory RAG tools via SMS and USSD.
 
 ---
 
@@ -53,7 +53,7 @@ sequenceDiagram
 | **SMS/USSD Gateway** | **Africa's Talking (AT)** | Industry-standard telco API platform in East Africa. Standard sandbox for testing, low-cost shortcodes, and reliable bulk/two-way SMS and USSD gateways. |
 | **Web Server / Webhook** | **FastAPI** (Python) | High concurrent execution; handles rapid USSD session timeouts (<3 seconds) and incoming webhooks with low latency. |
 | **Database & Cache** | **Postgres (Supabase)** | Stores market prices, advisory knowledge and pgvector RAG chunks; 12-hour in-process price cache on top. |
-| **Decision Engines** | **SokoSense Modules** | Local engines (market, timing, loans) and Postgres/pgvector RAG pipeline. |
+| **Decision Engines** | **SokoSense Modules** | Local engines (market, loans) and Postgres/pgvector RAG pipeline. |
 
 ---
 
@@ -64,7 +64,7 @@ Farmers can query SokoSense by sending natural language or key-value SMS message
 ### Webhook Controller Logic
 1. **Endpoint**: `POST /webhook/sms`
 2. **Payload**: Receives `from` (sender phone number) and `text` (body of SMS) in URL-encoded form data.
-3. **Execution**: Passes the raw query directly to the LangGraph `agent_graph` which automatically extracts intent and invokes the correct tool (`scrape_kamis_prices`, `answer_farmer_question`, `advise_on_loan`, `advise_on_sell_timing`, etc.).
+3. **Execution**: Passes the raw query directly to the LangGraph `agent_graph` which automatically extracts intent and invokes the correct tool (`scrape_kamis_prices`, `answer_farmer_question`, `advise_on_loan`, `advise_on_best_market`, etc.).
 4. **Formatting**: Translates the agent's structured JSON output into a compact, text-only SMS.
 
 ### Message Constraints & SMS Formatter
@@ -108,9 +108,8 @@ Farmer Dials: *384*543#
 Screen 1 (CON):
   Welcome to SokoSense
   1. Market Decision
-  2. Sell Timing
-  3. Loan Verdict
-  4. Crop Advisory
+  2. Loan Verdict
+  3. Crop Advisory
 
 Farmer Enters: 1
 Screen 2 (CON):
@@ -125,16 +124,9 @@ Screen 4 (END):
   SELL IN MUMIAS. KSh 3,465 more per bag. Worth the trip.
 ```
 
-#### 2. Sell Timing Advice (Option 2)
+#### 2. Loan Risk Assessment (Option 2)
 ```text
-Farmer Dials: *384*543# -> Selects Option 2 -> Enters "maize" -> Enters "Nakuru"
-Screen 4 (END):
-  HOLD/BUY. Trend: RISING. Sellers: HOLD (prices are up KSh 1,750/bag). Buyers: BUY today before prices rise further.
-```
-
-#### 3. Loan Risk Assessment (Option 3)
-```text
-Farmer Dials: *384*543# -> Selects Option 3
+Farmer Dials: *384*543# -> Selects Option 2
 Screen 2 (CON):
   Enter monthly interest rate % (e.g. 1.5):
 
@@ -143,9 +135,9 @@ Screen 3 (END):
   CAUTION. 19.56% APR. Above CBK benchmark. Compare SACCO options first.
 ```
 
-#### 4. Crop Advisory RAG Pipeline (Option 4)
+#### 3. Crop Advisory RAG Pipeline (Option 3)
 ```text
-Farmer Dials: *384*543# -> Selects Option 4
+Farmer Dials: *384*543# -> Selects Option 3
 Screen 2 (CON):
   Describe your crop issue/question:
 

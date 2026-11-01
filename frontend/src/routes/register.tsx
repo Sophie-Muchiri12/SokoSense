@@ -9,7 +9,7 @@ export const Route = createFileRoute("/register")({
 });
 
 const ROLES = [
-  { id: "farmer", label: "Farmer", desc: "Market prices, sell timing, loan checks and crop advisory for my farm." },
+  { id: "farmer", label: "Farmer", desc: "Market prices, loan checks and crop advisory for my farm." },
   { id: "sacco", label: "SACCO / partner", desc: "Cooperative or lender account — includes the SACCO dashboard." },
 ] as const;
 

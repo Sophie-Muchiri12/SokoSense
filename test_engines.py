@@ -1,6 +1,5 @@
-import json
-from models import LoanRequest, MarketDecisionRequest, TimingRequest
-from engines import loaning, market, timing
+from models import LoanRequest, MarketDecisionRequest
+from engines import loaning, market
 
 def test_all_engines():
     print("=" * 60)
@@ -21,16 +20,6 @@ def test_all_engines():
     market_res = market.decide_market(market_req)
     print("Response type:", type(market_res))
     print(market_res.model_dump_json(indent=2))
-    print()
-
-    print("=" * 60)
-    print("3. TESTING TIMING DECISION ENGINE...")
-    print("=" * 60)
-    # Timing decision for crop tomatoes in Meru
-    timing_req = TimingRequest(crop="tomatoes", market="Meru")
-    timing_res = timing.decide_timing(timing_req)
-    print("Response type:", type(timing_res))
-    print(timing_res.model_dump_json(indent=2))
     print("=" * 60)
 
 if __name__ == "__main__":
