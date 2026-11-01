@@ -1,0 +1,754 @@
+[
+  {
+    "name": "baringo.json",
+    "path": "coordinates/baringo.json",
+    "sha": "e0fb3e49a4fc24007b9f27bc0ac394a978084887",
+    "size": 248933,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/baringo.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/baringo.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/e0fb3e49a4fc24007b9f27bc0ac394a978084887",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/baringo.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/baringo.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/e0fb3e49a4fc24007b9f27bc0ac394a978084887",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/baringo.json"
+    }
+  },
+  {
+    "name": "bomet.json",
+    "path": "coordinates/bomet.json",
+    "sha": "da7992327a90fef2029bc88d813aab014bc8cb4c",
+    "size": 89739,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/bomet.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/bomet.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/da7992327a90fef2029bc88d813aab014bc8cb4c",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/bomet.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/bomet.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/da7992327a90fef2029bc88d813aab014bc8cb4c",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/bomet.json"
+    }
+  },
+  {
+    "name": "bungoma.json",
+    "path": "coordinates/bungoma.json",
+    "sha": "55118a7dc8dd5eb93ed78ae65756195fdad438d2",
+    "size": 213738,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/bungoma.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/bungoma.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/55118a7dc8dd5eb93ed78ae65756195fdad438d2",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/bungoma.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/bungoma.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/55118a7dc8dd5eb93ed78ae65756195fdad438d2",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/bungoma.json"
+    }
+  },
+  {
+    "name": "busia.json",
+    "path": "coordinates/busia.json",
+    "sha": "c1b596f3ad1dca61f512ac9019a3ac3f31e86d60",
+    "size": 536209,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/busia.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/busia.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/c1b596f3ad1dca61f512ac9019a3ac3f31e86d60",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/busia.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/busia.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/c1b596f3ad1dca61f512ac9019a3ac3f31e86d60",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/busia.json"
+    }
+  },
+  {
+    "name": "elgeyo-marakwet.json",
+    "path": "coordinates/elgeyo-marakwet.json",
+    "sha": "7a684641b859565485c96329f3b7109c2a1c1c61",
+    "size": 224850,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/elgeyo-marakwet.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/elgeyo-marakwet.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/7a684641b859565485c96329f3b7109c2a1c1c61",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/elgeyo-marakwet.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/elgeyo-marakwet.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/7a684641b859565485c96329f3b7109c2a1c1c61",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/elgeyo-marakwet.json"
+    }
+  },
+  {
+    "name": "embu.json",
+    "path": "coordinates/embu.json",
+    "sha": "c012bf633ca7d197d0f6abddc87a89892f00ea6e",
+    "size": 86951,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/embu.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/embu.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/c012bf633ca7d197d0f6abddc87a89892f00ea6e",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/embu.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/embu.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/c012bf633ca7d197d0f6abddc87a89892f00ea6e",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/embu.json"
+    }
+  },
+  {
+    "name": "garissa.json",
+    "path": "coordinates/garissa.json",
+    "sha": "ea5e1cfecdb7e192bbd468f04d7b9a968e150f4f",
+    "size": 133773,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/garissa.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/garissa.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/ea5e1cfecdb7e192bbd468f04d7b9a968e150f4f",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/garissa.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/garissa.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/ea5e1cfecdb7e192bbd468f04d7b9a968e150f4f",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/garissa.json"
+    }
+  },
+  {
+    "name": "homabay.json",
+    "path": "coordinates/homabay.json",
+    "sha": "8ae01d1024f5c23bd6a5e1268119867c4f3d2b33",
+    "size": 134420,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/homabay.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/homabay.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/8ae01d1024f5c23bd6a5e1268119867c4f3d2b33",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/homabay.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/homabay.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/8ae01d1024f5c23bd6a5e1268119867c4f3d2b33",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/homabay.json"
+    }
+  },
+  {
+    "name": "isiolo.json",
+    "path": "coordinates/isiolo.json",
+    "sha": "8b8b21177708c269063c4c4cf06359b5def9a5ce",
+    "size": 168872,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/isiolo.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/isiolo.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/8b8b21177708c269063c4c4cf06359b5def9a5ce",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/isiolo.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/isiolo.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/8b8b21177708c269063c4c4cf06359b5def9a5ce",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/isiolo.json"
+    }
+  },
+  {
+    "name": "kajiado.json",
+    "path": "coordinates/kajiado.json",
+    "sha": "ee4b4c2901c2bbcac7b24a4bb4e173220ee700e3",
+    "size": 85782,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kajiado.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kajiado.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/ee4b4c2901c2bbcac7b24a4bb4e173220ee700e3",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/kajiado.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kajiado.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/ee4b4c2901c2bbcac7b24a4bb4e173220ee700e3",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kajiado.json"
+    }
+  },
+  {
+    "name": "kakamega.json",
+    "path": "coordinates/kakamega.json",
+    "sha": "5e2be97704f95210737bdc11e0705b9ac9c6726b",
+    "size": 90226,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kakamega.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kakamega.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/5e2be97704f95210737bdc11e0705b9ac9c6726b",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/kakamega.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kakamega.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/5e2be97704f95210737bdc11e0705b9ac9c6726b",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kakamega.json"
+    }
+  },
+  {
+    "name": "kericho.json",
+    "path": "coordinates/kericho.json",
+    "sha": "1a8f08a5aa2a2caac3266c9fa710d2ccb010591b",
+    "size": 74544,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kericho.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kericho.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/1a8f08a5aa2a2caac3266c9fa710d2ccb010591b",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/kericho.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kericho.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/1a8f08a5aa2a2caac3266c9fa710d2ccb010591b",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kericho.json"
+    }
+  },
+  {
+    "name": "kiambu.json",
+    "path": "coordinates/kiambu.json",
+    "sha": "cb7f5bc747172baa848ab6491cd6df770f70f7bf",
+    "size": 98185,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kiambu.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kiambu.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/cb7f5bc747172baa848ab6491cd6df770f70f7bf",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/kiambu.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kiambu.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/cb7f5bc747172baa848ab6491cd6df770f70f7bf",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kiambu.json"
+    }
+  },
+  {
+    "name": "kilifi.json",
+    "path": "coordinates/kilifi.json",
+    "sha": "351f612943f705c948163611ef820ad7de97613e",
+    "size": 219855,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kilifi.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kilifi.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/351f612943f705c948163611ef820ad7de97613e",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/kilifi.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kilifi.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/351f612943f705c948163611ef820ad7de97613e",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kilifi.json"
+    }
+  },
+  {
+    "name": "kirinyaga.json",
+    "path": "coordinates/kirinyaga.json",
+    "sha": "4c0258b0a64d7542a0e6153ffe99337337764080",
+    "size": 66466,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kirinyaga.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kirinyaga.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/4c0258b0a64d7542a0e6153ffe99337337764080",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/kirinyaga.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kirinyaga.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/4c0258b0a64d7542a0e6153ffe99337337764080",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kirinyaga.json"
+    }
+  },
+  {
+    "name": "kisii.json",
+    "path": "coordinates/kisii.json",
+    "sha": "f804929e17898a78edf8ac4af41f7957709b1c34",
+    "size": 475340,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kisii.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kisii.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/f804929e17898a78edf8ac4af41f7957709b1c34",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/kisii.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kisii.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/f804929e17898a78edf8ac4af41f7957709b1c34",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kisii.json"
+    }
+  },
+  {
+    "name": "kisumu.json",
+    "path": "coordinates/kisumu.json",
+    "sha": "15633ea4bd7b605564f363aebd3c24a33043fcce",
+    "size": 55760,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kisumu.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kisumu.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/15633ea4bd7b605564f363aebd3c24a33043fcce",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/kisumu.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kisumu.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/15633ea4bd7b605564f363aebd3c24a33043fcce",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kisumu.json"
+    }
+  },
+  {
+    "name": "kitui.json",
+    "path": "coordinates/kitui.json",
+    "sha": "5f11fa59c263f1ac5fe9fe42c07bf96d3a7ae7e3",
+    "size": 205993,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kitui.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kitui.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/5f11fa59c263f1ac5fe9fe42c07bf96d3a7ae7e3",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/kitui.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kitui.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/5f11fa59c263f1ac5fe9fe42c07bf96d3a7ae7e3",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kitui.json"
+    }
+  },
+  {
+    "name": "kwale.json",
+    "path": "coordinates/kwale.json",
+    "sha": "aaa99f57294da424e34b9dfdfe9f99ea9d167895",
+    "size": 36696,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kwale.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kwale.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/aaa99f57294da424e34b9dfdfe9f99ea9d167895",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/kwale.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/kwale.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/aaa99f57294da424e34b9dfdfe9f99ea9d167895",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/kwale.json"
+    }
+  },
+  {
+    "name": "laikipia.json",
+    "path": "coordinates/laikipia.json",
+    "sha": "2a65d31952deb4179b2857235a839ebe5be978c2",
+    "size": 80852,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/laikipia.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/laikipia.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/2a65d31952deb4179b2857235a839ebe5be978c2",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/laikipia.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/laikipia.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/2a65d31952deb4179b2857235a839ebe5be978c2",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/laikipia.json"
+    }
+  },
+  {
+    "name": "lamu.json",
+    "path": "coordinates/lamu.json",
+    "sha": "c96df2694a570f204d51a569bd1c18ead97564de",
+    "size": 8445,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/lamu.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/lamu.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/c96df2694a570f204d51a569bd1c18ead97564de",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/lamu.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/lamu.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/c96df2694a570f204d51a569bd1c18ead97564de",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/lamu.json"
+    }
+  },
+  {
+    "name": "machakos.json",
+    "path": "coordinates/machakos.json",
+    "sha": "81af2a329cc11695fb98cb4f98c22bb331787375",
+    "size": 163609,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/machakos.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/machakos.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/81af2a329cc11695fb98cb4f98c22bb331787375",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/machakos.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/machakos.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/81af2a329cc11695fb98cb4f98c22bb331787375",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/machakos.json"
+    }
+  },
+  {
+    "name": "makueni.json",
+    "path": "coordinates/makueni.json",
+    "sha": "9bdaf314632f496b6a37aa34aded7d65b7eb18c3",
+    "size": 181063,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/makueni.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/makueni.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/9bdaf314632f496b6a37aa34aded7d65b7eb18c3",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/makueni.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/makueni.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/9bdaf314632f496b6a37aa34aded7d65b7eb18c3",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/makueni.json"
+    }
+  },
+  {
+    "name": "mandera.json",
+    "path": "coordinates/mandera.json",
+    "sha": "d88703837a691c61a3acc0e0c9cb1bbdec67211a",
+    "size": 63467,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/mandera.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/mandera.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/d88703837a691c61a3acc0e0c9cb1bbdec67211a",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/mandera.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/mandera.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/d88703837a691c61a3acc0e0c9cb1bbdec67211a",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/mandera.json"
+    }
+  },
+  {
+    "name": "marsabit.json",
+    "path": "coordinates/marsabit.json",
+    "sha": "1c28d9465abb0c325a18f274a14e7e1e39a5107c",
+    "size": 140273,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/marsabit.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/marsabit.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/1c28d9465abb0c325a18f274a14e7e1e39a5107c",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/marsabit.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/marsabit.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/1c28d9465abb0c325a18f274a14e7e1e39a5107c",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/marsabit.json"
+    }
+  },
+  {
+    "name": "meru.json",
+    "path": "coordinates/meru.json",
+    "sha": "88934de8eeb076ec87fa0bdc4231acdb4c043482",
+    "size": 74124,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/meru.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/meru.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/88934de8eeb076ec87fa0bdc4231acdb4c043482",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/meru.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/meru.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/88934de8eeb076ec87fa0bdc4231acdb4c043482",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/meru.json"
+    }
+  },
+  {
+    "name": "migori.json",
+    "path": "coordinates/migori.json",
+    "sha": "2a3b96a1388dbbb4550771cb37f8cdcf27f8ed95",
+    "size": 145292,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/migori.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/migori.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/2a3b96a1388dbbb4550771cb37f8cdcf27f8ed95",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/migori.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/migori.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/2a3b96a1388dbbb4550771cb37f8cdcf27f8ed95",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/migori.json"
+    }
+  },
+  {
+    "name": "mombasa.json",
+    "path": "coordinates/mombasa.json",
+    "sha": "54c87921bcb8e459026d625168fcdf0a341a24aa",
+    "size": 68421,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/mombasa.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/mombasa.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/54c87921bcb8e459026d625168fcdf0a341a24aa",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/mombasa.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/mombasa.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/54c87921bcb8e459026d625168fcdf0a341a24aa",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/mombasa.json"
+    }
+  },
+  {
+    "name": "muranga.json",
+    "path": "coordinates/muranga.json",
+    "sha": "79e2eb5b52891b1ffe201e9a9989c81c83fb74bb",
+    "size": 73075,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/muranga.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/muranga.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/79e2eb5b52891b1ffe201e9a9989c81c83fb74bb",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/muranga.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/muranga.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/79e2eb5b52891b1ffe201e9a9989c81c83fb74bb",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/muranga.json"
+    }
+  },
+  {
+    "name": "nairobi.json",
+    "path": "coordinates/nairobi.json",
+    "sha": "d808e414201b14ee3589548d36b4a643dc553866",
+    "size": 42739,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nairobi.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nairobi.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/d808e414201b14ee3589548d36b4a643dc553866",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/nairobi.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nairobi.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/d808e414201b14ee3589548d36b4a643dc553866",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nairobi.json"
+    }
+  },
+  {
+    "name": "nakuru.json",
+    "path": "coordinates/nakuru.json",
+    "sha": "46b18ff8dfe27859e32a9f9dcc231fe595c458b8",
+    "size": 153754,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nakuru.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nakuru.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/46b18ff8dfe27859e32a9f9dcc231fe595c458b8",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/nakuru.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nakuru.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/46b18ff8dfe27859e32a9f9dcc231fe595c458b8",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nakuru.json"
+    }
+  },
+  {
+    "name": "nandi.json",
+    "path": "coordinates/nandi.json",
+    "sha": "9da94ac31e755843f8b515d093fcf54485011ae6",
+    "size": 57432,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nandi.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nandi.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/9da94ac31e755843f8b515d093fcf54485011ae6",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/nandi.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nandi.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/9da94ac31e755843f8b515d093fcf54485011ae6",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nandi.json"
+    }
+  },
+  {
+    "name": "narok.json",
+    "path": "coordinates/narok.json",
+    "sha": "d1233f49080d5e2ceda497e7fa90d5993ca8ff80",
+    "size": 196121,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/narok.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/narok.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/d1233f49080d5e2ceda497e7fa90d5993ca8ff80",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/narok.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/narok.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/d1233f49080d5e2ceda497e7fa90d5993ca8ff80",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/narok.json"
+    }
+  },
+  {
+    "name": "nyamira.json",
+    "path": "coordinates/nyamira.json",
+    "sha": "a18efddc7c6b649dfd07639937e27104b4371196",
+    "size": 228521,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nyamira.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nyamira.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/a18efddc7c6b649dfd07639937e27104b4371196",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/nyamira.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nyamira.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/a18efddc7c6b649dfd07639937e27104b4371196",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nyamira.json"
+    }
+  },
+  {
+    "name": "nyandarua.json",
+    "path": "coordinates/nyandarua.json",
+    "sha": "2c5424d396ec66d0e027391a78e6835daf5e000a",
+    "size": 110957,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nyandarua.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nyandarua.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/2c5424d396ec66d0e027391a78e6835daf5e000a",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/nyandarua.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nyandarua.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/2c5424d396ec66d0e027391a78e6835daf5e000a",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nyandarua.json"
+    }
+  },
+  {
+    "name": "nyeri.json",
+    "path": "coordinates/nyeri.json",
+    "sha": "6c445cfdbb8fbdc83d75735749d162bc8db11660",
+    "size": 52118,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nyeri.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nyeri.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/6c445cfdbb8fbdc83d75735749d162bc8db11660",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/nyeri.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/nyeri.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/6c445cfdbb8fbdc83d75735749d162bc8db11660",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/nyeri.json"
+    }
+  },
+  {
+    "name": "samburu.json",
+    "path": "coordinates/samburu.json",
+    "sha": "314f7abb171e2592d08d8dcd90b50224aa0e8be7",
+    "size": 152070,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/samburu.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/samburu.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/314f7abb171e2592d08d8dcd90b50224aa0e8be7",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/samburu.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/samburu.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/314f7abb171e2592d08d8dcd90b50224aa0e8be7",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/samburu.json"
+    }
+  },
+  {
+    "name": "siaya.json",
+    "path": "coordinates/siaya.json",
+    "sha": "bcf00e6c311e0c47c767fc98c554b93de661598d",
+    "size": 50740,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/siaya.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/siaya.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/bcf00e6c311e0c47c767fc98c554b93de661598d",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/siaya.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/siaya.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/bcf00e6c311e0c47c767fc98c554b93de661598d",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/siaya.json"
+    }
+  },
+  {
+    "name": "taita-taveta.json",
+    "path": "coordinates/taita-taveta.json",
+    "sha": "ef5cd56360eb5541b77b0ac91f048bb6a0680602",
+    "size": 66532,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/taita-taveta.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/taita-taveta.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/ef5cd56360eb5541b77b0ac91f048bb6a0680602",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/taita-taveta.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/taita-taveta.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/ef5cd56360eb5541b77b0ac91f048bb6a0680602",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/taita-taveta.json"
+    }
+  },
+  {
+    "name": "tana-river.json",
+    "path": "coordinates/tana-river.json",
+    "sha": "27a1483b4acbc11de24ede8ba75e8fc3b7a4b0fa",
+    "size": 173436,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/tana-river.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/tana-river.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/27a1483b4acbc11de24ede8ba75e8fc3b7a4b0fa",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/tana-river.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/tana-river.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/27a1483b4acbc11de24ede8ba75e8fc3b7a4b0fa",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/tana-river.json"
+    }
+  },
+  {
+    "name": "tharaka-nithi.json",
+    "path": "coordinates/tharaka-nithi.json",
+    "sha": "073a03ba40657467656e8b6fef42870ef0ef726d",
+    "size": 68526,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/tharaka-nithi.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/tharaka-nithi.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/073a03ba40657467656e8b6fef42870ef0ef726d",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/tharaka-nithi.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/tharaka-nithi.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/073a03ba40657467656e8b6fef42870ef0ef726d",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/tharaka-nithi.json"
+    }
+  },
+  {
+    "name": "trans-nzoia.json",
+    "path": "coordinates/trans-nzoia.json",
+    "sha": "a8765b50cdf6870a43d08e09653dec363de49dde",
+    "size": 62105,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/trans-nzoia.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/trans-nzoia.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/a8765b50cdf6870a43d08e09653dec363de49dde",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/trans-nzoia.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/trans-nzoia.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/a8765b50cdf6870a43d08e09653dec363de49dde",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/trans-nzoia.json"
+    }
+  },
+  {
+    "name": "turkana.json",
+    "path": "coordinates/turkana.json",
+    "sha": "48a59046069344b6f44d0ba07a3e966520570e1b",
+    "size": 187450,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/turkana.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/turkana.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/48a59046069344b6f44d0ba07a3e966520570e1b",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/turkana.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/turkana.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/48a59046069344b6f44d0ba07a3e966520570e1b",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/turkana.json"
+    }
+  },
+  {
+    "name": "uasin-gishu.json",
+    "path": "coordinates/uasin-gishu.json",
+    "sha": "b4bcde48b6d94a05f5f0accf0c708ca1fe5f7585",
+    "size": 68869,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/uasin-gishu.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/uasin-gishu.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/b4bcde48b6d94a05f5f0accf0c708ca1fe5f7585",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/uasin-gishu.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/uasin-gishu.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/b4bcde48b6d94a05f5f0accf0c708ca1fe5f7585",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/uasin-gishu.json"
+    }
+  },
+  {
+    "name": "vihiga.json",
+    "path": "coordinates/vihiga.json",
+    "sha": "e0663d83178ea6adc2af684307c9d9e918a66fb1",
+    "size": 32196,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/vihiga.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/vihiga.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/e0663d83178ea6adc2af684307c9d9e918a66fb1",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/vihiga.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/vihiga.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/e0663d83178ea6adc2af684307c9d9e918a66fb1",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/vihiga.json"
+    }
+  },
+  {
+    "name": "wajir.json",
+    "path": "coordinates/wajir.json",
+    "sha": "ccffcee12be615c11b3dae893c49a3e575093950",
+    "size": 128437,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/wajir.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/wajir.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/ccffcee12be615c11b3dae893c49a3e575093950",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/wajir.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/wajir.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/ccffcee12be615c11b3dae893c49a3e575093950",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/wajir.json"
+    }
+  },
+  {
+    "name": "west-pokot.json",
+    "path": "coordinates/west-pokot.json",
+    "sha": "52b78205ebf49398b80420c291a9621b56007123",
+    "size": 95512,
+    "url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/west-pokot.json?ref=master",
+    "html_url": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/west-pokot.json",
+    "git_url": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/52b78205ebf49398b80420c291a9621b56007123",
+    "download_url": "https://raw.githubusercontent.com/Mondieki/kenya-counties-subcounties/master/coordinates/west-pokot.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/contents/coordinates/west-pokot.json?ref=master",
+      "git": "https://api.github.com/repos/Mondieki/kenya-counties-subcounties/git/blobs/52b78205ebf49398b80420c291a9621b56007123",
+      "html": "https://github.com/Mondieki/kenya-counties-subcounties/blob/master/coordinates/west-pokot.json"
+    }
+  }
+]

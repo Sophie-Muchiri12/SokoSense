@@ -1,0 +1,522 @@
+import { r as __toESM } from "../_runtime.mjs";
+import { i as require_react, r as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { r as useAuth } from "./auth-7f7W3twp.mjs";
+import { t as PageHeader } from "./market-CsderNyk.mjs";
+import { t as RequireAdmin } from "./auth-guard-CUFQePul.mjs";
+import { f as startMarketRefresh, i as getLogs, o as getMarketRefreshStatus, r as getHealth } from "./sokosense-api-BEmahCSf.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/admin-DlVsKOEg.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var ENGINES = [
+	{
+		id: "agent",
+		name: "Agent engine",
+		desc: "LangGraph · tool-calling loop",
+		p50: null,
+		p95: null,
+		rps: null,
+		uptime: null
+	},
+	{
+		id: "market",
+		name: "Market engine",
+		desc: "KAMIS market CSV · arbitrage",
+		p50: null,
+		p95: null,
+		rps: null,
+		uptime: null
+	},
+	{
+		id: "advisory",
+		name: "Advisory engine",
+		desc: "pgvector RAG · weather + crop",
+		p50: null,
+		p95: null,
+		rps: null,
+		uptime: null
+	}
+];
+var DATE_RANGES = [
+	"1h",
+	"24h",
+	"7d",
+	"30d"
+];
+var STATUSES = [
+	"all",
+	"2xx",
+	"4xx",
+	"5xx"
+];
+function AdminPage() {
+	const { adminLogout } = useAuth();
+	const [range, setRange] = (0, import_react.useState)("24h");
+	const [statusFilter, setStatusFilter] = (0, import_react.useState)("all");
+	const [q, setQ] = (0, import_react.useState)("");
+	const [health, setHealth] = (0, import_react.useState)("loading");
+	const [healthService, setHealthService] = (0, import_react.useState)(null);
+	const [logs, setLogs] = (0, import_react.useState)([]);
+	const [logsTotal, setLogsTotal] = (0, import_react.useState)(0);
+	const [logsLoading, setLogsLoading] = (0, import_react.useState)(true);
+	const [logsError, setLogsError] = (0, import_react.useState)(null);
+	const [lastRefresh, setLastRefresh] = (0, import_react.useState)(null);
+	const [csvStatus, setCsvStatus] = (0, import_react.useState)(null);
+	const [refreshJob, setRefreshJob] = (0, import_react.useState)(null);
+	const [refreshError, setRefreshError] = (0, import_react.useState)(null);
+	const marketPollRef = (0, import_react.useRef)(null);
+	const fetchMarketStatus = () => {
+		getMarketRefreshStatus().then((r) => {
+			setCsvStatus(r.csv);
+			setRefreshJob(r.job);
+			setRefreshError(null);
+		}).catch((err) => setRefreshError(err instanceof Error ? err.message : "Failed to load market data status"));
+	};
+	const handleRefreshMarket = () => {
+		setRefreshError(null);
+		startMarketRefresh().then((r) => {
+			setCsvStatus(r.csv);
+			setRefreshJob(r.job);
+		}).catch((err) => setRefreshError(err instanceof Error ? err.message : "Failed to start market refresh"));
+	};
+	(0, import_react.useEffect)(() => {
+		if (marketPollRef.current) clearInterval(marketPollRef.current);
+		if (refreshJob?.state === "running") marketPollRef.current = setInterval(fetchMarketStatus, 3e3);
+		return () => {
+			if (marketPollRef.current) clearInterval(marketPollRef.current);
+		};
+	}, [refreshJob?.state]);
+	const intervalRef = (0, import_react.useRef)(null);
+	const fetchHealth = () => {
+		getHealth().then((h) => {
+			setHealth(h.status === "ok" ? "ok" : "error");
+			setHealthService(h.service ?? null);
+		}).catch(() => setHealth("error"));
+	};
+	const fetchLogs = () => {
+		setLogsLoading(true);
+		getLogs(1, 50).then((r) => {
+			setLogs(r.items);
+			setLogsTotal(r.total);
+			setLogsError(null);
+			setLastRefresh(/* @__PURE__ */ new Date());
+		}).catch((err) => {
+			setLogsError(err instanceof Error ? err.message : "Failed to load logs");
+		}).finally(() => setLogsLoading(false));
+	};
+	(0, import_react.useEffect)(() => {
+		fetchHealth();
+		fetchLogs();
+		fetchMarketStatus();
+		intervalRef.current = setInterval(() => {
+			fetchHealth();
+			fetchLogs();
+			fetchMarketStatus();
+		}, 15e3);
+		return () => {
+			if (intervalRef.current) clearInterval(intervalRef.current);
+		};
+	}, []);
+	const filtered = (0, import_react.useMemo)(() => {
+		return logs.filter((l) => {
+			const status = typeof l.status === "number" ? l.status : 200;
+			if (statusFilter === "2xx" && !(status >= 200 && status < 300)) return false;
+			if (statusFilter === "4xx" && !(status >= 400 && status < 500)) return false;
+			if (statusFilter === "5xx" && status < 500) return false;
+			if (q) {
+				if (!JSON.stringify(l).toLowerCase().includes(q.toLowerCase())) return false;
+			}
+			return true;
+		});
+	}, [
+		logs,
+		statusFilter,
+		q
+	]);
+	const healthLabel = health === "ok" ? "All systems operational" : health === "loading" ? "Checking health…" : "API unreachable";
+	const healthCls = health === "ok" ? "bg-green-surface text-green-deep" : health === "loading" ? "bg-canvas text-steel" : "bg-rose-50 text-rose-700";
+	const dotCls = health === "ok" ? "bg-green" : health === "loading" ? "bg-amber animate-pulse" : "bg-rose-500";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "mx-auto max-w-[1320px] min-w-0 px-5 sm:px-6 pt-10 sm:pt-16 pb-14 sm:pb-20",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex flex-col lg:flex-row lg:items-end justify-between gap-6",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(PageHeader, {
+					eyebrow: "Operations · internal",
+					title: "System health,",
+					italic: "end to end.",
+					sub: `Realtime telemetry for the SokoSense intelligence platform — engines, latency, request volumes and recent activity.${healthService ? ` Service: ${healthService}.` : ""}`
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex flex-wrap items-center gap-2",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: `inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] ${healthCls}`,
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `h-1.5 w-1.5 rounded-full ${dotCls}` }), healthLabel]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							onClick: adminLogout,
+							className: "rounded-full border border-hairline bg-paper px-3.5 py-1.5 text-[11.5px] text-ink hover:border-rose-300 hover:text-rose-600",
+							children: "Admin sign out"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "inline-flex rounded-full border border-hairline bg-paper p-0.5",
+							children: DATE_RANGES.map((r) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								onClick: () => setRange(r),
+								className: `px-3 py-1 text-[11.5px] tabular rounded-full transition ${range === r ? "bg-ink text-paper" : "text-steel hover:text-ink"}`,
+								children: r
+							}, r))
+						})
+					]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-px bg-hairline rounded-2xl overflow-hidden border border-hairline",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Kpi, {
+						label: "API status",
+						value: health === "ok" ? "Online" : health === "loading" ? "Checking…" : "Offline",
+						sub: `GET /health · ${health === "ok" ? "200 OK" : "unreachable"}`,
+						positive: health === "ok"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Kpi, {
+						label: "Log entries",
+						value: logsTotal.toLocaleString(),
+						sub: logsError ? "Failed to load" : logsLoading ? "Loading…" : "Total stored"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Kpi, {
+						label: "Last refresh",
+						value: lastRefresh ? lastRefresh.toLocaleTimeString([], {
+							hour: "2-digit",
+							minute: "2-digit"
+						}) : "—",
+						sub: "Auto-refresh every 15s",
+						positive: true
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-8 grid lg:grid-cols-3 gap-5",
+				children: ENGINES.map((e) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EngineCard, {
+					engine: e,
+					apiHealthy: health === "ok"
+				}, e.id))
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-6 card-surface p-6",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex flex-col md:flex-row md:items-start justify-between gap-4",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "eyebrow",
+								children: "Market data"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+								className: "font-serif text-[22px] text-ink mt-0.5",
+								children: "KAMIS price CSV"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "text-[12.5px] text-steel mt-1 max-w-xl leading-relaxed",
+								children: "Every market price in the system is read from one CSV file. Refreshing re-scrapes all KAMIS commodities (top 10 most recent rows per market), builds a new CSV, and swaps it in — the old file is removed the moment the new one is ready. If a run fails, the current CSV keeps serving."
+							})
+						] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							onClick: handleRefreshMarket,
+							disabled: refreshJob?.state === "running",
+							className: "shrink-0 rounded-full bg-ink text-paper px-4 py-2 text-[12.5px] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed",
+							children: refreshJob?.state === "running" ? "Refreshing…" : "Refresh market data"
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-hairline rounded-xl overflow-hidden border border-hairline",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "bg-paper p-4",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[10.5px] uppercase tracking-wider text-mist",
+										children: "Active file"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[13px] text-ink mt-1 font-mono truncate",
+										children: csvStatus?.path ?? "—"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[11.5px] text-steel mt-0.5",
+										children: csvStatus?.exists ? "Serving all market reads" : "Missing — run a refresh"
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "bg-paper p-4",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[10.5px] uppercase tracking-wider text-mist",
+										children: "Rows / commodities"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[13px] text-ink mt-1 tabular",
+										children: csvStatus ? `${csvStatus.rows.toLocaleString()} rows · ${csvStatus.commodities} commodities · ${csvStatus.markets} markets` : "—"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[11.5px] text-steel mt-0.5",
+										children: "Top 10 most recent per market"
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "bg-paper p-4",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[10.5px] uppercase tracking-wider text-mist",
+										children: "Latest KAMIS report"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[13px] text-ink mt-1 tabular",
+										children: csvStatus?.latest_date_reported ?? "—"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+										className: "text-[11.5px] text-steel mt-0.5",
+										children: ["Collected ", csvStatus?.last_fetched_at ? new Date(csvStatus.last_fetched_at).toLocaleString() : "—"]
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "bg-paper p-4",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[10.5px] uppercase tracking-wider text-mist",
+										children: "Last refresh run"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[13px] text-ink mt-1 capitalize",
+										children: refreshJob?.state ?? "idle"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-[11.5px] text-steel mt-0.5",
+										children: refreshJob?.state === "running" && refreshJob.progress ? `${refreshJob.progress.commodity} (${refreshJob.progress.current}/${refreshJob.progress.total})` : refreshJob?.state === "succeeded" && refreshJob.stats ? `${refreshJob.stats.rows_written.toLocaleString()} rows from ${refreshJob.stats.products_with_rows}/${refreshJob.stats.products_scanned} commodities` : refreshJob?.finished_at ? new Date(refreshJob.finished_at).toLocaleString() : "Never run from here"
+									})
+								]
+							})
+						]
+					}),
+					refreshJob?.state === "running" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "mt-4 text-[12.5px] text-steel flex items-center gap-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-2 w-2 rounded-full bg-teal animate-pulse" }), "Scraping KAMIS — this can take a few minutes. The current CSV keeps serving meanwhile."]
+					}),
+					refreshJob?.state === "failed" && refreshJob.error && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "mt-4 text-[12.5px] text-rose-600",
+						children: [
+							"Refresh failed: ",
+							refreshJob.error,
+							" The previous CSV is still serving."
+						]
+					}),
+					refreshError && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-4 text-[12.5px] text-rose-600",
+						children: refreshError
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-6 card-surface overflow-hidden",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "px-6 py-4 border-b border-hairline flex flex-col md:flex-row md:items-center justify-between gap-3",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "eyebrow",
+							children: "Request log"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+							className: "font-serif text-[22px] text-ink mt-0.5",
+							children: logsLoading ? "Loading…" : logsError ? "Failed to load logs" : `${filtered.length} of ${logsTotal} entries`
+						})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "flex flex-wrap items-center gap-2",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Select, {
+									label: "Status",
+									value: statusFilter,
+									onChange: setStatusFilter,
+									options: STATUSES
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									value: q,
+									onChange: (e) => setQ(e.target.value),
+									placeholder: "Search logs…",
+									className: "rounded-full border border-hairline bg-paper px-3.5 py-1.5 text-[12px] text-ink placeholder:text-mist focus:outline-none focus:border-teal/50 w-full sm:w-56"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+									onClick: () => {
+										fetchHealth();
+										fetchLogs();
+									},
+									className: "rounded-full border border-hairline bg-paper px-3.5 py-1.5 text-[12px] text-ink hover:border-ink/40",
+									children: "Refresh"
+								})
+							]
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "overflow-x-auto",
+						children: logsError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "px-6 py-10 text-center text-rose-600 text-[13px]",
+							children: logsError
+						}) : logsLoading ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "px-6 py-10 text-center text-steel text-[13px] flex items-center justify-center gap-2",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-2 w-2 rounded-full bg-teal animate-pulse" }), "Loading request log…"]
+						}) : filtered.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "px-6 py-10 text-center text-mist text-[13px]",
+							children: logs.length === 0 ? "No log entries yet — logs are written as requests arrive." : "No entries match these filters."
+						}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("table", {
+							className: "w-full text-[12.5px]",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", {
+								className: "text-left text-[10.5px] uppercase tracking-wider text-mist bg-canvas",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+										className: "px-6 py-3 font-medium",
+										children: "Timestamp"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+										className: "px-4 py-3 font-medium",
+										children: "Level"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+										className: "px-4 py-3 font-medium",
+										children: "Message"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+										className: "px-4 py-3 font-medium text-right",
+										children: "Status"
+									})
+								]
+							}) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", {
+								className: "font-mono",
+								children: filtered.map((l, i) => {
+									const status = typeof l.status === "number" ? l.status : null;
+									const level = typeof l.level === "string" ? l.level : "info";
+									const msg = typeof l.message === "string" ? l.message : JSON.stringify(l);
+									return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", {
+										className: "border-t border-hairline hover:bg-canvas",
+										children: [
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", {
+												className: "px-6 py-3 text-mist tabular",
+												children: typeof l.timestamp === "string" ? l.timestamp : ""
+											}),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", {
+												className: "px-4 py-3",
+												children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LevelTag, { level })
+											}),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", {
+												className: "px-4 py-3 text-steel max-w-[480px] truncate",
+												children: msg
+											}),
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", {
+												className: "px-4 py-3 text-right",
+												children: status !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StatusBadge, { code: status }) : "—"
+											})
+										]
+									}, i);
+								})
+							})]
+						})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "px-6 py-3 border-t border-hairline text-[11.5px] text-mist flex justify-between",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: lastRefresh ? `Refreshed ${lastRefresh.toLocaleTimeString([], {
+							hour: "2-digit",
+							minute: "2-digit",
+							second: "2-digit"
+						})}` : "Waiting for first refresh…" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "font-mono text-steel",
+							children: "GET /api/logs · FastAPI"
+						})]
+					})
+				]
+			})
+		]
+	});
+}
+function Kpi({ label, value, sub, positive }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "bg-paper p-6",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[11px] uppercase tracking-wider text-mist",
+				children: label
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "font-serif text-[34px] text-ink mt-2 tabular leading-none",
+				children: value
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: `mt-2 text-[12px] tabular ${positive ? "text-green" : "text-steel"}`,
+				children: sub
+			})
+		]
+	});
+}
+function EngineCard({ engine, apiHealthy }) {
+	const status = apiHealthy ? "ok" : "unknown";
+	const dotColor = status === "ok" ? "bg-green animate-pulse" : "bg-amber";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "card-surface p-6",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "flex items-start justify-between",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "eyebrow",
+					children: engine.id
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
+					className: "font-serif text-[20px] text-ink mt-1",
+					children: engine.name
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "text-[12px] text-steel mt-1",
+					children: engine.desc
+				})
+			] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+				className: "inline-flex items-center gap-1.5 rounded-full bg-canvas border border-hairline px-2.5 py-1 text-[11px] capitalize text-steel",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `h-1.5 w-1.5 rounded-full ${dotColor}` }), status]
+			})]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			className: "mt-5 text-[11.5px] text-mist leading-relaxed",
+			children: "Live telemetry (p50 / p95 / RPS) will appear here once the logging middleware is wired."
+		})]
+	});
+}
+function LevelTag({ level }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		className: `inline-flex rounded-md border px-2 py-0.5 text-[10.5px] font-medium ${{
+			error: "bg-rose-50 text-rose-700",
+			warning: "bg-amber/15 text-amber",
+			warn: "bg-amber/15 text-amber",
+			info: "bg-teal/10 text-teal",
+			debug: "bg-canvas text-steel"
+		}[level.toLowerCase()] ?? "bg-canvas border-hairline text-steel"}`,
+		children: level
+	});
+}
+function StatusBadge({ code }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		className: `inline-flex rounded-md px-2 py-0.5 text-[10.5px] font-medium tabular ${code < 300 ? "bg-green-surface text-green-deep" : code < 500 ? "bg-amber/15 text-amber" : "bg-rose-50 text-rose-700"}`,
+		children: code
+	});
+}
+function Select({ label, value, onChange, options }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+		className: "inline-flex items-center gap-2 rounded-full border border-hairline bg-paper px-3 py-1 text-[11.5px]",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: "text-mist uppercase tracking-wider text-[10px]",
+			children: label
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("select", {
+			value,
+			onChange: (e) => onChange(e.target.value),
+			className: "bg-transparent text-ink focus:outline-none capitalize",
+			children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+				value: o,
+				children: o
+			}, o))
+		})]
+	});
+}
+var SplitComponent = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RequireAdmin, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AdminPage, {}) });
+//#endregion
+export { SplitComponent as component };
